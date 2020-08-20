@@ -1,7 +1,7 @@
 module WAVI
 
 #Useful packages
-using LinearAlgebra, SparseArrays, LinearMaps, Parameters, 
+using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
       IterativeSolvers, Interpolations, BenchmarkTools, PyPlot
 
 #Import functions so they can be modified in this module.
@@ -9,7 +9,7 @@ import LinearAlgebra: ldiv!
 import SparseArrays: spdiagm, spdiagm_internal, dimlub
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, plot_output, State, Params 
+export start, run!, plot_output, State, Params
 
 #Abstract types
 abstract type AbstractModel{T <: Real, N <: Integer} end
@@ -25,7 +25,7 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 #Format: fieldname::Type = default_value.
 #T & N are type parameters, usually real numbers (e.g. Float64) and integers (e.g. Int64) respectively.
 @with_kw struct Params{T <: Real, N <: Integer}
-nx::N = 80 
+nx::N = 80
 ny::N = 10
 nσ::N = 4
 x0::T = 0.0
@@ -43,7 +43,7 @@ gas_const=8.314;
 sec_per_year::T = 3600*24*365.25
 starting_viscosity::T = 1.0e7
 starting_temperature::T = 265.700709
-bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)  
+bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
 starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
 accumulation_rate::T = 0.0
 basal_melt_rate::T = 0.0
@@ -54,11 +54,11 @@ glen_temperature_ref::T = 263.15
 glen_n::T = 3.0
 glen_reg_strain_rate::T = 1.0e-5
 n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
-weertman_c::T = 1e4    
+weertman_c::T = 1e4
 weertman_m::T = 3.0
 weertman_reg_speed::T = 1.0e-5
 sea_level_wrt_geoid::T = 0.0
-minimum_thickness::T = 50.0  
+minimum_thickness::T = 50.0
 tol_picard::T = 1e-5
 maxiter_picard::N = 30
 tol_coarse::T = 1e-5
@@ -72,10 +72,10 @@ end
 
 #Struct to hold information on h-grid, located at cell centers.
 @with_kw struct HGrid{T <: Real, N <: Integer}
-nx::N 
+nx::N
 ny::N
 x0::T = 0.0
-y0::T = 0.0    
+y0::T = 0.0
 dx::T = 1.0
 dy::T = 1.0
 xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
@@ -88,12 +88,12 @@ spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
 b::Array{T,2} = params.bed_elevation; @assert size(b)==(nx,ny)
 h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
 s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-dhdt::Array{T,2} = zeros(nx,ny); @assert size(dhdt)==(nx,ny) 
+dhdt::Array{T,2} = zeros(nx,ny); @assert size(dhdt)==(nx,ny)
 accumulation::Array{T,2} = zeros(nx,ny); @assert size(accumulation)==(nx,ny)
-basal_melt::Array{T,2} = zeros(nx,ny); @assert size(basal_melt)==(nx,ny)   
+basal_melt::Array{T,2} = zeros(nx,ny); @assert size(basal_melt)==(nx,ny)
 haf::Array{T,2} = zeros(nx,ny); @assert size(haf)==(nx,ny)
 grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)    
+dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)
 shelf_strain_rate::Array{T,2} = zeros(nx,ny); @assert size(shelf_strain_rate)==(nx,ny)
 av_speed::Array{T,2} = zeros(nx,ny); @assert size(av_speed)==(nx,ny)
 bed_speed::Array{T,2} = zeros(nx,ny); @assert size(bed_speed)==(nx,ny)
@@ -112,7 +112,7 @@ end
 nx::N
 ny::N
 x0::T = 0.0
-y0::T = 0.0    
+y0::T = 0.0
 dx::T = 1.0
 dy::T = 1.0
 xx::Array{T,2}=[x0+(i-1.0)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
@@ -125,7 +125,7 @@ spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
 cent::KronType{T,N} = spI(ny) ⊗ c(nx-1)
 ∂x::KronType{T,N} = spI(ny) ⊗ ∂1d(nx-1,dx)
 ∂y::KronType{T,N} = ∂1d(ny-1,dy) ⊗ χ(nx-2)
-levels::N     
+levels::N
 dwt::KronType{T,N} = wavelet_matrix(ny,levels,"forward" ) ⊗ wavelet_matrix(nx,levels,"forward")
 s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
 h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
@@ -140,7 +140,7 @@ end
 nx::N
 ny::N
 x0::T = 0.0
-y0::T = 0.0    
+y0::T = 0.0
 dx::T = 1.0
 dy::T = 1.0
 xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
@@ -153,7 +153,7 @@ spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
 cent::KronType{T,N} = c(ny-1) ⊗ spI(nx)
 ∂x::KronType{T,N} = χ(ny-2) ⊗ ∂1d(nx-1,dx)
 ∂y::KronType{T,N} = ∂1d(ny-1,dy) ⊗ spI(nx)
-levels::N  
+levels::N
 dwt::KronType{T,N} = wavelet_matrix(ny,levels,"forward" ) ⊗ wavelet_matrix(nx,levels,"forward")
 s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
 h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
@@ -168,7 +168,7 @@ end
 nx::N
 ny::N
 x0::T = 0.0
-y0::T = 0.0    
+y0::T = 0.0
 dx::T = 1.0
 dy::T = 1.0
 xx::Array{T,2}=[x0+i*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
@@ -192,10 +192,10 @@ quadrature_weights::Vector{T} = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(qu
 η::Array{T,3} = fill(params.starting_viscosity,nx,ny,nσ); @assert size(η)==(nx,ny,nσ)
 θ::Array{T,3} = fill(params.starting_temperature,nx,ny,nσ); @assert size(θ)==(nx,ny,nσ)
 Φ::Array{T,3} = fill(params.starting_damage,nx,ny,nσ); @assert size(Φ)==(nx,ny,nσ)
-glen_b::Array{T,3} = glen_b.(θ,Φ); @assert size(glen_b)==(nx,ny,nσ)    
+glen_b::Array{T,3} = glen_b.(θ,Φ); @assert size(glen_b)==(nx,ny,nσ)
 end
 
-#Struct to hold information on wavelet-grid (u-component). 
+#Struct to hold information on wavelet-grid (u-component).
 @with_kw struct UWavelets{T <: Real, N <: Integer}
 nx::N
 ny::N
@@ -209,7 +209,7 @@ idwt::KronType{T,N} = wavelet_matrix(ny,levels,"reverse" ) ⊗ wavelet_matrix(nx
 wavelets::Array{T,2} = zeros(nx,ny); @assert size(wavelets)==(nx,ny)
 end
 
-#Struct to hold information on wavelet-grid (v-component). 
+#Struct to hold information on wavelet-grid (v-component).
 @with_kw struct VWavelets{T <: Real, N <: Integer}
 nx::N
 ny::N
@@ -230,7 +230,7 @@ gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
 gc::CGrid{T,N}
-g3d::SigmaGrid{T,N}   
+g3d::SigmaGrid{T,N}
 wu::UWavelets{T,N}
 wv::VWavelets{T,N}
 end
@@ -239,7 +239,7 @@ end
 @with_kw struct Preconditioner{T <: Real, N <: Integer} <: AbstractPreconditioner{T,N}
 op::LinearMap{T}
 op_diag::Vector{T} = diag(sparse(op))
-nsmooth::N = 5    
+nsmooth::N = 5
 sweep::Vector{N}
 sweep_order::Vector{N} = unique(sweep)
 smoother_omega::T = 1.0
@@ -248,7 +248,7 @@ prolong::LinearMap{T}
 op_coarse::LinearMap{T} = restrict*op*prolong
 correction_coarse::Vector{T} = zeros(T,size(op_coarse,2))
 tol_coarse::T = 1e-7
-maxiter_coarse::N = 1000    
+maxiter_coarse::N = 1000
 end
 
 
@@ -267,21 +267,21 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 Create WAVI State from input parameters.
 """
 function start(params)
-      
+
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     @assert params.h_mask==clip(params.h_mask) "Model domain mask has invalid points. Use clip function to remove them."
     h_mask = params.h_mask
     u_mask = get_u_mask(h_mask)
     v_mask = get_v_mask(h_mask)
     c_mask = get_c_mask(h_mask)
-    
+
     #Remove all points on u- and v-grids with homogenous Dirichlet conditions.
     u_mask[params.u_iszero].=false
     v_mask[params.v_iszero].=false
-    
+
     #h-grid
     gh=HGrid(x0=params.x0,
-    y0=params.y0,        
+    y0=params.y0,
     nx=params.nx,
     ny=params.ny,
     dx=params.dx,
@@ -290,43 +290,43 @@ function start(params)
     b = params.bed_elevation,
     h = params.starting_thickness,
     ηav = fill(params.starting_viscosity,params.nx,params.ny),
-    )    
-    
+    )
+
     #u-grid
     gu=UGrid(
     x0=params.x0,
-    y0=params.y0,        
+    y0=params.y0,
     nx=params.nx+1,
     ny=params.ny,
     dx=params.dx,
     dy=params.dy,
     mask=u_mask,
     levels=params.levels
-    )  
-    
+    )
+
     #v-grid
     gv=VGrid(
     x0=params.x0,
-    y0=params.y0,        
+    y0=params.y0,
     nx=params.nx,
     ny=params.ny+1,
     dx=params.dx,
     dy=params.dy,
     mask=v_mask,
     levels=params.levels
-    ) 
-    
+    )
+
     #c-grid
     gc=CGrid(
     x0=params.x0,
-    y0=params.y0,        
+    y0=params.y0,
     nx=params.nx-1,
     ny=params.ny-1,
     dx=params.dx,
     dy=params.dy,
     mask=c_mask
-    ) 
-    
+    )
+
     #3D-grid
     g3d=SigmaGrid(
     nx=params.nx,
@@ -335,20 +335,20 @@ function start(params)
     η = fill(params.starting_viscosity,params.nx,params.ny,params.nσ),
     θ = fill(params.starting_temperature,params.nx,params.ny,params.nσ),
     Φ = fill(params.starting_damage,params.nx,params.ny,params.nσ),
-    glen_b = fill(glen_b(params.starting_temperature,params.starting_damage,params),params.nx,params.ny,params.nσ)    
+    glen_b = fill(glen_b(params.starting_temperature,params.starting_damage,params),params.nx,params.ny,params.nσ)
     )
-    
+
     #Wavelet-grid, u-component.
     wu=UWavelets(nx=params.nx+1,ny=params.ny,levels=params.levels)
-    
+
     #Wavelet-grid, v-component.
     wv=VWavelets(nx=params.nx,ny=params.ny+1,levels=params.levels)
-    
+
     #Use type constructor to build initial state.
     wavi=State(params,gh,gu,gv,gc,g3d,wu,wv)
 
     return wavi
-end    
+end
 
 """
     run!(wavi)
@@ -405,7 +405,7 @@ end
 """
     get_u_mask(h_mask)
 
-Find mask of valid grid points on u-grid corresponding to a mask defined on h-grid. 
+Find mask of valid grid points on u-grid corresponding to a mask defined on h-grid.
 
 """
 function get_u_mask(h_mask)
@@ -419,7 +419,7 @@ end
 """
     get_v_mask(h_mask)
 
-Find mask of valid grid points on v-grid corresponding to a mask defined on h-grid. 
+Find mask of valid grid points on v-grid corresponding to a mask defined on h-grid.
 
 """
 function get_v_mask(h_mask)
@@ -433,23 +433,23 @@ end
 """
     get_c_mask(h_mask)
 
-Find mask of valid grid points on c-grid corresponding to a mask defined on h-grid. 
+Find mask of valid grid points on c-grid corresponding to a mask defined on h-grid.
 
 """
 function get_c_mask(h_mask)
     #select cell corners with four neighbouring cell centers in h_mask
     c_mask=h_mask[1:end-1,1:end-1] .& h_mask[1:end-1,2:end] .& h_mask[2:end,1:end-1] .& h_mask[2:end,2:end]
     return c_mask
-end    
+end
 """
     clip(trial_mask)
 
-Find mask of valid grid points on h-grid corresponding to a trial mask, also defined on h-grid. 
-Clip any grid points from the trial mask that cannot be used in the model. 
+Find mask of valid grid points on h-grid corresponding to a trial mask, also defined on h-grid.
+Clip any grid points from the trial mask that cannot be used in the model.
 
 """
 function clip(trial_mask)
-    
+
     good_corners=get_c_mask(trial_mask)
 
     #include all centers next to a selected corner
@@ -459,7 +459,7 @@ function clip(trial_mask)
     mask[1:end-1,2:end]=mask[1:end-1,2:end].|good_corners
     mask[2:end,1:end-1]=mask[2:end,1:end-1].|good_corners
     mask[2:end,2:end]=mask[2:end,2:end].|good_corners
- 
+
     return mask
 end
 
@@ -470,7 +470,7 @@ end
 """
     update_geometry_on_uv_grids!(wavi::AbstractModel)
 
-Interpolate thickness and surface elvation from h-grid to u- and v-grids. 
+Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 
 """
 function update_geometry_on_uv_grids!(wavi::AbstractModel)
@@ -491,20 +491,20 @@ end
 """
 function update_velocities!(wavi::AbstractModel)
     @unpack gu,gv,wu,wv,params=wavi
-    
-    n = gu.n + gv.n  
-    
-    x=get_start_guess(wavi)    
-    b=get_rhs(wavi)        
-    
+
+    n = gu.n + gv.n
+
+    x=get_start_guess(wavi)
+    b=get_rhs(wavi)
+
     rel_resid=zero(eltype(b))
-    
+
     converged::Bool = false
     i_picard::Int64 = 0
     while !converged && (i_picard < params.maxiter_picard)
-        
+
         i_picard = i_picard + 1
-        
+
         set_velocities!(wavi,x)
         update_shelf_strain_rate!(wavi)
         update_av_speed!(wavi)
@@ -518,16 +518,16 @@ function update_velocities!(wavi::AbstractModel)
         update_βeff_on_uv_grids!(wavi)
         update_rheological_operators!(wavi)
         op=get_op(wavi)
-        
-        rel_resid = norm(b .- op*x)/norm(b)                
+
+        rel_resid = norm(b .- op*x)/norm(b)
         converged = rel_resid < params.tol_picard
-         
-        p=get_preconditioner(wavi,op)   
+
+        p=get_preconditioner(wavi,op)
         precondition!(x, p, b)
-        
-    end  
+
+    end
     set_velocities!(wavi,x)
-    
+
     return wavi
 end
 """
@@ -616,35 +616,35 @@ end
 function get_preconditioner(wavi::AbstractModel{T,N},op::LinearMap{T}) where {T, N}
 
     @unpack gu,gv,wu,wv,params=wavi
-    
+
     m,n=size(op)
     @assert m == n == gu.n + gv.n
-    
+
     n = gu.n + gv.n
     n_coarse = wu.n[] + wv.n[]
-    
+
     restrict_fun(x) = restrictvec(wavi,x)
     prolong_fun(x) = prolongvec(wavi,x)
-    
+
     restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)    
-    
+    prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+
     op_diag=get_op_diag(wavi,op)
-    
+
     #Four colour Jacobi preconditioner. Red-Black checkerboard Jacobi for each velocity component.
     sweep=[[1 .+ mod(i-j,2) for i=1:gu.nx, j=1:gu.ny][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nx, j=1:gv.ny][gv.mask]]
     sweep_order=[1,3,2,4]
-    
-    p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order, 
-            op_diag=op_diag, nsmooth=params.nsmooth, tol_coarse = params.tol_coarse, 
+
+    p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order,
+            op_diag=op_diag, nsmooth=params.nsmooth, tol_coarse = params.tol_coarse,
             maxiter_coarse = params.maxiter_coarse, smoother_omega=params.smoother_omega)
-    
+
     return p
 end
 """
     LinearAlgebra.ldiv!(x::AbstractVecOrMat{T}, p::AbstractPreconditioner{T,N}, b::AbstractVecOrMat{T}) where {T,N}
 
-Overload LinearAlgebra.ldiv! function so that the bespoke preconditioner is deployed in calls to the 
+Overload LinearAlgebra.ldiv! function so that the bespoke preconditioner is deployed in calls to the
 conjugate gradient method if p has type  <: AbstractPreconditioner.
 
 """
@@ -652,51 +652,51 @@ function ldiv!(x::AbstractVecOrMat{T}, p::AbstractPreconditioner{T,N}, b::Abstra
     precondition!(x, p, b)
 end
 """
-    precondition!(x, p, b) 
+    precondition!(x, p, b)
 
 Apply wavelet-based multigrid preconditioner using information stored in p.
 """
-function precondition!(x, p, b) 
+function precondition!(x, p, b)
     @unpack op,op_diag,nsmooth,sweep,sweep_order,smoother_omega,restrict,
             prolong,op_coarse,correction_coarse,tol_coarse,maxiter_coarse = p
-    
-    
+
+
     n=size(op,1)
-    
+
     # Multigrid smooth
-    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag, 
+    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=sweep_order, smoother_omega = smoother_omega)
-    
+
     resid=b-op*x;
-    
+
     # Multigrid restriction
     b_coarse=restrict*resid
-    
+
     # Multigrid solve for correction
     cg!(correction_coarse, op_coarse, b_coarse; tol = tol_coarse, maxiter = maxiter_coarse)
 
     # Multigrid prolongation
     x .= x .+ prolong*correction_coarse
-        
+
     # Multigrid smooth
-    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag, 
+    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=reverse(sweep_order), smoother_omega = smoother_omega)
-        
+
     return x
 end
 """
-    gauss_seidel_smoother!(x, op, b; 
-                                iters=5, 
-                                op_diag=diag(sparse(op)), 
-                                sweep=(1:size(op,1)), 
+    gauss_seidel_smoother!(x, op, b;
+                                iters=5,
+                                op_diag=diag(sparse(op)),
+                                sweep=(1:size(op,1)),
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
 Apply smoother used in multigrid preconditioner.
 """
-function gauss_seidel_smoother!(x, op, b; 
-                                iters=5, 
-                                op_diag=diag(sparse(op)), 
-                                sweep=(1:size(op,1)), 
+function gauss_seidel_smoother!(x, op, b;
+                                iters=5,
+                                op_diag=diag(sparse(op)),
+                                sweep=(1:size(op,1)),
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
     resid=b-op*x
@@ -771,7 +771,7 @@ pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
 
 Return fraction of each grid cell with function z1 above zero. Uses bilinear
 interpolation of values at three nearest cell centers to represent the function.
-In: 
+In:
    z1:             m x n array of gridded function values.
    mask:           m x n mask   1 = valid data, 0= invalid data.
 Out:
@@ -786,7 +786,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
     area_fraction=zeros(T,m,n);
     area_fraction_u=zeros(T,m+1,n);
     area_fraction_v=zeros(T,m,n+1);
-    
+
     for quadrant=1:4
 
         area_fraction_quadrant=zeros(T,m,n);
@@ -796,8 +796,8 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
         #Distance unit is half a grid cell so each grid cell
         #is made up of four unit-square quadrants.
         #Quadrant 1: defined by neighbours in grid East & grid North direction
-        #In local coordinate system. 
-        #(x_1,y_1,z_1)=(0,0,z_1); 
+        #In local coordinate system.
+        #(x_1,y_1,z_1)=(0,0,z_1);
         #(x_2,y_2,z_2)=(2,0,z_2); Grid East
         #(x_3,y_3,z_3)=(0,2,z_3); Grid North
         #Triples for quadrants 2-4 are defined by neighbours in the other
@@ -827,7 +827,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
               z2[.!mask[1:m,[1;1:(n-1)]]]=z1[.!mask[1:m,[1;1:(n-1)]]];
               z3=z1[[2:m;m],1:n];
               z3[.!mask[[2:m;m],1:n]]=z1[.!mask[[2:m;m],1:n]];
-        else 
+        else
                 error("Quadrant not defined");
         end
 
@@ -881,9 +881,9 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
         #Compile areas for sign changes with trivial cases.
         area_fraction_quadrant[sc].=areasc;
         area_fraction_quadrant[(z1.>0.0) .& (z2.>0.0) .& (z3.>0.0)].=1.0;
-        area_fraction_quadrant[(z1.<=0.0) .& (z2.<=0.0) .& (z3.<=0.0)].=0.0; 
+        area_fraction_quadrant[(z1.<=0.0) .& (z2.<=0.0) .& (z3.<=0.0)].=0.0;
 
-        #Add areas for each quadrant together. 
+        #Add areas for each quadrant together.
         #N.B. distance unit for x and y is half a grid cell.
         #Summing over quadrants gives the fraction of each grid cell above zero.
         area_fraction.=area_fraction.+0.25*area_fraction_quadrant;
@@ -896,7 +896,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
             area_fraction_u.=area_fraction_u.+0.25*[area_fraction_quadrant;zeros(T,1,n)];
         elseif quadrant == 4
             area_fraction_u.=area_fraction_u.+0.25*[zeros(T,1,n);area_fraction_quadrant];
-        else 
+        else
             error("Quadrant not defined");
         end
 
@@ -915,7 +915,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
 
     end
 
-    return area_fraction, area_fraction_u, area_fraction_v                    
+    return area_fraction, area_fraction_u, area_fraction_v
 
 end
 """
@@ -928,12 +928,12 @@ function update_dsdh!(wavi::AbstractModel)
     gh.dsdh .= (1.0 - params.density_ice./params.density_ocean) .+
            (params.density_ice./params.density_ocean).*gh.grounded_fraction;
     return wavi
-end    
+end
 """
     update_weertman_c!(wavi::AbstractModel)
 
 Update coefficient used in the sliding law to account for migration of grounding line.
-"""    
+"""
 function update_weertman_c!(wavi::AbstractModel)
     @unpack gh,params = wavi
     gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
@@ -943,7 +943,7 @@ end
     update_accumulation_rate!(wavi::AbstractModel)
 
 Update the accumulation rate.
-"""    
+"""
 function update_accumulation_rate!(wavi::AbstractModel)
     @unpack gh,params = wavi
     gh.accumulation .= params.accumulation_rate
@@ -953,7 +953,7 @@ end
     update_basal_melt!(wavi::AbstractModel)
 
 Update the basal melt rate.
-"""    
+"""
 function update_basal_melt!(wavi::AbstractModel)
     @unpack gh, params = wavi
     gh.basal_melt .= params.basal_melt_rate
@@ -963,7 +963,7 @@ end
     update_βeff!(wavi::AbstractModel)
 
 Compute the effective drag coefficient.
-"""  
+"""
 function update_βeff!(wavi::AbstractModel)
     @unpack gh=wavi
     gh.βeff .= gh.β ./ (1.0 .+ gh.quad_f2 .* gh.β)
@@ -973,20 +973,20 @@ end
     update_βeff_on_uv_grids!(wavi::AbstractModel)
 
 Interpolate the effective drag coefficient onto u- and v-grids, accounting for grounded fraction.
-""" 
+"""
 function update_βeff_on_uv_grids!(wavi::AbstractModel)
     @unpack gh,gu,gv=wavi
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
-    
+
     T=eltype(gh.grounded_fraction)
-    
+
     onesvec=ones(T,gh.nx*gh.ny)
     gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     ipolgfu=zeros(T,gu.nx,gu.ny);
     ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
-    
+
     gv.βeff[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
     ipolgfv=zeros(T,gv.nx,gv.ny);
     ipolgfv[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
@@ -999,7 +999,7 @@ end
     set_velocities!(wavi::AbstractModel,x)
 
 Set velocities to particular values. Input vector x represents stacked u and v components at valid grid points.
-""" 
+"""
 function set_velocities!(wavi::AbstractModel,x)
     @unpack gh,gu,gv,gc=wavi
     gu.u[:] .= gu.spread*x[1:gu.n]
@@ -1010,12 +1010,12 @@ end
     update_shelf_strain_rate!(wavi::AbstractModel)
 
 Find the effective strain rate for 'ice shelf' parts of strain rate tensor, neglecting all vertical shear.
-""" 
+"""
 function update_shelf_strain_rate!(wavi::AbstractModel)
     @unpack gh,gu,gv,gc=wavi
-    gh.shelf_strain_rate[:] .= sqrt.( (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).^2 .+ 
+    gh.shelf_strain_rate[:] .= sqrt.( (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).^2 .+
                                       (gh.crop*(gv.∂y*(gv.crop*gv.v[:]))).^2 .+
-                                (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).*(gh.crop*(gv.∂y*(gv.crop*gv.v[:]))) .+ 
+                                (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).*(gh.crop*(gv.∂y*(gv.crop*gv.v[:]))) .+
                        0.25*(gh.crop*(gc.cent*(gc.crop*( gu.∂y*(gu.crop*gu.u[:]) .+ gv.∂x*(gv.crop*gv.v[:]) )))).^2  )
     return wavi
 end
@@ -1023,7 +1023,7 @@ end
     update_av_speed!(wavi::AbstractModel)
 
 Find the depth-averaged speed on the h-grid using components on u- and v- grids
-""" 
+"""
 function update_av_speed!(wavi::AbstractModel)
     @unpack gh,gu,gv=wavi
     gh.av_speed[:] .= sqrt.( (gh.crop*(gu.cent*(gu.crop*gu.u[:]))).^2 .+ (gh.crop*(gv.cent*(gv.crop*gv.v[:]))).^2 )
@@ -1033,7 +1033,7 @@ end
     update_bed_speed!(wavi::AbstractModel)
 
 Find the sliding speed at the bed on the h-grid using the average speed.
-""" 
+"""
 function update_bed_speed!(wavi::AbstractModel)
     @unpack gh=wavi
     gh.bed_speed .= gh.av_speed ./ (1.0 .+ gh.quad_f2 .* gh.β)
@@ -1043,7 +1043,7 @@ end
     update_β!(wavi::AbstractModel)
 
 Find the drag coefficient at the bed using the sliding law.
-""" 
+"""
 function update_β!(wavi::AbstractModel)
     @unpack gh,params=wavi
     gh.β .= gh.weertman_c .* ( sqrt.(gh.bed_speed.^2 .+  params.weertman_reg_speed^2 ) ).^(1.0/params.weertman_m - 1.0)
@@ -1053,17 +1053,17 @@ end
     update_basal_drag!(wavi::AbstractModel)
 
 Find the shear stress at the bed.
-""" 
+"""
 function update_basal_drag!(wavi::AbstractModel)
     @unpack gh=wavi
     gh.τbed .= gh.β .* gh.bed_speed
     return wavi
-end    
+end
 """
     inner_update_viscosity!(wavi::AbstractModel)
 
 Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
-"""    
+"""
 function inner_update_viscosity!(wavi::AbstractModel)
     @unpack gh,g3d,params=wavi
     for k=1:g3d.nσ
@@ -1071,10 +1071,10 @@ function inner_update_viscosity!(wavi::AbstractModel)
             for i=1:g3d.nx
                 if gh.mask[i,j]
                     for iter=1:params.n_iter_viscosity
-                        g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * ( 
-                                                   sqrt(    gh.shelf_strain_rate[i,j]^2 + 
+                        g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * (
+                                                   sqrt(    gh.shelf_strain_rate[i,j]^2 +
                                                             0.25*(gh.τbed[i,j]*g3d.ζ[k]/g3d.η[i,j,k])^2 +
-                                                            params.glen_reg_strain_rate^2   ) 
+                                                            params.glen_reg_strain_rate^2   )
                                                                  )^(1.0/params.glen_n - 1.0)
                     end
                 end
@@ -1087,14 +1087,14 @@ end
     update_av_viscosity!(wavi::AbstractModel)
 
 Use quadrature to compute the depth averaged viscosity.
-""" 
+"""
 function update_av_viscosity!(wavi::AbstractModel)
     @unpack gh,g3d=wavi
     gh.ηav .= zero(gh.ηav)
     for k=1:g3d.nσ
        for j = 1:g3d.ny
           for i = 1:g3d.nx
-                gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k] 
+                gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k]
           end
        end
     end
@@ -1104,7 +1104,7 @@ end
     update_av_viscosity!(wavi::AbstractModel)
 
 Use quadrature to compute f2 function, used to relate average velocities to basal velocities.
-""" 
+"""
 function update_quadrature_f2!(wavi::AbstractModel)
     @unpack gh,g3d=wavi
     gh.quad_f2 .= zero(gh.quad_f2)
@@ -1121,7 +1121,7 @@ end
     update_rheological_operators!(wavi::AbstractModel)
 
 Precompute various diagonal matrices used in defining the momentum operator.
-""" 
+"""
 function update_rheological_operators!(wavi::AbstractModel)
     @unpack gh,gu,gv,params=wavi
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
@@ -1135,7 +1135,7 @@ end
     opvec(wavi::AbstractModel,vec::AbstractVector)
 
 Function to multiply a vector by the momentum operator.
-""" 
+"""
 function opvec(wavi::AbstractModel,vec::AbstractVector)
     @unpack gh,gu,gv,gc=wavi
     @assert length(vec)==(gu.n+gv.n)
@@ -1145,13 +1145,13 @@ function opvec(wavi::AbstractModel,vec::AbstractVector)
     opvecprod=
     [
      #x-component
-     gu.samp*(gu.∂x'*(2gh.dneghηav[]*(2gu.∂x*uspread .+ gv.∂y*vspread)) .+ 
+     gu.samp*(gu.∂x'*(2gh.dneghηav[]*(2gu.∂x*uspread .+ gv.∂y*vspread)) .+
               gu.∂y'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gu.∂y*uspread .+ gv.∂x*vspread )))))) .+
               gu.dnegβeff[]*uspread .+ (gu.h[:].*(gu.∂x'*(extra))) )
         ;
      #y-component
-     gv.samp*(gv.∂y'*(2gh.dneghηav[]*(2gv.∂y*vspread .+ gu.∂x*uspread)) .+ 
-              gv.∂x'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gv.∂x*vspread .+ gu.∂y*uspread )))))) .+ 
+     gv.samp*(gv.∂y'*(2gh.dneghηav[]*(2gv.∂y*vspread .+ gu.∂x*uspread)) .+
+              gv.∂x'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gv.∂x*vspread .+ gu.∂y*uspread )))))) .+
               gv.dnegβeff[]*vspread .+ (gv.h[:].*(gv.∂y'*(extra))) )
     ]
     return opvecprod
@@ -1159,8 +1159,8 @@ end
 """
     restrictvec(wavi::AbstractModel,vec::AbstractVector)
 
-Function to restrict a vector from the fine grid to the coarse grid, used in multigrid preconditioner. 
-""" 
+Function to restrict a vector from the fine grid to the coarse grid, used in multigrid preconditioner.
+"""
 function restrictvec(wavi::AbstractModel,vec::AbstractVector)
     @unpack wu,wv,gu,gv=wavi
     @assert length(vec)==(gu.n+gv.n)
@@ -1179,8 +1179,8 @@ end
 """
     prolongvec(wavi::AbstractModel,waveletvec::AbstractVector)
 
-Function to prolong a vector from the coarse grid to the fine grid, used in multigrid preconditioner. 
-""" 
+Function to prolong a vector from the coarse grid to the fine grid, used in multigrid preconditioner.
+"""
 function prolongvec(wavi::AbstractModel,waveletvec::AbstractVector)
     @unpack wu,wv,gu,gv=wavi
     @assert length(waveletvec)==(wu.n[]+wv.n[])
@@ -1199,26 +1199,26 @@ end
 """
     update_wavelets!(wavi::AbstractModel)
 
-Compute wavelet transform of velocities to define the coarse grid used in multigrid preconditioner. 
-""" 
+Compute wavelet transform of velocities to define the coarse grid used in multigrid preconditioner.
+"""
 function update_wavelets!(wavi::AbstractModel)
     @unpack wu,wv,gu,gv,params=wavi
-    
+
     wu.wavelets[:] .= gu.dwt*(gu.crop*gu.u[:])
     wv.wavelets[:] .= gv.dwt*(gv.crop*gv.v[:])
-    
+
     wu.mask .= (abs.(wu.wavelets) .>= params.wavelet_threshold)
     wv.mask .= (abs.(wv.wavelets) .>= params.wavelet_threshold)
-    
+
     wu.n[] = count(wu.mask)
     wv.n[] = count(wv.mask)
-    
+
     wu.crop[] .= Diagonal(float(wu.mask[:]))
     wv.crop[] .= Diagonal(float(wv.mask[:]))
-    
+
     wu.samp[] = wu.crop[][wu.mask[:],:]
     wv.samp[] = wv.crop[][wv.mask[:],:]
-    
+
     wu.spread[] = sparse(wu.samp[]')
     wv.spread[] = sparse(wv.samp[]')
 
@@ -1227,50 +1227,50 @@ end
 """
     wavelet_matrix(n,levels,direction)
 
-Compute matrix used to apply wavelet transform in one dimension. 
-""" 
+Compute matrix used to apply wavelet transform in one dimension.
+"""
 function wavelet_matrix(n,levels,direction);
 
     identity=spdiagm(n,n, 0 => ones(n))
 
     isforward = lowercase(direction) == "forward"
     isreverse = lowercase(direction) == "reverse"
-    
-    if isforward 
+
+    if isforward
         fwav=identity
     elseif isreverse
         rwav=identity
     else
         error("Direction of wavelet transform not defined properly")
     end
-    
+
     step=1
 
     for j=levels:-1:0
-        
+
         step=step*2
-        
+
         ixodd=1:step:(n-div(step,2))
         ixeven=ixodd.+div(step,2)
         ixothers=setdiff(1:n, union(ixodd,ixeven))
-        
+
         odds=identity[ixodd,:]
         evens=identity[ixeven,:]
         others=identity[ixothers,:]
-        
-        if isforward 
+
+        if isforward
             #Forward Haar wavelet lifting scheme
             fwav = (others'*others+0.5*(evens'*(evens - odds) + odds'*(odds + evens)))*fwav
-        elseif isreverse 
+        elseif isreverse
             #Reverse Haar wavelet lifting scheme
             rwav = rwav*(others'*others + evens'*(evens + odds) + odds'*(odds - evens))
         else
             error("Direction of wavelet transform not defined properly")
         end
-                
+
     end
-            
-    if isforward 
+
+    if isforward
             #Forward Haar wavelet lifting scheme
             return fwav
     elseif isreverse
@@ -1279,7 +1279,7 @@ function wavelet_matrix(n,levels,direction);
     else
             error("Direction of wavelet transform not defined properly")
     end
-            
+
 end
 """
     spdiagm(m::Integer, n::Integer, kv::Pair{<:Integer,<:AbstractVector}...)
@@ -1324,23 +1324,29 @@ function plot_output(wavi::State)
     flowlines_speed=itp_speed.(flowlines_x,flowlines_y)
     flowlines_color=get_cmap("Reds")(log10.(flowlines_speed)./2.0)
     flowlines_color[:,:,4].=0.25;
-    
-    fig=figure()  
-    surf(gh.xx/1000.0,gh.yy/1000.0,gh.s, animated=true,
+
+    nanmask=zeros(gh.nx,gh.ny)
+    nanmask[.!gh.mask] .= NaN
+
+    fig=figure(figsize=(16,12))
+        surf(gh.xx/1000.0,gh.yy/1000.0,gh.s.+nanmask, animated=true,
                 color=(0.8,0.8,0.8,0.7), linewidth=0, zorder=5)
-    surf(gh.xx/1000.0,gh.yy/1000.0,(gh.s.-gh.h), animated=true,
+        surf(gh.xx/1000.0,gh.yy/1000.0,(gh.s.-gh.h).+nanmask, animated=true,
                 color=(0.0,0.7,0.8,0.7), linewidth=0,zorder=2)
-    surf(gh.xx/1000.0,gh.yy/1000.0,(gh.b), alpha=0.7, animated=true, zorder=1,
+        surf(gh.xx/1000.0,gh.yy/1000.0,(gh.b), alpha=0.7, animated=true, zorder=1,
                 facecolors=get_cmap("BrBG")(0.1*gh.b/minimum(gh.b)), linewidth=0)
     for i=1:n
-        plot3D(flowlines_x[i,:]/1000,flowlines_y[i,:]/1000,flowlines_z[i,:].-10, 
+        plot3D(flowlines_x[i,:]/1000,flowlines_y[i,:]/1000,flowlines_z[i,:].-10,
             color = flowlines_color[i,1,:], linewidth=1, zorder=10)
     end
-    
+
+    xlabel("km")
+    ylabel("km")
+    zlabel("m")
     display(fig)
     clf()
-    
-    
+
+    return nothing
 end
 
 
