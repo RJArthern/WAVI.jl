@@ -6,7 +6,7 @@ Driver routine for WAVI. Defines parameters, initialises state, and runs n_times
 function MISMIP_PLUS_test(n_timesteps=1000)
 
 #Number of timesteps between plots
-n_steps_plot=200
+n_steps_plot=Inf
 
 # MISMIP+
 nx = 80

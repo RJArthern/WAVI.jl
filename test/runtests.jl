@@ -1,20 +1,30 @@
 
 
 
-using Test, TestSetExtensions, SafeTestsets
+using Test, TestSetExtensions, SafeTestsets, LinearAlgebra
 
 @testset ExtendedTestSet "WAVI tests" begin
     @safetestset "Iceberg" begin
 
-        using WAVI
+        using WAVI, LinearAlgebra
 
         include("Iceberg_test.jl")
         wavi=Iceberg_test(10000)
-        #Steady state iceberg thickness a = 0.3 m/yr, A=2.0e-17 Pa^-3 a^-1
+        #Steady state iceberg thickness and velocity
+        #a = 0.3 m/yr, A=2.0e-17 Pa^-3 a^-1
         #ice density 918 kg/m3 ocean density 1028.0 kg/m3, Glen law n=3.
         h0=((36.0*0.3/(2.0e-17))*(1.0/(9.81*918.0*(1-918.0/1028.0)))^3)^(1.0/4.0)
-        relerr=maximum(abs.(wavi.gh.h[wavi.gh.mask].-h0)/h0)
-        @test relerr < 1.0e-4
+        u0=wavi.gu.xx*0.3/(2.0*h0)
+        v0=wavi.gv.yy*0.3/(2.0*h0)
+        relerr_h=norm(wavi.gh.h[wavi.gh.mask].-h0)/
+                    norm(h0*ones(length(wavi.gh.h[wavi.gh.mask])))
+        relerr_u=norm(wavi.gu.u[wavi.gu.mask]-u0[wavi.gu.mask])/
+                         norm(u0[wavi.gu.mask])
+        relerr_v=norm(wavi.gv.v[wavi.gv.mask]-v0[wavi.gv.mask])/
+                         norm(v0[wavi.gv.mask])
+        @test relerr_h < 1.0e-4
+        @test  relerr_u < 3.0e-4
+        @test  relerr_v < 3.0e-4
     end
 
     @safetestset "MISMIP+" begin

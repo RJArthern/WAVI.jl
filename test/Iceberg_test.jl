@@ -7,7 +7,7 @@ Defines parameters, initialises state, and runs n_timesteps.
 function Iceberg_test(n_timesteps=1000)
 
 #Number of timesteps between plots
-n_steps_plot=100
+n_steps_plot=Inf
 
 # Iceberg
 nx = 20
@@ -31,9 +31,9 @@ accumulation_rate=0.3
 
 #Homogenous Dirichlet boundary conditions
 u_iszero=falses(nx+1,ny)
-u_iszero[div(nx,2),:].=true
+u_iszero[div(nx,2)+1,:].=true
 v_iszero=falses(nx,ny+1)
-v_iszero[:,div(ny,2)].=true
+v_iszero[:,div(ny,2)+1].=true
 
 
 bed_elevation=-500.0.*ones(nx,ny)
@@ -60,14 +60,14 @@ params = Params(nx=nx,
 wavi=start(params)
 
 for i=1:n_timesteps
-run!(wavi)
-print("\r")
-print("Completed: ",round(i*params.dt),
-      " years (", round(100.0*i/n_timesteps),"%)  ")
-if mod(i,n_steps_plot)==0
-  #IJulia.clear_output(true)
-  plot_output(wavi)
-end
+    run!(wavi)
+    print("\r")
+    print("Completed: ",round(i*params.dt),
+          " years (", round(100.0*i/n_timesteps),"%)  ")
+    if mod(i,n_steps_plot)==0
+      #IJulia.clear_output(true)
+      plot_output(wavi)
+    end
 end
 
 return wavi
