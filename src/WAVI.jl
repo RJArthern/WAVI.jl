@@ -68,7 +68,7 @@ wavelet_threshold::T = 10.0
 nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
-step_thickness::Bool=true
+step_thickness::Bool = true
 end
 
 #Struct to hold information on h-grid, located at cell centers.
