@@ -369,7 +369,7 @@ function run!(wavi)
     update_weertman_c!(wavi)
     update_dsdh!(wavi)
     update_velocities!(wavi)
-    if step_thickness==true
+    if params.step_thickness==true
       update_dhdt!(wavi)
       update_thickness!(wavi)
     end
