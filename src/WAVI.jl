@@ -359,7 +359,7 @@ end
 
 Run WAVI model for one timestep. Input variable is modified.
 """
-function run!(wavi)
+function run!(wavi,params)
     update_surface_elevation!(wavi)
     update_geometry_on_uv_grids!(wavi)
     update_height_above_floatation!(wavi)
