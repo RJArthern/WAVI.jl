@@ -68,6 +68,7 @@ wavelet_threshold::T = 10.0
 nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
+step_thickness::Bool=true
 end
 
 #Struct to hold information on h-grid, located at cell centers.
@@ -279,6 +280,9 @@ function start(params)
     u_mask[params.u_iszero].=false
     v_mask[params.v_iszero].=false
     
+    #step thickness setting
+    step_thickness = params.step_thickness
+      
     #h-grid
     gh=HGrid(x0=params.x0,
     y0=params.y0,        
@@ -365,8 +369,10 @@ function run!(wavi)
     update_weertman_c!(wavi)
     update_dsdh!(wavi)
     update_velocities!(wavi)
-    update_dhdt!(wavi)
-    update_thickness!(wavi)
+    if step_thickness==true
+      update_dhdt!(wavi)
+      update_thickness!(wavi)
+    end
     update_wavelets!(wavi)
     return wavi
 end
