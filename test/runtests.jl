@@ -33,12 +33,7 @@ using Test, TestSetExtensions, SafeTestsets, LinearAlgebra
 
         include("MISMIP_PLUS_test.jl")
         wavi=MISMIP_PLUS_test(20000)
-        glmask=diff(sign.(wavi.gh.haf),dims=1).==-2
-        glx1=wavi.gh.xx[1:end-1,:][glmask]
-        glx2=wavi.gh.xx[2:end,:][glmask]
-        haf1=wavi.gh.haf[1:end-1,:][glmask]
-        haf2=wavi.gh.haf[2:end,:][glmask]
-        glx=glx1+(glx2-glx1).*(zero(haf1)-haf1)./(haf2-haf1)
+        glx=WAVI.get_GLx(wavi)
         glxtest=glx[[1,div(wavi.gh.ny,2),div(wavi.gh.ny,2)+1,wavi.gh.ny]]
         @test (glxtest[4]-glxtest[1])/(glxtest[4]+glxtest[1]) < 1e-4
         @test (glxtest[2]-glxtest[3])/(glxtest[2]+glxtest[3]) < 1e-4
