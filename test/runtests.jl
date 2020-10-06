@@ -33,7 +33,7 @@ using Test, TestSetExtensions, SafeTestsets, LinearAlgebra
 
         include("MISMIP_PLUS_test.jl")
         wavi=MISMIP_PLUS_test(20000)
-        glx=WAVI.get_GLx(wavi)
+        glx=WAVI.get_glx(wavi)
         glxtest=glx[[1,div(wavi.gh.ny,2),div(wavi.gh.ny,2)+1,wavi.gh.ny]]
         @test length(glxtest) == wavi.params.ny #check that the grounding line covers the whole domain in the y-direction
         @test (glxtest[4]-glxtest[1])/(glxtest[4]+glxtest[1]) < 1e-4

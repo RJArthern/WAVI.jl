@@ -373,12 +373,12 @@ end
 
 # Utility functions
 """
-     get_GLx(wavi)
+     get_glx(wavi)
 
 Return the grounding line in the form x = x(y). Assumes each y-row has at least
 one grid point where ice grounded and one where ice floating.
 """
-function get_GLx(wavi)
+function get_glx(wavi)
       glmask=diff(sign.(wavi.gh.haf),dims=1).==-2 #calculate where sign of height above floating passes thru zero
       glx1=wavi.gh.xx[1:end-1,:][glmask] #x co-ordiates upstream of grounding line
       glx2=wavi.gh.xx[2:end,:][glmask] #x co-ordinates immediately downstream
