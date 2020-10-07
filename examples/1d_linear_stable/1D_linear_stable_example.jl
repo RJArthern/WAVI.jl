@@ -25,7 +25,7 @@ dt = 0.5            #timestep
 accumulation_rate = 0.3
 starting_thickness=200.0.*ones(nx,ny) #initial condition
 maxiter_picard = 1 #No need for Picard iteration if runninng to steady state
-nsteps_out = 50 #number of steps per output point
+nsteps_out = 200 #number of steps per output point
 glen_reg_strain_rate = 1e-7
 
 #grids
@@ -45,8 +45,6 @@ bed_elevation=bed_elev_function.(xx,yy)
 #initialize output of time and grounding line
 t = zeros((1, floor(Int, n_timesteps/nsteps_out)))
 xgl = zeros((1, floor(Int, n_timesteps/nsteps_out)))
-ugl = zeros((1, floor(Int, n_timesteps/nsteps_out)))
-hgl = zeros((1, floor(Int, n_timesteps/nsteps_out)))
 
 #boundary conditions: Homogenous Dirichlet
 u_iszero=falses(nx+1,ny)
@@ -87,13 +85,6 @@ for i=1:n_timesteps
       if mod(i,nsteps_out)==0
             t[count] = i*params.dt;
             xgl[count] = WAVI.get_GLx(wavi)[2]
-
-            mxval, mxindx= findmax(-broadcast(abs, wavi.gh.haf; ); dims = 1); #returns index of grid point with haf closest to zeros
-            u_gl_all = wavi.gh.av_speed[mxindx]
-            h_gl_all = wavi.gh.h[mxindx]
-            hgl[count] = h_gl_all[2]
-            ugl[count] = u_gl_all[2]
-
             count = count + 1
       end
 end
