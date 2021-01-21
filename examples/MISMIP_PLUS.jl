@@ -1,9 +1,9 @@
 """
-driver(n_timesteps)
+MISMIP_PLUS(n_timesteps,outfile)
 
 Driver routine for WAVI. Defines parameters, initialises state, and runs n_timesteps.
 """
-function MISMIP_PLUS(n_timesteps=1000,outfile)
+function MISMIP_PLUS(n_timesteps,outfile)
 
 #Number of timesteps between plots
 n_steps_plot=Inf
