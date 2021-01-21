@@ -3,7 +3,7 @@ driver(n_timesteps)
 
 Driver routine for WAVI. Defines parameters, initialises state, and runs n_timesteps.
 """
-function MISMIP_PLUS(n_timesteps=1000)
+function MISMIP_PLUS(n_timesteps=1000,outfile)
 
 #Number of timesteps between plots
 n_steps_plot=Inf
@@ -61,12 +61,13 @@ params = Params(nx=nx,
             h_mask=h_mask,
             u_iszero=u_iszero,
             v_iszero=v_iszero,
-            maxiter_picard=maxiter_picard
+            maxiter_picard=maxiter_picard,
+            outfile=outfile
             )
 
 wavi=start(params)
 
-f=jldopen("/test_output/outfile.jld2","w")
+f=jldopen(params.outfile,"w")
 write(f,"0",wavi)
 for i=1:n_timesteps
 run!(wavi)
