@@ -7,17 +7,17 @@ function MISMIP_PLUS(n_timesteps=1000)
 
 #Number of timesteps between plots
 n_steps_plot=Inf
-n_steps_save=100
+n_steps_save=1000
 
 # MISMIP+
-nx = 80
-ny = 10
+nx = 320
+ny = 40
 nσ = 4
 x0 = 0.0
 y0 = -40000.0
-dx = 8000.0
-dy = 8000.0
-dt = 0.5
+dx = 2000.0
+dy = 2000.0
+dt = 0.01
 xx=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]
 yy=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]
 starting_thickness=100.0.*ones(nx,ny)
@@ -67,6 +67,7 @@ params = Params(nx=nx,
 wavi=start(params)
 
 f=jldopen("/test_output/outfile.jld2","w")
+write(f,"0",wavi)
 for i=1:n_timesteps
 run!(wavi)
 print("\r")
