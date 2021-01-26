@@ -2,7 +2,7 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, PyPlot
+      IterativeSolvers, Interpolations, BenchmarkTools, PyPlot, Reexport
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
@@ -10,6 +10,9 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 
 #This module will export these functions and types, allowing basic use of the model.
 export start, run!, plot_output, State, Params
+
+#Reexport Modules useful for users of the WAVI module
+@reexport using JLD2
 
 #Abstract types
 abstract type AbstractModel{T <: Real, N <: Integer} end
