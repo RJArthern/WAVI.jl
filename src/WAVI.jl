@@ -693,7 +693,7 @@ function precondition!(x, p, b)
     b_coarse=restrict*resid
 
     # Multigrid solve for correction
-    cg!(correction_coarse, op_coarse, b_coarse; tol = tol_coarse, maxiter = maxiter_coarse)
+    cg!(correction_coarse, op_coarse, b_coarse; reltol = tol_coarse, maxiter = maxiter_coarse)
 
     # Multigrid prolongation
     x .= x .+ prolong*correction_coarse
