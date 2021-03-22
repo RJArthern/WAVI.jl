@@ -72,7 +72,6 @@ nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
 outfile::String = "WAVI_output.jld2"
-start_time::T = 0.0
 end
 
 #Struct to hold information on h-grid, located at cell centers.
@@ -228,13 +227,6 @@ idwt::KronType{T,N} = wavelet_matrix(ny,levels,"reverse" ) ⊗ wavelet_matrix(nx
 wavelets::Array{T,2} = zeros(nx,ny); @assert size(wavelets)==(nx,ny)
 end
 
-#Struct to hold information on wavelet-grid (v-component).
-@with_kw struct Clock{T <: Real}
-    start_time::T
-    time::Array{T,1}
-    dt::T
-    end
-
 #Struct to hold model state comprised of all the above information.
 @with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
 params::Params{T,N}
@@ -245,7 +237,6 @@ gc::CGrid{T,N}
 g3d::SigmaGrid{T,N}
 wu::UWavelets{T,N}
 wv::VWavelets{T,N}
-clock::Clock{T}
 end
 
 #Struct to hold information about wavelet-based multigrid preconditioner.
@@ -266,6 +257,7 @@ end
 
 
 #Functions
+
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -356,11 +348,8 @@ function start(params)
     #Wavelet-grid, v-component.
     wv=VWavelets(nx=params.nx,ny=params.ny+1,levels=params.levels)
 
-    #clock
-    clock=Clock(start_time=params.start_time,time=[params.start_time],dt=params.dt)
-
     #Use type constructor to build initial state.
-    wavi=State(params,gh,gu,gv,gc,g3d,wu,wv,clock)
+    wavi=State(params,gh,gu,gv,gc,g3d,wu,wv)
 
     return wavi
 end
@@ -383,7 +372,6 @@ function run!(wavi)
     update_dhdt!(wavi)
     update_thickness!(wavi)
     update_wavelets!(wavi)
-    update_clock!(wavi)
     return wavi
 end
 
@@ -498,12 +486,6 @@ end
 
 
 # Functions to update various quantities
-
-function update_clock!(wavi::AbstractModel)
-    @unpack clock=wavi
-    clock.time[:] = clock.time[:] .+ clock.dt
-   return wavi
-end
 
 """
     update_geometry_on_uv_grids!(wavi::AbstractModel)
