@@ -1320,54 +1320,6 @@ end
 
 Graphical output of wavi state.
 """
-function plot_output(wavi::State)
-    @unpack gh,gu,gv=wavi
-    finvisible=figure()
-    xs=(gh.x0.+(0.5:1:gh.nx-0.5)*gh.dx)
-    ys=(gh.y0.+(0.5:1:gh.ny-0.5)*gh.dy)
-    lw = 5 .* gh.av_speed' ./ maximum(gh.av_speed') # Line Widths
-    sp=streamplot(gh.xx',gh.yy',reshape(gu.cent*gu.u[:],gh.nx,gh.ny)',reshape(gv.cent*gv.v[:],gh.nx,gh.ny)',
-                   density=0.5,color="k",linewidth=lw)
-    close(finvisible)
-    lines=sp.lines.get_paths()
-    n=length(lines)
-    flowlines_x=zeros(n,2)
-    flowlines_y=zeros(n,2)
-    for i=1:length(lines)
-        flowlines_x[i,:]=clamp.(lines[i].vertices[:,1]',minimum(xs),maximum(xs))
-        flowlines_y[i,:]=clamp.(lines[i].vertices[:,2]',minimum(ys),maximum(ys))
-    end
-    flowlines_z=zeros(n,2)
-    itp_elev=LinearInterpolation((xs,ys),gh.s)
-    flowlines_z.=itp_elev.(flowlines_x,flowlines_y)
-    itp_speed=LinearInterpolation((xs,ys),gh.av_speed)
-    flowlines_speed=itp_speed.(flowlines_x,flowlines_y)
-    flowlines_color=get_cmap("Reds")(log10.(flowlines_speed)./2.0)
-    flowlines_color[:,:,4].=0.25;
-
-    nanmask=zeros(gh.nx,gh.ny)
-    nanmask[.!gh.mask] .= NaN
-
-    fig=figure(figsize=(16,12))
-        surf(gh.xx/1000.0,gh.yy/1000.0,gh.s.+nanmask, animated=true,
-                color=(0.8,0.8,0.8,0.7), linewidth=0, zorder=5)
-        surf(gh.xx/1000.0,gh.yy/1000.0,(gh.s.-gh.h).+nanmask, animated=true,
-                color=(0.0,0.7,0.8,0.7), linewidth=0,zorder=2)
-        surf(gh.xx/1000.0,gh.yy/1000.0,(gh.b), alpha=0.7, animated=true, zorder=1,
-                facecolors=get_cmap("BrBG")(0.1*gh.b/minimum(gh.b)), linewidth=0)
-    for i=1:n
-        plot3D(flowlines_x[i,:]/1000,flowlines_y[i,:]/1000,flowlines_z[i,:].-10,
-            color = flowlines_color[i,1,:], linewidth=1, zorder=10)
-    end
-
-    xlabel("km")
-    ylabel("km")
-    zlabel("m")
-    display(fig)
-    clf()
-
-    return nothing
-end
 
 
 end

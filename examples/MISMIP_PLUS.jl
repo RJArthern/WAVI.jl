@@ -76,7 +76,7 @@ print("Completed: ",round(i*params.dt),
       " years (", round(100.0*i/n_timesteps),"%)  ")
 if mod(i,n_steps_plot)==0
   #IJulia.clear_output(true)
-  plot_output(wavi)
+  #plot_output(wavi)
 end
 if mod(i,n_steps_save)==0
   #IJulia.clear_output(true)
