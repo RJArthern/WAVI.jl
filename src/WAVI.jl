@@ -2,7 +2,7 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, PyPlot, Reexport
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
@@ -1315,11 +1315,5 @@ function _spdiagm(size, kv::Pair{<:Integer,<:AbstractVector}...)
     (m ≥ mmax && n ≥ nmax) || throw(DimensionMismatch("invalid size=$size"))
     return sparse(I, J, V, m, n)
 end
-"""
-    plot_output(wavi::AbstractModel)
-
-Graphical output of wavi state.
-"""
-
 
 end
