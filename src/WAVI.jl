@@ -233,7 +233,7 @@ end
     start_time::T
     time::Array{T,1}
     dt::T
-    end
+end
 
 #Struct to hold model state comprised of all the above information.
 @with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
