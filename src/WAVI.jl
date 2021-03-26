@@ -230,9 +230,9 @@ end
 
 #Struct to hold information on wavelet-grid (v-component).
 @with_kw struct Clock{T <: Real}
-    start_time::T
-    time::Array{T,1}
-    dt::T
+start_time::T
+time::Array{T,1}
+dt::T #hello rob!
 end
 
 #Struct to hold model state comprised of all the above information.
