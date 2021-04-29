@@ -2,7 +2,7 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, Reexport
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
