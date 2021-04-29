@@ -24,167 +24,56 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 #Concrete types
 
+
 #Struct to hold model parameters.
 #Format: fieldname::Type = default_value.
 #T & N are type parameters, usually real numbers (e.g. Float64) and integers (e.g. Int64) respectively.
-#@with_kw struct Params{T <: Real, N <: Integer}
-#nx::N = 80
-#ny::N = 10
-#nσ::N = 4
-#x0::T = 0.0
-#y0::T = -40000.0
-#dx::T = 8000.0
-#dy::T = 8000.0
-#h_mask::Array{Bool,2}=trues(nx,ny);@assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
-#u_iszero::Array{Bool,2}=falses(nx+1,ny);@assert size(u_iszero)==(nx+1,ny)
-#v_iszero::Array{Bool,2}=falses(nx,ny+1);@assert size(v_iszero)==(nx,ny+1)
-#dt::T = 1.0
-#g::T = 9.81
-#density_ice::T = 918.0
-#density_ocean::T = 1028.0
-#gas_const=8.314;
-#sec_per_year::T = 3600*24*365.25
-#starting_viscosity::T = 1.0e7
-#starting_temperature::T = 265.700709
-#bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
-#starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
-#accumulation_rate::T = 0.0
-#basal_melt_rate::T = 0.0
-#starting_damage::T = 0.0
-#glen_a_activation_energy::T = 5.8631e+04
-#glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
-#glen_temperature_ref::T = 263.15
-#glen_n::T = 3.0
-#glen_reg_strain_rate::T = 1.0e-5
-#n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
-#weertman_c::T = 1e4
-#weertman_m::T = 3.0
-#weertman_reg_speed::T = 1.0e-5
-#sea_level_wrt_geoid::T = 0.0
-#minimum_thickness::T = 50.0
-#tol_picard::T = 1e-5
-#maxiter_picard::N = 30
-#tol_coarse::T = 1e-5
-#maxiter_coarse::N = 1000
-#levels::N = 3
-#wavelet_threshold::T = 10.0
-#nsmooth::N = 5
-#smoother_omega::T = 1.0
-#stencil_margin::N = 3
-#outfile::String = "WAVI_output.jld2"
-#end
-
-struct Params{T <: Real, N <: Integer}
-    nx::N
-    ny::N
-    nσ::N
-    x0::T
-    y0::T
-    dx::T
-    dy::T
-    h_mask::Array{Bool,2}
-    u_iszero::Array{Bool,2}
-    v_iszero::Array{Bool,2}
-    dt::T 
-    g::T 
-    density_ice::T
-    density_ocean::T 
-    gas_const::T
-    sec_per_year::T
-    starting_viscosity::T
-    starting_temperature::T
-    bed_elevation::Array{T,2}
-    starting_thickness::Array{T,2}
-    accumulation_rate::T
-    basal_melt_rate::T
-    starting_damage::T
-    glen_a_activation_energy::T
-    glen_a_ref::T
-    glen_temperature_ref::T
-    glen_n::T
-    glen_reg_strain_rate::T 
-    n_iter_viscosity::N
-    weertman_c::T
-    weertman_m::T
-    weertman_reg_speed::T
-    sea_level_wrt_geoid::T
-    minimum_thickness::T
-    tol_picard::T
-    maxiter_picard::N 
-    tol_coarse::T 
-    maxiter_coarse::N 
-    levels::N
-    wavelet_threshold::T
-    nsmooth::N
-    smoother_omega::T
-    stencil_margin::N 
+@with_kw struct Params{T <: Real, N <: Integer}
+nx::N = 80
+ny::N = 10
+nσ::N = 4
+x0::T = 0.0
+y0::T = -40000.0
+dx::T = 8000.0
+dy::T = 8000.0
+h_mask::Array{Bool,2}=trues(nx,ny);@assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
+u_iszero::Array{Bool,2}=falses(nx+1,ny);@assert size(u_iszero)==(nx+1,ny)
+v_iszero::Array{Bool,2}=falses(nx,ny+1);@assert size(v_iszero)==(nx,ny+1)
+dt::T = 1.0
+g::T = 9.81
+density_ice::T = 918.0
+density_ocean::T = 1028.0
+gas_const=8.314;
+sec_per_year::T = 3600*24*365.25
+starting_viscosity::T = 1.0e7
+starting_temperature::T = 265.700709
+bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
+starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
+accumulation_rate::T = 0.0
+basal_melt_rate::T = 0.0
+starting_damage::T = 0.0
+glen_a_activation_energy::T = 5.8631e+04
+glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
+glen_temperature_ref::T = 263.15
+glen_n::T = 3.0
+glen_reg_strain_rate::T = 1.0e-5
+n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
+weertman_c::T = 1e4
+weertman_m::T = 3.0
+weertman_reg_speed::T = 1.0e-5
+sea_level_wrt_geoid::T = 0.0
+minimum_thickness::T = 50.0
+tol_picard::T = 1e-5
+maxiter_picard::N = 30
+tol_coarse::T = 1e-5
+maxiter_coarse::N = 1000
+levels::N = 3
+wavelet_threshold::T = 10.0
+nsmooth::N = 5
+smoother_omega::T = 1.0
+stencil_margin::N = 3
+outfile::String = "WAVI_output.jld2"
 end
-
-function Params( ;
-                nx = 80,
-                ny = 10, 
-                nσ = 4,
-                x0 = 0.0,
-                y0 = 0.0, 
-                dx = 8000.0,
-                dy = 8000.0,
-                h_mask = trues(nx,ny),
-                u_iszero=falses(nx+1,ny),
-                v_iszero=falses(nx,ny+1),
-                dt = 1.0,
-                g = 9.81, 
-                density_ice = 918.0,
-                density_ocean = 1028.0,
-                gas_const = 8.314,
-                sec_per_year =  3600*24*365.25,
-                starting_viscosity = 1.0e7,
-                starting_temperature = 265.700709,
-                bed_elevation = zeros(nx,ny),
-                starting_thickness = zeros(nx,ny),
-                accumulation_rate = 0.0,
-                basal_melt_rate = 0.0,
-                starting_damage = 0.0,
-                glen_a_activation_energy = 5.8631e+04,
-                glen_a_ref = 4.9e-16 * 3600*24*365.25 * 1.0e-9,
-                glen_temperature_ref = 263.15,
-                glen_n = 3.0,
-                glen_reg_strain_rate = 1.0e-5,
-                n_iter_viscosity = 2,
-                weertman_c = 1e4,
-                weertman_m = 3.0,
-                weertman_reg_speed = 1.0e-5,
-                sea_level_wrt_geoid = 0.0,
-                minimum_thickness = 50.0,
-                tol_picard = 1e-5,
-                maxiter_picard = 30,
-                tol_coarse = 1e-5,
-                maxiter_coarse = 1000,
-                levels = 3,
-                wavelet_threshold = 10.0,
-                nsmooth = 5,
-                smoother_omega = 1.0,
-                stencil_margin = 3
-                )
-
-    #size assertions
-    @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
-    @assert size(u_iszero)==(nx+1,ny)
-    @assert size(v_iszero)==(nx,ny+1)
-    @assert size(bed_elevation)==(nx,ny)
-    @assert size(starting_thickness)==(nx,ny)
-    @assert n_iter_viscosity ==2 #temporary?
-
-    return Params(nx,ny,nσ,x0,y0,dx,dy,h_mask,u_iszero,v_iszero,dt,g,density_ice,density_ocean,
-                gas_const,sec_per_year,starting_viscosity,starting_temperature,bed_elevation,
-                starting_thickness,accumulation_rate,basal_melt_rate,starting_damage,glen_a_activation_energy,
-                glen_a_ref,glen_n,glen_reg_strain_rate,n_iter_viscosity,weertman_c,weertman_m,
-                weertman_reg_speed,sea_level_wrt_geoid,minimum_thickness,tol_picard,maxiter_coarse,
-                levels,wavelet_threshold,nsmooth,smoother_omega,stencil_margin)
-end
-    
-
-
-
 
 #Struct to hold information on h-grid, located at cell centers.
 @with_kw struct HGrid{T <: Real, N <: Integer}
