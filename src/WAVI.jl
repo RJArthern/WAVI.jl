@@ -342,6 +342,7 @@ end
 
 #Struct to hold model state comprised of all the above information.
 @with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
+grid::Grid{T,N}
 params::Params{T,N}
 timestepping_params::TimesteppingParams{T,N}
 gh::HGrid{T,N}
@@ -385,7 +386,9 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Create WAVI State from input parameters.
 """
-function start(params; timestepping_params = TimesteppingParams())
+function start(params; 
+    grid = Grid(),
+    timestepping_params = TimesteppingParams())
 
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     @assert params.h_mask==clip(params.h_mask) "Model domain mask has invalid points. Use clip function to remove them."
@@ -467,7 +470,7 @@ function start(params; timestepping_params = TimesteppingParams())
     clock=Clock(n_iter=timestepping_params.n_iter0, time = timestepping_params.t0)
 
     #Use type constructor to build initial state.
-    wavi=State(params,timestepping_params,gh,gu,gv,gc,g3d,wu,wv,clock)
+    wavi=State(grid,params,timestepping_params,gh,gu,gv,gc,g3d,wu,wv,clock)
 
     return wavi
 end
