@@ -24,16 +24,7 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 #Concrete types
 
-#include("./outputs.jl")
-###################################################################################
-######################## outputs ##################################################
-# splice into function body
 
-
-test = @eval function ()
-    i = 10
-    $expr
-end
 
 ##################################################################################
 
