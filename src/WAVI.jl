@@ -380,7 +380,8 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Create WAVI State from input parameters.
 """
-function start(params; 
+function start(; 
+    params = Params(),
     grid = Grid(),
     timestepping_params = TimesteppingParams())
 
