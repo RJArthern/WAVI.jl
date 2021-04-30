@@ -188,34 +188,69 @@ end
 
 
 #Struct to hold information on h-grid, located at cell centers.
-@with_kw struct HGrid{T <: Real, N <: Integer}
-nx::N
-ny::N
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny); @assert mask == clip(mask)
-n::N = count(mask); @assert n == count(mask)
-crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-b::Array{T,2} = params.bed_elevation; @assert size(b)==(nx,ny)
-h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-dhdt::Array{T,2} = zeros(nx,ny); @assert size(dhdt)==(nx,ny)
-accumulation::Array{T,2} = zeros(nx,ny); @assert size(accumulation)==(nx,ny)
-basal_melt::Array{T,2} = zeros(nx,ny); @assert size(basal_melt)==(nx,ny)
-haf::Array{T,2} = zeros(nx,ny); @assert size(haf)==(nx,ny)
-grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)
-shelf_strain_rate::Array{T,2} = zeros(nx,ny); @assert size(shelf_strain_rate)==(nx,ny)
-av_speed::Array{T,2} = zeros(nx,ny); @assert size(av_speed)==(nx,ny)
-bed_speed::Array{T,2} = zeros(nx,ny); @assert size(bed_speed)==(nx,ny)
-weertman_c::Array{T,2} = zeros(nx,ny); @assert size(weertman_c)==(nx,ny)
-β::Array{T,2} = zeros(nx,ny); @assert size(β)==(nx,ny)
-βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-τbed::Array{T,2} = zeros(nx,ny); @assert size(τbed)==(nx,ny)
-ηav::Array{T,2}; @assert size(ηav)==(nx,ny)
-quad_f2::Array{T,2} = h./(3*ηav); @assert size(quad_f2)==(nx,ny)
-dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
+struct HGrid{T <: Real, N <: Integer}
+mask::Array{Bool,2}
+n::N
+crop::Diagonal{T,Array{T,1}}
+samp::SparseMatrixCSC{T,N} 
+spread::SparseMatrixCSC{T,N}
+b::Array{T,2} 
+h::Array{T,2} 
+s::Array{T,2} 
+dhdt::Array{T,2} 
+accumulation::Array{T,2}
+basal_melt::Array{T,2}
+haf::Array{T,2}
+grounded_fraction::Array{T,2}
+dsdh::Array{T,2}
+shelf_strain_rate::Array{T,2} 
+av_speed::Array{T,2}
+bed_speed::Array{T,2}
+weertman_c::Array{T,2}
+β::Array{T,2} 
+βeff::Array{T,2} 
+τbed::Array{T,2}
+ηav::Array{T,2}
+quad_f2::Array{T,2}
+dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} 
+dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}}
+end
+
+function HGrid(grid::Grid{T,N}, params) where {T <: Real, N <: Integer}
+    #unpack grid size
+    nx = grid.nx
+    ny = grid.ny
+
+    #fill fields
+    mask = grid.h_mask
+    n = count(mask);                 @assert n == count(mask)
+    crop = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
+    samp = crop[mask[:],:];          @assert samp == crop[mask[:],:]
+    spread = sparse(samp');          @assert spread == sparse(samp')
+    b = params.bed_elevation;        @assert size(b)==(nx,ny)
+    h = params.starting_thickness;   @assert size(h)==(nx,ny)
+    s = zeros(nx,ny);                @assert size(s)==(nx,ny)
+    dhdt = zeros(nx,ny);             @assert size(dhdt)==(nx,ny)
+    accumulation = zeros(nx,ny);     @assert size(accumulation)==(nx,ny)
+    basal_melt = zeros(nx,ny);       @assert size(basal_melt)==(nx,ny)
+    haf = zeros(nx,ny);              @assert size(haf)==(nx,ny)
+    grounded_fraction = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
+    dsdh = ones(nx,ny);              @assert size(dsdh)==(nx,ny)
+    shelf_strain_rate = zeros(nx,ny);@assert size(shelf_strain_rate)==(nx,ny)
+    av_speed = zeros(nx,ny);         @assert size(av_speed)==(nx,ny)
+    bed_speed = zeros(nx,ny);        @assert size(bed_speed)==(nx,ny)
+    weertman_c = zeros(nx,ny);       @assert size(weertman_c)==(nx,ny)
+    β = zeros(nx,ny);                @assert size(β)==(nx,ny)
+    βeff = zeros(nx,ny);             @assert size(βeff)==(nx,ny)
+    τbed = zeros(nx,ny);             @assert size(τbed)==(nx,ny)
+    ηav = fill(params.starting_viscosity,nx,ny)
+    quad_f2 = h./(3*ηav);           @assert size(quad_f2)==(nx,ny)
+    dneghηav = Ref(crop*Diagonal(zeros(nx*ny))*crop)
+    dimplicit = Ref(crop*Diagonal(zeros(nx*ny))*crop)
+
+    return HGrid(mask,n,crop,samp,spread,b,h,s,dhdt,accumulation,basal_melt,haf,
+        grounded_fraction,dsdh,shelf_strain_rate,av_speed,bed_speed,weertman_c,β,
+        βeff,τbed,ηav,quad_f2,dneghηav,dimplicit)
 end
 
 #Struct to hold information on u-grid, located at grid-East and grid-West cell faces.
@@ -397,13 +432,8 @@ function start(;
 
     #h-grid
     gh=HGrid(
-    nx = grid.nx,
-    ny = grid.ny,
-    mask=h_mask,
-    b = params.bed_elevation,
-    h = params.starting_thickness,
-    ηav = fill(params.starting_viscosity,params.nx,params.ny),
-    )
+        grid, 
+        params)
 
     #u-grid
     gu=UGrid(
