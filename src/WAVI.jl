@@ -191,12 +191,6 @@ end
 @with_kw struct HGrid{T <: Real, N <: Integer}
 nx::N
 ny::N
-x0::T = 0.0
-y0::T = 0.0
-dx::T = 1.0
-dy::T = 1.0
-xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
 mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny); @assert mask == clip(mask)
 n::N = count(mask); @assert n == count(mask)
 crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
@@ -391,8 +385,7 @@ function start(params;
     timestepping_params = TimesteppingParams())
 
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
-    @assert params.h_mask==clip(params.h_mask) "Model domain mask has invalid points. Use clip function to remove them."
-    h_mask = params.h_mask 
+    h_mask = grid.h_mask 
     u_mask = get_u_mask(h_mask)
     v_mask = get_v_mask(h_mask)
     c_mask = get_c_mask(h_mask)
@@ -402,12 +395,9 @@ function start(params;
     v_mask[params.v_iszero].=false
 
     #h-grid
-    gh=HGrid(x0=params.x0,
-    y0=params.y0,
-    nx=params.nx,
-    ny=params.ny,
-    dx=params.dx,
-    dy=params.dy,
+    gh=HGrid(
+    nx = grid.nx,
+    ny = grid.ny,
     mask=h_mask,
     b = params.bed_elevation,
     h = params.starting_thickness,
