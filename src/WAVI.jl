@@ -2,7 +2,7 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
@@ -24,6 +24,18 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 #Concrete types
 
+#include("./outputs.jl")
+###################################################################################
+######################## outputs ##################################################
+# splice into function body
+
+
+test = @eval function ()
+    i = 10
+    $expr
+end
+
+##################################################################################
 
 #Struct to hold model parameters.
 #Format: fieldname::Type = default_value.
