@@ -9,7 +9,7 @@ import LinearAlgebra: ldiv!
 import SparseArrays: spdiagm, spdiagm_internal, dimlub
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, plot_output, State, Params
+export start, run!, plot_output, State, Params, TimesteppingParams
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -76,6 +76,46 @@ nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
 end
+
+
+struct TimesteppingParams{T <: Real,N <: Integer}
+    n_iter0::N      #initial iteration number
+    dt::T           #timestep
+    end_time::T     #end time of this simulation
+    t0::T          #start time of this simulation 
+end
+
+function TimesteppingParams(;
+                        n_iter0 = 0,
+                        dt = 1.0,
+                        end_time = 1.0,
+                        t0 = nothing)
+
+    (n_iter0 > 0) & (n_iter0 >0) || ArgumentError("n_iter0 must be a positive number")
+
+    #if n_iter0 > 0, check file exists and get start time, else throw error 
+
+
+    #initialize t0 (really you should read start time from pickup file)
+    t0 = n_iter0 > 0 ? n_iter0 * dt : 0 
+    t0 = map(typeof(dt), t0)
+    
+    return TimesteppingParams(n_iter0, dt, end_time, t0)
+end
+
+#mutable clock structure to store time info
+mutable struct Clock{T <: Real, N <: Integer}
+    n_iter::N
+    time::T
+end
+
+#clock constructor
+function Clock(;
+                n_iter = 0,
+                time = 0)
+    return Clock(n_iter, time)
+end
+
 
 #Struct to hold information on h-grid, located at cell centers.
 @with_kw struct HGrid{T <: Real, N <: Integer}
@@ -233,13 +273,15 @@ end
 #Struct to hold model state comprised of all the above information.
 @with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
 params::Params{T,N}
+timestepping_params::TimesteppingParams{T,N}
 gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
 gc::CGrid{T,N}
-g3d::SigmaGrid{T,N}
+g3d::SigmaGrid{T,N}   
 wu::UWavelets{T,N}
 wv::VWavelets{T,N}
+clock::Clock{T,N}
 end
 
 #Struct to hold information about wavelet-based multigrid preconditioner.
@@ -273,11 +315,11 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Create WAVI State from input parameters.
 """
-function start(params)
+function start(params; timestepping_params = TimesteppingParams())
 
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     @assert params.h_mask==clip(params.h_mask) "Model domain mask has invalid points. Use clip function to remove them."
-    h_mask = params.h_mask
+    h_mask = params.h_mask 
     u_mask = get_u_mask(h_mask)
     v_mask = get_v_mask(h_mask)
     c_mask = get_c_mask(h_mask)
@@ -351,8 +393,11 @@ function start(params)
     #Wavelet-grid, v-component.
     wv=VWavelets(nx=params.nx,ny=params.ny+1,levels=params.levels)
 
+    #clock
+    clock=Clock(n_iter=timestepping_params.n_iter0, time = timestepping_params.t0)
+
     #Use type constructor to build initial state.
-    wavi=State(params,gh,gu,gv,gc,g3d,wu,wv)
+    wavi=State(params,timestepping_params,gh,gu,gv,gc,g3d,wu,wv,clock)
 
     return wavi
 end
