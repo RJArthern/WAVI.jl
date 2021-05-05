@@ -64,9 +64,9 @@ function Grid(bed_elevation::Array{T,2};
                 nσ = 4,
                 x0 = 0.0,
                 y0 = -40000.0,
-                h_mask = trues(nx,ny),
-                u_iszero = falses(nx+1,ny),
-                v_iszero = falses(nx,ny+1)) where (T <: Real)
+                h_mask = trues(Base.size(bed_elevation)[1],Base.size(bed_elevation)[2]),
+                u_iszero = falses(Base.size(bed_elevation)[1]+1,Base.size(bed_elevation)[2]),
+                v_iszero = falses(Base.size(bed_elevation)[1],Base.size(bed_elevation)[2]+1)) where (T <: Real)
 
     #check the sizes of inputs
     nx = Base.size(bed_elevation)[1]
@@ -259,7 +259,7 @@ function HGrid(grid::Grid{T,N}, params) where {T <: Real, N <: Integer}
     crop = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
     samp = crop[mask[:],:];          @assert samp == crop[mask[:],:]
     spread = sparse(samp');          @assert spread == sparse(samp')
-    b = grid.bathymetry;             @assert size(b)==(nx,ny)
+    b = grid.bed_elevation;             @assert size(b)==(nx,ny)
     h = params.starting_thickness;   @assert size(h)==(nx,ny)
     s = zeros(nx,ny);                @assert size(s)==(nx,ny)
     dhdt = zeros(nx,ny);             @assert size(dhdt)==(nx,ny)
