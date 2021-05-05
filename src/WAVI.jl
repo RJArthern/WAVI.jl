@@ -535,7 +535,7 @@ function start(grid;
     clock=Clock(n_iter=timestepping_params.n_iter0, time = timestepping_params.t0)
 
     #Use type constructor to build initial state.
-    wavi=State(grid,params,timestepping_params,gh,gu,gv,gc,g3d,wu,wv,clock)
+    wavi=State(grid,params,timestepping_params,solver_params,gh,gu,gv,gc,g3d,wu,wv,clock)
 
     return wavi
 end
@@ -558,6 +558,7 @@ function run!(wavi)
     update_dhdt!(wavi)
     update_thickness!(wavi)
     update_wavelets!(wavi)
+    update_clock!(wavi)
     return wavi
 end
 
@@ -672,6 +673,19 @@ end
 
 
 # Functions to update various quantities
+"""
+    update_clock!(wavi::AbstractModel)
+
+Update the clock
+
+"""
+function update_clock!(wavi::AbstractModel)
+    @unpack clock, timestepping_params = wavi
+    clock.n_iter += 1
+    clock.time += timestepping_params.dt
+    return wavi
+end
+
 
 """
     update_geometry_on_uv_grids!(wavi::AbstractModel)
