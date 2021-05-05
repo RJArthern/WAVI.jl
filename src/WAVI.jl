@@ -174,6 +174,19 @@ smoother_omega::T = 1.0
 stencil_margin::N = 3
 end
 
+#structure to hold the solver parameters
+@with_kw struct SolverParams{T <: Real, N <: Integer}
+    n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
+    tol_picard::T = 1e-5
+    maxiter_picard::N = 30
+    tol_coarse::T = 1e-5
+    maxiter_coarse::N = 1000
+    levels::N = 3
+    wavelet_threshold::T = 10.0
+    nsmooth::N = 5
+    smoother_omega::T = 1.0
+    stencil_margin::N = 3
+end
 
 struct TimesteppingParams{T <: Real,N <: Integer}
     n_iter0::N      #initial iteration number
@@ -406,6 +419,7 @@ end
 grid::Grid{T,N}
 params::Params{T,N}
 timestepping_params::TimesteppingParams{T,N}
+solver_params::SolverParams{T,N}
 gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
@@ -447,10 +461,10 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Create WAVI State from input parameters.
 """
-function start(; 
+function start(grid; 
     params = Params(),
-    grid = Grid(),
-    timestepping_params = TimesteppingParams())
+    timestepping_params = TimesteppingParams(),
+    solver_params = SolverParams())
 
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     h_mask = grid.h_mask 
@@ -463,9 +477,7 @@ function start(;
     v_mask[params.v_iszero].=false
 
     #h-grid
-    gh=HGrid(
-        grid, 
-        params)
+    gh=HGrid(grid, params)
 
     #u-grid
     gu=UGrid(
@@ -476,7 +488,7 @@ function start(;
     dx=params.dx,
     dy=params.dy,
     mask=u_mask,
-    levels=params.levels
+    levels=solver_params.levels
     )
 
     #v-grid
@@ -488,7 +500,7 @@ function start(;
     dx=params.dx,
     dy=params.dy,
     mask=v_mask,
-    levels=params.levels
+    levels=solver_params.levels
     )
 
     #c-grid
@@ -684,7 +696,7 @@ end
 
 """
 function update_velocities!(wavi::AbstractModel)
-    @unpack gu,gv,wu,wv,params=wavi
+    @unpack gu,gv,wu,wv,params,solver_params=wavi
 
     n = gu.n + gv.n
 
@@ -714,7 +726,7 @@ function update_velocities!(wavi::AbstractModel)
         op=get_op(wavi)
 
         rel_resid = norm(b .- op*x)/norm(b)
-        converged = rel_resid < params.tol_picard
+        converged = rel_resid < solver_params.tol_picard
 
         p=get_preconditioner(wavi,op)
         precondition!(x, p, b)
@@ -786,11 +798,11 @@ end
 
 """
 function get_op_diag(wavi::AbstractModel,op::LinearMap)
-    @unpack gu,gv,params=wavi
+    @unpack gu,gv,params,solver_params=wavi
     m,n=size(op)
     @assert m == n == gu.n + gv.n
     op_diag=zeros(eltype(op),n)
-    sm=params.stencil_margin
+    sm=solver_params.stencil_margin
     sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nx, j=1:gu.ny][gu.mask];
            [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nx, j=1:gv.ny][gv.mask] ]
     e=zeros(Bool,n)
@@ -809,7 +821,7 @@ end
 """
 function get_preconditioner(wavi::AbstractModel{T,N},op::LinearMap{T}) where {T, N}
 
-    @unpack gu,gv,wu,wv,params=wavi
+    @unpack gu,gv,wu,wv,params,solver_params=wavi
 
     m,n=size(op)
     @assert m == n == gu.n + gv.n
@@ -830,8 +842,8 @@ function get_preconditioner(wavi::AbstractModel{T,N},op::LinearMap{T}) where {T,
     sweep_order=[1,3,2,4]
 
     p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order,
-            op_diag=op_diag, nsmooth=params.nsmooth, tol_coarse = params.tol_coarse,
-            maxiter_coarse = params.maxiter_coarse, smoother_omega=params.smoother_omega)
+            op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
+            maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
     return p
 end
@@ -1259,12 +1271,12 @@ end
 Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
 """
 function inner_update_viscosity!(wavi::AbstractModel)
-    @unpack gh,g3d,params=wavi
+    @unpack gh,g3d,params,solver_params=wavi
     for k=1:g3d.nσ
         for j=1:g3d.ny
             for i=1:g3d.nx
                 if gh.mask[i,j]
-                    for iter=1:params.n_iter_viscosity
+                    for iter=1:solver_params.n_iter_viscosity
                         g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * (
                                                    sqrt(    gh.shelf_strain_rate[i,j]^2 +
                                                             0.25*(gh.τbed[i,j]*g3d.ζ[k]/g3d.η[i,j,k])^2 +
@@ -1396,13 +1408,13 @@ end
 Compute wavelet transform of velocities to define the coarse grid used in multigrid preconditioner.
 """
 function update_wavelets!(wavi::AbstractModel)
-    @unpack wu,wv,gu,gv,params=wavi
+    @unpack wu,wv,gu,gv,params,solver_params=wavi
 
     wu.wavelets[:] .= gu.dwt*(gu.crop*gu.u[:])
     wv.wavelets[:] .= gv.dwt*(gv.crop*gv.v[:])
 
-    wu.mask .= (abs.(wu.wavelets) .>= params.wavelet_threshold)
-    wv.mask .= (abs.(wv.wavelets) .>= params.wavelet_threshold)
+    wu.mask .= (abs.(wu.wavelets) .>= solver_params.wavelet_threshold)
+    wv.mask .= (abs.(wv.wavelets) .>= solver_params.wavelet_threshold)
 
     wu.n[] = count(wu.mask)
     wv.n[] = count(wv.mask)
