@@ -53,8 +53,13 @@ struct Grid{T <: Real, N <: Integer}
     quadrature_weights::Vector{T} #quadrature weights
 end
 
+
+
+
+
 #grid constructor 
-function Grid(bed::Array{T,2}; dx = 8000.0,
+function Grid(bed_elevation::Array{T,2}; 
+                dx = 8000.0,
                 dy = 8000.0,
                 nσ = 4,
                 x0 = 0.0,
@@ -64,9 +69,9 @@ function Grid(bed::Array{T,2}; dx = 8000.0,
                 v_iszero = falses(nx,ny+1)) where (T <: Real)
 
     #check the sizes of inputs
-    nx = Base.size(bed)[1]
-    ny = Base.size(bed)[2]
-    @assert size(bed)==(nx,ny);
+    nx = Base.size(bed_elevation)[1]
+    ny = Base.size(bed_elevation)[2]
+    @assert size(bed_elevation)==(nx,ny);
     @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
     @assert size(u_iszero)==(nx+1,ny)
     @assert size(v_iszero)==(nx,ny+1)
@@ -100,23 +105,23 @@ function Grid(bed::Array{T,2}; dx = 8000.0,
 end
 
 #grid constructor for a functional bed form
-function Grid(bed_function::F; dx = 8000.0,
-                            dy = 8000.0,
-                            nx = 80,
-                            ny = 10,
-                            nσ = 4,
-                            x0 = 0.0,
-                            y0 = -40000.0,
-                            h_mask = trues(nx,ny),
-                            u_iszero = falses(nx+1,ny),
-                            v_iszero = falses(nx,ny+1)) where (F <: Function)
+function Grid(bed_function::F;
+                dx = 8000.0,
+                dy = 8000.0,
+                nx = 80,
+                ny = 10,
+                nσ = 4,
+                x0 = 0.0,
+                y0 = -40000.0,
+                h_mask = trues(nx,ny),
+                u_iszero = falses(nx+1,ny),
+                v_iszero = falses(nx,ny+1)) where (F <: Function)
     #convert the function into an array
     xxh=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxh)==(nx,ny)
     yyh=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyh)==(nx,ny)
-    bed = bed_function.(xxh,yyh)
+    bed_elevation = bed_function.(xxh,yyh)
 
-    return Grid(bed_elevation; nσ = nσ, x0 = x0, y0 = y0, h_mask =h_mask,
-                 u_iszero = u_iszero, v_iszero = v_iszero)
+    return Grid(bed_elevation; nσ = nσ, x0 = x0, y0 = y0, h_mask =h_mask,u_iszero = u_iszero, v_iszero = v_iszero)
 end
 
 
