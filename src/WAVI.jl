@@ -141,11 +141,11 @@ density_ocean::T = 1028.0
 gas_const=8.314;
 sec_per_year::T = 3600*24*365.25
 default_thickness::T = 100.
-starting_viscosity::T = 1.0e7
-starting_temperature::T = 265.700709
+default_viscosity::T = 1.0e7
+default_temperature::T = 265.700709
+default_damage::T = 0.0
 accumulation_rate::T = 0.0
 basal_melt_rate::T = 0.0
-starting_damage::T = 0.0
 glen_a_activation_energy::T = 5.8631e+04
 glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
 glen_temperature_ref::T = 263.15
@@ -171,6 +171,9 @@ end
 #structure to store initial conditions
 @with_kw struct InitialConditions{T <: Real}
     initial_thickness::Array{T,2} = zeros(10,10)
+    initial_viscosity::Array{T,2} = zeros(10,10) #placeholder array
+    initial_temperature::Array{T,2} = zeros(10,10)
+    initial_damage::Array{T,2} = zeros(10,10)
 end
 
 
@@ -503,13 +506,33 @@ function start(grid;
     solver_params = SolverParams(),
     initial_conditions = InitialConditions())
 
-    #check whether some initial thickness has been passed
+    #Check initial conditions, and revert to default values if not
     if initial_conditions.initial_thickness == zeros(10,10)
-        def_thick = params.default_thickness
-        @warn "You didn't pass an initial thickness, reverting to constant value specified in params ($def_thick m everywhere)"
-        initial_conditions = @set initial_conditions.initial_thickness =  def_thick*ones(grid.nx, grid.ny)
+        default_thickness = params.default_thickness
+        println("Did not find a specified initial thickness, reverting to constant value specified in params ($default_thickness m everywhere)")
+        initial_conditions = @set initial_conditions.initial_thickness =  default_thickness*ones(grid.nx, grid.ny)
     end
- 
+    
+    if initial_conditions.initial_viscosity == zeros(10,10)
+        default_viscosity = params.default_viscosity
+        println("Did not find a specified initial viscosity, reverting to constant value specified in params ($default_viscosity everywhere) - units?!")
+        initial_conditions = @set initial_conditions.initial_viscosity =  default_viscosity*ones(grid.nx, grid.ny)
+    end
+
+    if initial_conditions.initial_temperature == zeros(10,10)
+        default_temperature = params.default_temperature
+        println("Did not find a specified initial temperature, reverting to constant value specified in params ($default_temperature K everywhere)")
+        initial_conditions = @set initial_conditions.initial_temperature =  default_temperature*ones(grid.nx, grid.ny)
+    end
+
+    if initial_conditions.initial_damage == zeros(10,10)
+        default_damage = params.default_damage
+        println("Did not find a specified initial damage field, reverting to constant value specified in params ($default_damage K everywhere)")
+        initial_conditions = @set initial_conditions.initial_damage =  default_damage*ones(grid.nx, grid.ny)
+    end
+
+
+
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     h_mask = grid.h_mask 
     u_mask = get_u_mask(h_mask)
@@ -532,7 +555,7 @@ function start(grid;
     mask=h_mask,
     b = grid.bed_elevation,
     h = initial_conditions.initial_thickness,
-    ηav = fill(params.starting_viscosity,grid.nx,grid.ny),
+    ηav = initial_conditions.initial_viscosity,
     )
 
     #u-grid
@@ -575,10 +598,10 @@ function start(grid;
     nx=grid.nx,
     ny=grid.ny,
     nσ=grid.nσ,
-    η = fill(params.starting_viscosity,grid.nx,grid.ny,grid.nσ),
-    θ = fill(params.starting_temperature,grid.nx,grid.ny,grid.nσ),
-    Φ = fill(params.starting_damage,grid.nx,grid.ny,grid.nσ),
-    glen_b = fill(glen_b(params.starting_temperature,params.starting_damage,params),grid.nx,grid.ny,grid.nσ)
+    η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
+    θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
+    Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),
+    glen_b = fill(glen_b(params.default_temperature,params.default_damage,params),grid.nx,grid.ny,grid.nσ)
     )
 
     #Wavelet-grid, u-component.
