@@ -2,7 +2,7 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2, HDF5
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
@@ -36,6 +36,7 @@ struct Grid{T <: Real, N <: Integer}
     dy::T
     x0::T
     y0::T
+    bed::Array{T,2}         #bathymetry
     h_mask::Array{Bool,2}
     u_iszero::Array{Bool,2} #zero boundary condition locations on u
     v_iszero::Array{Bool,2} #zero boundary condition locations on u
@@ -53,7 +54,7 @@ struct Grid{T <: Real, N <: Integer}
 end
 
 #grid constructor 
-function Grid(; dx = 8000.0,
+function Grid(bed::Array{T,2}; dx = 8000.0,
                 dy = 8000.0,
                 nx = 80,
                 ny = 10,
@@ -62,9 +63,10 @@ function Grid(; dx = 8000.0,
                 y0 = -40000.0,
                 h_mask = trues(nx,ny),
                 u_iszero = falses(nx+1,ny),
-                v_iszero = falses(nx,ny+1))
+                v_iszero = falses(nx,ny+1)) where (T <: Real)
 
     #check the sizes of inputs
+    @assert size(bed)==(nx,ny);
     @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
     @assert size(u_iszero)==(nx+1,ny)
     @assert size(v_iszero)==(nx,ny+1)
@@ -93,8 +95,28 @@ function Grid(; dx = 8000.0,
     ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
     quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(quadrature_weights) == nσ
 
-    return Grid(nx,ny,nσ,dx,dy,x0,y0,h_mask,u_iszero,v_iszero,
+    return Grid(nx,ny,nσ,dx,dy,x0,y0,bed,h_mask,u_iszero,v_iszero,
                 xxh,yyh,xxu,yyu,xxv,yyv,xxc,yyc,σ,ζ,quadrature_weights)
+end
+
+#grid constructor for a functional bed form
+function Grid(bed_function::F; dx = 8000.0,
+                            dy = 8000.0,
+                            nx = 80,
+                            ny = 10,
+                            nσ = 4,
+                            x0 = 0.0,
+                            y0 = -40000.0,
+                            h_mask = trues(nx,ny),
+                            u_iszero = falses(nx+1,ny),
+                            v_iszero = falses(nx,ny+1)) where (F <: Function)
+    #convert the function into an array
+    xxh=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxh)==(nx,ny)
+    yyh=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyh)==(nx,ny)
+    bed = bed_function.(xxh,yyh)
+
+    return Grid(nx,ny,nσ,dx,dy,x0,y0,bed,h_mask,u_iszero,v_iszero,
+             xxh,yyh,xxu,yyu,xxv,yyv,xxc,yyc,σ,ζ,quadrature_weights)
 end
 
 
@@ -173,6 +195,10 @@ function TimesteppingParams(;
     return TimesteppingParams(n_iter0, dt, end_time, t0)
 end
 
+
+
+
+
 #mutable clock structure to store time info
 mutable struct Clock{T <: Real, N <: Integer}
     n_iter::N
@@ -216,6 +242,7 @@ dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}}
 dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}}
 end
 
+#H grid constructor
 function HGrid(grid::Grid{T,N}, params) where {T <: Real, N <: Integer}
     #unpack grid size
     nx = grid.nx
