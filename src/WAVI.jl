@@ -2,11 +2,12 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2, HDF5
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2, HDF5, Setfield
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
 import SparseArrays: spdiagm, spdiagm_internal, dimlub
+import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
 export start, run!, plot_output, State, Params, TimesteppingParams, Grid
@@ -128,27 +129,20 @@ end
 #Struct to hold model parameters.
 #Format: fieldname::Type = default_value.
 #T & N are type parameters, usually real numbers (e.g. Float64) and integers (e.g. Int64) respectively.
+
+#bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
+#starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
+
 @with_kw struct Params{T <: Real, N <: Integer}
-nx::N = 80
-ny::N = 10
-nσ::N = 4
-x0::T = 0.0
-y0::T = -40000.0
-dx::T = 8000.0
-dy::T = 8000.0
-h_mask::Array{Bool,2}=trues(nx,ny);@assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
-u_iszero::Array{Bool,2}=falses(nx+1,ny);@assert size(u_iszero)==(nx+1,ny)
-v_iszero::Array{Bool,2}=falses(nx,ny+1);@assert size(v_iszero)==(nx,ny+1)
 dt::T = 1.0
 g::T = 9.81
 density_ice::T = 918.0
 density_ocean::T = 1028.0
 gas_const=8.314;
 sec_per_year::T = 3600*24*365.25
+default_thickness::T = 100.
 starting_viscosity::T = 1.0e7
 starting_temperature::T = 265.700709
-bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
-starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
 accumulation_rate::T = 0.0
 basal_melt_rate::T = 0.0
 starting_damage::T = 0.0
@@ -173,6 +167,12 @@ nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
 end
+
+#structure to store initial conditions
+@with_kw struct InitialConditions{T <: Real}
+    initial_thickness::Array{T,2} = zeros(10,10)
+end
+
 
 #structure to hold the solver parameters
 @with_kw struct SolverParams{T <: Real, N <: Integer}
@@ -212,9 +212,6 @@ function TimesteppingParams(;
     
     return TimesteppingParams(n_iter0, dt, end_time, t0)
 end
-
-
-
 
 
 #mutable clock structure to store time info
@@ -458,6 +455,7 @@ grid::Grid{T,N}
 params::Params{T,N}
 timestepping_params::TimesteppingParams{T,N}
 solver_params::SolverParams{T,N}
+initial_conditions::InitialConditions{T}
 gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
@@ -502,8 +500,16 @@ Create WAVI State from input parameters.
 function start(grid; 
     params = Params(),
     timestepping_params = TimesteppingParams(),
-    solver_params = SolverParams())
+    solver_params = SolverParams(),
+    initial_conditions = InitialConditions())
 
+    #check whether some initial thickness has been passed
+    if initial_conditions.initial_thickness == zeros(10,10)
+        def_thick = params.default_thickness
+        @warn "You didn't pass an initial thickness, reverting to constant value specified in params ($def_thick m everywhere)"
+        initial_conditions = @set initial_conditions.initial_thickness =  def_thick*ones(grid.nx, grid.ny)
+    end
+ 
     #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
     h_mask = grid.h_mask 
     u_mask = get_u_mask(h_mask)
@@ -511,81 +517,81 @@ function start(grid;
     c_mask = get_c_mask(h_mask)
 
     #Remove all points on u- and v-grids with homogenous Dirichlet conditions.
-    u_mask[params.u_iszero].=false
-    v_mask[params.v_iszero].=false
+    u_mask[grid.u_iszero].=false
+    v_mask[grid.v_iszero].=false
 
     #h-grid
     #gh=HGrid(grid, params) #uncomment if using the explicit constructor method
     gh=HGrid(
-    x0=params.x0,
-    y0=params.y0,
-    nx=params.nx,
-    ny=params.ny,
-    dx=params.dx,
-    dy=params.dy,
+    x0=grid.x0,
+    y0=grid.y0,
+    nx=grid.nx,
+    ny=grid.ny,
+    dx=grid.dx,
+    dy=grid.dy,
     mask=h_mask,
-    b = params.bed_elevation,
-    h = params.starting_thickness,
-    ηav = fill(params.starting_viscosity,params.nx,params.ny),
+    b = grid.bed_elevation,
+    h = initial_conditions.initial_thickness,
+    ηav = fill(params.starting_viscosity,grid.nx,grid.ny),
     )
 
     #u-grid
     gu=UGrid(
-    x0=params.x0,
-    y0=params.y0,
-    nx=params.nx+1,
-    ny=params.ny,
-    dx=params.dx,
-    dy=params.dy,
+    x0=grid.x0,
+    y0=grid.y0,
+    nx=grid.nx+1,
+    ny=grid.ny,
+    dx=grid.dx,
+    dy=grid.dy,
     mask=u_mask,
     levels=solver_params.levels
     )
 
     #v-grid
     gv=VGrid(
-    x0=params.x0,
-    y0=params.y0,
-    nx=params.nx,
-    ny=params.ny+1,
-    dx=params.dx,
-    dy=params.dy,
+    x0=grid.x0,
+    y0=grid.y0,
+    nx=grid.nx,
+    ny=grid.ny+1,
+    dx=grid.dx,
+    dy=grid.dy,
     mask=v_mask,
     levels=solver_params.levels
     )
 
     #c-grid
     gc=CGrid(
-    x0=params.x0,
-    y0=params.y0,
-    nx=params.nx-1,
-    ny=params.ny-1,
-    dx=params.dx,
-    dy=params.dy,
+    x0=grid.x0,
+    y0=grid.y0,
+    nx=grid.nx-1,
+    ny=grid.ny-1,
+    dx=grid.dx,
+    dy=grid.dy,
     mask=c_mask
     )
 
     #3D-grid
     g3d=SigmaGrid(
-    nx=params.nx,
-    ny=params.ny,
-    nσ=params.nσ,
-    η = fill(params.starting_viscosity,params.nx,params.ny,params.nσ),
-    θ = fill(params.starting_temperature,params.nx,params.ny,params.nσ),
-    Φ = fill(params.starting_damage,params.nx,params.ny,params.nσ),
-    glen_b = fill(glen_b(params.starting_temperature,params.starting_damage,params),params.nx,params.ny,params.nσ)
+    nx=grid.nx,
+    ny=grid.ny,
+    nσ=grid.nσ,
+    η = fill(params.starting_viscosity,grid.nx,grid.ny,grid.nσ),
+    θ = fill(params.starting_temperature,grid.nx,grid.ny,grid.nσ),
+    Φ = fill(params.starting_damage,grid.nx,grid.ny,grid.nσ),
+    glen_b = fill(glen_b(params.starting_temperature,params.starting_damage,params),grid.nx,grid.ny,grid.nσ)
     )
 
     #Wavelet-grid, u-component.
-    wu=UWavelets(nx=params.nx+1,ny=params.ny,levels=params.levels)
+    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(nx=params.nx,ny=params.ny+1,levels=params.levels)
+    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=params.levels)
 
     #clock
     clock=Clock(n_iter=timestepping_params.n_iter0, time = timestepping_params.t0)
 
     #Use type constructor to build initial state.
-    wavi=State(grid,params,timestepping_params,solver_params,gh,gu,gv,gc,g3d,wu,wv,clock)
+    wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,gh,gu,gv,gc,g3d,wu,wv,clock)
 
     return wavi
 end
