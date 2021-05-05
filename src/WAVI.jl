@@ -10,7 +10,7 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, plot_output, State, Params, TimesteppingParams, Grid
+export start, run!, plot_output, State, Params, TimesteppingParams, Grid, SolverParams, InitialConditions
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
