@@ -16,6 +16,7 @@ export start, run!, plot_output, State, Params, TimesteppingParams, Grid, Solver
 @reexport using JLD2
 
 #Abstract types
+abstract type AbstractGrid{T <: Real, N <: Integer} end
 abstract type AbstractModel{T <: Real, N <: Integer} end
 abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
 
@@ -29,7 +30,7 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 ##################################################################################
 #grid info
-struct Grid{T <: Real, N <: Integer}
+struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
     nx::N
     ny::N
     nσ::N 
@@ -52,9 +53,6 @@ struct Grid{T <: Real, N <: Integer}
     ζ::Vector{T}            #reverse sigma levels
     quadrature_weights::Vector{T} #quadrature weights
 end
-
-
-
 
 
 #grid constructor 
@@ -479,10 +477,30 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Create WAVI State from input parameters.
 """
-function start(grid; 
+function start(;
+    grid = nothing, 
+    bed_elevation = nothing,
     params = Params(),
     solver_params = SolverParams(),
-    initial_conditions = InitialConditions())
+    initial_conditions = InitialConditions(),
+    timestepping_params = TimesteppingParams())
+
+    #check that a grid and bed has been inputted
+    ~(grid === nothing) || throw(ArgumentError("You must specify an input grid"))
+    ~(bed_elevation === nothing) || throw(ArgumentError("You must input a bed elevation"))
+    
+    #check types
+    #if a functional bed has been specified, convert to an array
+    bed_array = zeros(grid.nx,grid.nx) #initialize a bed array
+    try
+    bed_array = get_bed_elevation(bed_elevation, grid)
+        println(typeof(bed_array))
+    catch
+    throw(ArgumentError("bed elevation must be of type function or array"))
+    end
+            #check the size of the bed
+    #(Base.size(bed_array) = (grid.nx, grid.ny)) || throw(ArgumentError("Bed and grid sizes must be identical"))
+    
 
     #Check initial conditions, and revert to default values if not
     initial_conditions = check_initial_conditions(initial_conditions, params, grid)
@@ -507,7 +525,7 @@ function start(grid;
     dx=grid.dx,
     dy=grid.dy,
     mask=h_mask,
-    b = grid.bed_elevation,
+    b = bed_array,
     h = initial_conditions.initial_thickness,
     ηav = initial_conditions.initial_viscosity,
     )
@@ -565,7 +583,8 @@ function start(grid;
     wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=params.levels)
 
     #Default clock
-    clock = Clock()
+    clock = Clock(n_iter = 0, time = 0.0)
+
     #Use type constructor to build initial state.
     wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,gh,gu,gv,gc,g3d,wu,wv,clock)
 
@@ -577,7 +596,7 @@ end
 
 Check whether initial conditions have been specified. Default them to standard values if not
 """
-function check_initial_conditions(initial_conditions::InitialConditions, params::Params, grid::Grid)
+function check_initial_conditions(initial_conditions, params, grid)
     if initial_conditions.initial_thickness == zeros(10,10)
         default_thickness = params.default_thickness
         println("Did not find a specified initial thickness, reverting to constant value specified in params ($default_thickness m everywhere)")
@@ -660,6 +679,19 @@ function simulation(;
 end
 
 # Utility functions
+function get_bed_elevation(bed_elevation::F, grid) where (F <: Function)
+    bed_array = bed_elevation.(grid.xxh, grid.yyh)
+    return bed_array
+end
+
+function get_bed_elevation(bed_elevation::Array{T,2}, grid) where (T <: Real)
+    bed_array = bed_elevation
+    return bed_array
+end
+
+
+
+
 """
      get_glx(wavi)
 
