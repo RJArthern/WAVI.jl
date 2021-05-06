@@ -37,7 +37,6 @@ struct Grid{T <: Real, N <: Integer}
     dy::T
     x0::T
     y0::T
-    bed_elevation::Array{T,2}        
     h_mask::Array{Bool,2}
     u_iszero::Array{Bool,2} #zero boundary condition locations on u
     v_iszero::Array{Bool,2} #zero boundary condition locations on u
@@ -59,20 +58,19 @@ end
 
 
 #grid constructor 
-function Grid(bed_elevation::Array{T,2}; 
+function Grid(; 
+                nx = 80,
+                ny = 10,
                 dx = 8000.0,
                 dy = 8000.0,
                 nσ = 4,
                 x0 = 0.0,
                 y0 = -40000.0,
-                h_mask = trues(Base.size(bed_elevation)[1],Base.size(bed_elevation)[2]),
-                u_iszero = falses(Base.size(bed_elevation)[1]+1,Base.size(bed_elevation)[2]),
-                v_iszero = falses(Base.size(bed_elevation)[1],Base.size(bed_elevation)[2]+1)) where (T <: Real)
+                h_mask = trues(nx,ny),
+                u_iszero = falses(nx+1,ny),
+                v_iszero = falses(nx,ny+1))
 
     #check the sizes of inputs
-    nx = Base.size(bed_elevation)[1]
-    ny = Base.size(bed_elevation)[2]
-    @assert size(bed_elevation)==(nx,ny);
     @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
     @assert size(u_iszero)==(nx+1,ny)
     @assert size(v_iszero)==(nx,ny+1)
@@ -101,29 +99,10 @@ function Grid(bed_elevation::Array{T,2};
     ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
     quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(quadrature_weights) == nσ
 
-    return Grid(nx,ny,nσ,dx,dy,x0,y0,bed_elevation,h_mask,u_iszero,v_iszero,
+    return Grid(nx,ny,nσ,dx,dy,x0,y0,h_mask,u_iszero,v_iszero,
                 xxh,yyh,xxu,yyu,xxv,yyv,xxc,yyc,σ,ζ,quadrature_weights)
 end
 
-#grid constructor for a functional bed form
-function Grid(bed_function::F;
-                dx = 8000.0,
-                dy = 8000.0,
-                nx = 80,
-                ny = 10,
-                nσ = 4,
-                x0 = 0.0,
-                y0 = -40000.0,
-                h_mask = trues(nx,ny),
-                u_iszero = falses(nx+1,ny),
-                v_iszero = falses(nx,ny+1)) where (F <: Function)
-    #convert the function into an array
-    xxh=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxh)==(nx,ny)
-    yyh=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyh)==(nx,ny)
-    bed_elevation = bed_function.(xxh,yyh)
-
-    return Grid(bed_elevation; nσ = nσ, x0 = x0, y0 = y0, h_mask =h_mask,u_iszero = u_iszero, v_iszero = v_iszero)
-end
 
 
 #Struct to hold model parameters.
@@ -665,8 +644,8 @@ function simulation(;
         wavi = start(grid; params = params,  solver_params)
         
         #set the clock
-        wavi.clock.n_iter=0, 
-        wavi.clock.time = 0
+        #wavi.clock.n_iter = 0, 
+        #wavi.clock.time = 0
 
         #do the run
 
@@ -676,7 +655,7 @@ function simulation(;
         #update the parameters of those that have been specified the flag is specified
 
         #continue with the run
-
+    end
     return wavi
 end
 
