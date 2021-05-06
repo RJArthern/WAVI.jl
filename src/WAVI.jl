@@ -617,7 +617,7 @@ function check_initial_conditions(initial_conditions, params, grid)
     
     if initial_conditions.initial_viscosity == zeros(10,10)
         default_viscosity = params.default_viscosity
-        println("Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity everywhere) - units?!")
+        println("Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity Pa s everywhere)")
         initial_conditions = @set initial_conditions.initial_viscosity =  default_viscosity*ones(grid.nx, grid.ny)
     end
 
@@ -657,7 +657,21 @@ function run!(wavi)
     return wavi
 end
 
+#MISMIP+ bed elevation
+function mismip_plus_bed(x,y)
+    xbar = 300000.0
+    b0 = -150.0; b2 = -728.8; b4 = 343.91; b6 = -50.75
+    wc = 24000.0; fc = 4000.0; dc = 500.0
+    bx(x)=b0+b2*(x/xbar)^2+b4*(x/xbar)^4+b6*(x/xbar)^6
+    by(y)= dc*( (1+exp(-2(y-wc)/fc))^(-1) + (1+exp(2(y+wc)/fc))^(-1) )
+    b = max(bx(x) + by(y), -720.0)
+    return b
+    end
 
+"""
+    simulation
+    
+"""
 function simulation(; 
     grid = nothing,
     bed_elevation = nothing,
@@ -689,32 +703,59 @@ function simulation(;
                     timestepping_params = timestepping_params)
 
         #do the run
-        chkpt_tag = "A"
-        for i = 1:timestepping_params.niter_total
+        chkpt_tag = "A" #initialize the checkpoint tag
+        println("running simulation...")
+        for i = 1:timestepping_params.n_iter_total
             run!(wavi)
-            if mod(i,timestepping_params.n_iter_chkpt)
+            if mod(i,timestepping_params.n_iter_chkpt) == 0
                 #output a temporary checkpoint
                 fname = string("Chkpt",chkpt_tag, ".jld2")
                 @save fname wavi
                 chkpt_tag = (chkpt_tag == "A") ? "B" : "A"
-                println("making temporary checkpoint at t = $(wavi.clock.time)")
+                println("making temporary checkpoint at iteration number $(wavi.clock.n_iter)")
             end
-            if mod(i,timestepping_params.n_iter_pchkpt)
+            if mod(i,timestepping_params.n_iter_pchkpt) == 0
                 #output a permanent checkpoint
                 n_iter_string =  lpad(wavi.clock.n_iter, 10, "0"); #filename as a string with 10 digits
                 fname = string("PChkpt_",n_iter_string, ".jld2")
                 @save fname wavi
-                println("making permanent checkpoint at t = $(wavi.clock.time)")
+                println("making permanent checkpoint at iteration number $(wavi.clock.n_iter)")
 
             end
         end
+        
 
-    else
-        #find the file (return error if you didn't)
+    else #look for a pickup
+        n_iter_string =  lpad(timestepping_params.n_iter0, 10, "0"); #filename as a string with 10 digits
+        try 
+            @load string("PChkpt_",n_iter_string, ".jld2") wavi
+            println("Pickup successful")
+        catch 
+            println("Pickup error, terminating run")
+        end
 
         #update the parameters of those that have been specified the flag is specified
 
         #continue with the run
+        chkpt_tag = "A" #initialize the checkpoint tag
+        for i = (timestepping_params.n_iter0+1):timestepping_params.n_iter_total
+            run!(wavi)
+            if mod(i,timestepping_params.n_iter_chkpt) == 0
+                #output a temporary checkpoint
+                println("making temporary checkpoint at iteration number $(wavi.clock.n_iter)")
+                fname = string("Chkpt",chkpt_tag, ".jld2")
+                @save fname wavi
+                chkpt_tag = (chkpt_tag == "A") ? "B" : "A"
+            end
+            if mod(i,timestepping_params.n_iter_pchkpt) ==0 
+                #output a permanent checkpoint
+                println("making permanent checkpoint at iteration number $(wavi.clock.n_iter)")
+                n_iter_string =  lpad(wavi.clock.n_iter, 10, "0"); #filename as a string with 10 digits
+                fname = string("PChkpt_",n_iter_string, ".jld2")
+                @save fname wavi
+
+            end
+        end
     end
     return wavi
 end
