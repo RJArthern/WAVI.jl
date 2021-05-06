@@ -502,7 +502,6 @@ Create WAVI State from input parameters.
 """
 function start(grid; 
     params = Params(),
-    timestepping_params = TimesteppingParams(),
     solver_params = SolverParams(),
     initial_conditions = InitialConditions())
 
@@ -586,9 +585,8 @@ function start(grid;
     #Wavelet-grid, v-component.
     wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=params.levels)
 
-    #clock
-    clock=Clock(n_iter=timestepping_params.n_iter0, time = timestepping_params.t0)
-
+    #Default clock
+    clock = Clock()
     #Use type constructor to build initial state.
     wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,gh,gu,gv,gc,g3d,wu,wv,clock)
 
@@ -646,6 +644,39 @@ function run!(wavi)
     update_thickness!(wavi)
     update_wavelets!(wavi)
     update_clock!(wavi)
+    return wavi
+end
+
+
+function simulation(; 
+    timestepping_params = TimesteppingParams(),
+    grid = nothing,
+    params = nothing,
+    solver_params = nothing)
+
+    if n_iter0 == 0 #start a fresh run
+        println("Starting clean wavi simulation")
+        ~(grid === nothing) || error("Must pass a grid if starting a fresh run")
+
+        #if no parameters have been passed, construct defaults
+        if (params = nothing); params = Params(); end 
+        if (timestepping_params = nothing); timestepping_params = TimesteppingParams(); end 
+        if (solver_params = nothing); solver_params = Solver_Params(); end 
+        wavi = start(grid; params = params,  solver_params)
+        
+        #set the clock
+        wavi.clock.n_iter=0, 
+        wavi.clock.time = 0
+
+        #do the run
+
+    else
+        #find the file (return error if you didn't)
+
+        #update the parameters of those that have been specified the flag is specified
+
+        #continue with the run
+
     return wavi
 end
 
