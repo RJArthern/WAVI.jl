@@ -169,16 +169,16 @@ end
     stencil_margin::N = 3
 end
 
-struct TimesteppingParams{T <: Real, N <: Integer}
+struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
     n_iter0::N      #initial iteration number
     dt::T           #timestep
     end_time::T     #end time of this simulation
     t0::T           #start time of this simulation 
     chkpt_freq::T   #temporary checkpoint frequency
     pchkpt_freq::T  #permanent checkpoint frequency  
-    n_iter_total::N #total number of timesteps counting from zero
-    n_iter_chkpt::N #number of iterations per temporary checkpoint
-    n_iter_pchkpt::N#number of iterations per permanent checkpoint
+    n_iter_total::TO #total number of timesteps counting from zero
+    n_iter_chkpt::C #number of iterations per temporary checkpoint
+    n_iter_pchkpt::P#number of iterations per permanent checkpoint
 end
 
 function TimesteppingParams(;
@@ -199,9 +199,9 @@ function TimesteppingParams(;
     t0 = map(typeof(dt), t0)
 
     #compute number of timesteps (total and per checkpoint)
-    n_iter_total  = round(Int, end_time/dt)
-    n_iter_chkpt  = round(Int, chkpt_freq/dt)
-    n_iter_pchkpt = round(Int, pchkpt_freq/dt)
+    end_time == Inf ? n_iter_total = Inf : n_iter_total  = round(Int, end_time/dt)
+    chkpt_freq == Inf ? n_iter_chkpt = Inf : n_iter_chkpt  = round(Int, chkpt_freq/dt)
+    pchkpt_freq == Inf ? n_iter_pchkpt = Inf : n_iter_pchkpt = round(Int, pchkpt_freq/dt)
     
     return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq, n_iter_total, n_iter_chkpt, n_iter_pchkpt)
 end
@@ -701,8 +701,8 @@ function simulation(;
             end
             if mod(i,timestepping_params.n_iter_pchkpt)
                 #output a permanent checkpoint
-                nIter_string =  lpad(nIter, 10, "0"); #filename as a string with 10 digits
-                fname = string("PChkpt_",nIter_string, ".jld2")
+                n_iter_string =  lpad(wavi.clock.n_iter, 10, "0"); #filename as a string with 10 digits
+                fname = string("PChkpt_",n_iter_string, ".jld2")
                 @save fname wavi
                 println("making permanent checkpoint at t = $(wavi.clock.time)")
 
@@ -729,8 +729,6 @@ function get_bed_elevation(bed_elevation::Array{T,2}, grid) where (T <: Real)
     bed_array = bed_elevation
     return bed_array
 end
-
-
 
 
 """
