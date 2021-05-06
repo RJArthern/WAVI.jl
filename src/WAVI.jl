@@ -10,7 +10,8 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, plot_output, State, Params, TimesteppingParams, Grid, SolverParams, InitialConditions
+export start, run!, plot_output, State, Params, 
+TimesteppingParams, Grid, SolverParams, InitialConditions, simulation
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -168,20 +169,27 @@ end
     stencil_margin::N = 3
 end
 
-struct TimesteppingParams{T <: Real,N <: Integer}
+struct TimesteppingParams{T <: Real, N <: Integer}
     n_iter0::N      #initial iteration number
     dt::T           #timestep
     end_time::T     #end time of this simulation
-    t0::T          #start time of this simulation 
+    t0::T           #start time of this simulation 
+    chkpt_freq::T   #temporary checkpoint frequency
+    pchkpt_freq::T  #permanent checkpoint frequency  
+    n_iter_total::N #total number of timesteps counting from zero
+    n_iter_chkpt::N #number of iterations per temporary checkpoint
+    n_iter_pchkpt::N#number of iterations per permanent checkpoint
 end
 
 function TimesteppingParams(;
                         n_iter0 = 0,
                         dt = 1.0,
                         end_time = 1.0,
-                        t0 = nothing)
+                        t0 = nothing,
+                        chkpt_freq = Inf,
+                        pchkpt_freq = Inf)
 
-    (n_iter0 > 0) & (n_iter0 >0) || ArgumentError("n_iter0 must be a positive number")
+    #(n_iter0 > 0) || ArgumentError("n_iter0 must be a positive number")
 
     #if n_iter0 > 0, check file exists and get start time, else throw error 
 
@@ -189,8 +197,13 @@ function TimesteppingParams(;
     #initialize t0 (really you should read start time from pickup file)
     t0 = n_iter0 > 0 ? n_iter0 * dt : 0 
     t0 = map(typeof(dt), t0)
+
+    #compute number of timesteps (total and per checkpoint)
+    n_iter_total  = round(Int, end_time/dt)
+    n_iter_chkpt  = round(Int, chkpt_freq/dt)
+    n_iter_pchkpt = round(Int, pchkpt_freq/dt)
     
-    return TimesteppingParams(n_iter0, dt, end_time, t0)
+    return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq, n_iter_total, n_iter_chkpt, n_iter_pchkpt)
 end
 
 
@@ -494,7 +507,6 @@ function start(;
     bed_array = zeros(grid.nx,grid.nx) #initialize a bed array
     try
     bed_array = get_bed_elevation(bed_elevation, grid)
-        println(typeof(bed_array))
     catch
     throw(ArgumentError("bed elevation must be of type function or array"))
     end
@@ -599,25 +611,25 @@ Check whether initial conditions have been specified. Default them to standard v
 function check_initial_conditions(initial_conditions, params, grid)
     if initial_conditions.initial_thickness == zeros(10,10)
         default_thickness = params.default_thickness
-        println("Did not find a specified initial thickness, reverting to constant value specified in params ($default_thickness m everywhere)")
+        println("Did not find a specified initial thickness, reverting to default value specified in params ($default_thickness m everywhere)")
         initial_conditions = @set initial_conditions.initial_thickness =  default_thickness*ones(grid.nx, grid.ny)
     end
     
     if initial_conditions.initial_viscosity == zeros(10,10)
         default_viscosity = params.default_viscosity
-        println("Did not find a specified initial viscosity, reverting to constant value specified in params ($default_viscosity everywhere) - units?!")
+        println("Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity everywhere) - units?!")
         initial_conditions = @set initial_conditions.initial_viscosity =  default_viscosity*ones(grid.nx, grid.ny)
     end
 
     if initial_conditions.initial_temperature == zeros(10,10)
         default_temperature = params.default_temperature
-        println("Did not find a specified initial temperature, reverting to constant value specified in params ($default_temperature K everywhere)")
+        println("Did not find a specified initial temperature, reverting to default value specified in params ($default_temperature K everywhere)")
         initial_conditions = @set initial_conditions.initial_temperature =  default_temperature*ones(grid.nx, grid.ny)
     end
 
     if initial_conditions.initial_damage == zeros(10,10)
         default_damage = params.default_damage
-        println("Did not find a specified initial damage field, reverting to constant value specified in params ($default_damage everywhere)")
+        println("Did not find a specified initial damage field, reverting to default value specified in params ($default_damage everywhere)")
         initial_conditions = @set initial_conditions.initial_damage =  default_damage*ones(grid.nx, grid.ny)
     end
     return initial_conditions
@@ -647,26 +659,55 @@ end
 
 
 function simulation(; 
-    timestepping_params = TimesteppingParams(),
     grid = nothing,
+    bed_elevation = nothing,
     params = nothing,
-    solver_params = nothing)
+    solver_params = nothing,
+    initial_conditions = nothing,
+    timestepping_params = nothing)
 
-    if n_iter0 == 0 #start a fresh run
-        println("Starting clean wavi simulation")
+    ~(timestepping_params === nothing) || error("Must pass timestepping params")
+
+    if timestepping_params.n_iter0 == 0 #start a fresh run
+        #check that grid and bed have been passed
         ~(grid === nothing) || error("Must pass a grid if starting a fresh run")
+        ~(bed_elevation === nothing) || error("Must pass a bed (array or function) if starting a fresh run")
+
+        println("Starting clean wavi simulation")
+
 
         #if no parameters have been passed, construct defaults
-        if (params = nothing); params = Params(); end 
-        if (timestepping_params = nothing); timestepping_params = TimesteppingParams(); end 
-        if (solver_params = nothing); solver_params = Solver_Params(); end 
-        wavi = start(grid; params = params,  solver_params)
-        
-        #set the clock
-        #wavi.clock.n_iter = 0, 
-        #wavi.clock.time = 0
+        if (params === nothing); params = Params(); end 
+        if (solver_params === nothing); solver_params = SolverParams(); end 
+        if (initial_conditions === nothing); initial_conditions = InitialConditions(); end #don't worry about strange defaults here, these will be picked up by start
+        if (timestepping_params === nothing); timestepping_params = TimesteppingParams(); end 
+        wavi = start(grid = grid, 
+                    bed_elevation = bed_elevation,
+                    params = params, 
+                    solver_params = solver_params,
+                    initial_conditions = initial_conditions,
+                    timestepping_params = timestepping_params)
 
         #do the run
+        chkpt_tag = "A"
+        for i = 1:timestepping_params.niter_total
+            run!(wavi)
+            if mod(i,timestepping_params.n_iter_chkpt)
+                #output a temporary checkpoint
+                fname = string("Chkpt",chkpt_tag, ".jld2")
+                @save fname wavi
+                chkpt_tag = (chkpt_tag == "A") ? "B" : "A"
+                println("making temporary checkpoint at t = $(wavi.clock.time)")
+            end
+            if mod(i,timestepping_params.n_iter_pchkpt)
+                #output a permanent checkpoint
+                nIter_string =  lpad(nIter, 10, "0"); #filename as a string with 10 digits
+                fname = string("PChkpt_",nIter_string, ".jld2")
+                @save fname wavi
+                println("making permanent checkpoint at t = $(wavi.clock.time)")
+
+            end
+        end
 
     else
         #find the file (return error if you didn't)
