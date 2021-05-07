@@ -110,8 +110,7 @@ end
 #bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
 #starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
 
-@with_kw struct Params{T <: Real, N <: Integer}
-dt::T = 1.0
+@with_kw struct Params{T <: Real}
 g::T = 9.81
 density_ice::T = 918.0
 density_ocean::T = 1028.0
@@ -128,21 +127,11 @@ glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
 glen_temperature_ref::T = 263.15
 glen_n::T = 3.0
 glen_reg_strain_rate::T = 1.0e-5
-n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
 weertman_c::T = 1e4
 weertman_m::T = 3.0
 weertman_reg_speed::T = 1.0e-5
 sea_level_wrt_geoid::T = 0.0
 minimum_thickness::T = 50.0
-tol_picard::T = 1e-5
-maxiter_picard::N = 30
-tol_coarse::T = 1e-5
-maxiter_coarse::N = 1000
-levels::N = 3
-wavelet_threshold::T = 10.0
-nsmooth::N = 5
-smoother_omega::T = 1.0
-stencil_margin::N = 3
 end
 
 #structure to store initial conditions
@@ -444,7 +433,7 @@ end
 #Struct to hold model state comprised of all the above information.
 @with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
 grid::Grid{T,N}
-params::Params{T,N}
+params::Params{T}
 timestepping_params::TimesteppingParams{T,N}
 solver_params::SolverParams{T,N}
 initial_conditions::InitialConditions{T}
@@ -591,10 +580,10 @@ function start(;
     )
 
     #Wavelet-grid, u-component.
-    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=params.levels)
+    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=solver_params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=params.levels)
+    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=solver_params.levels)
 
     #Default clock
     clock = Clock(n_iter = 0, time = 0.0)
@@ -932,7 +921,7 @@ function update_velocities!(wavi::AbstractModel)
 
     converged::Bool = false
     i_picard::Int64 = 0
-    while !converged && (i_picard < params.maxiter_picard)
+    while !converged && (i_picard < solver_params.maxiter_picard)
 
         i_picard = i_picard + 1
 

@@ -25,7 +25,7 @@ function driver()
     #Timestepping Parameters
     n_iter0 = 0
     dt = 0.1
-    end_time = 0.1
+    end_time = 100.
     chkpt_freq = 10.
     pchkpt_freq = 20.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
