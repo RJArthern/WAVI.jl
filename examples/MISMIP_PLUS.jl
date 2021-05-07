@@ -23,11 +23,11 @@ function driver()
                 v_iszero = v_iszero)
 
     #Timestepping Parameters
-    n_iter0 = 100
+    n_iter0 = 0
     dt = 0.1
-    end_time = 20.
-    chkpt_freq = 1.
-    pchkpt_freq = 2.
+    end_time = 100.
+    chkpt_freq = 10.
+    pchkpt_freq = 20.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
                                             dt = dt, 
                                             end_time = end_time, 
