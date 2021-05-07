@@ -9,7 +9,7 @@ import LinearAlgebra: ldiv!
 import SparseArrays: spdiagm, spdiagm_internal, dimlub
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, plot_output, State, Params
+export start, run!, plot_output, State, Params, read_thick!, write_vel!
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -72,6 +72,7 @@ nsmooth::N = 5
 smoother_omega::T = 1.0
 stencil_margin::N = 3
 outfile::String = "WAVI_output.jld2"
+step_thickness::Bool = true
 end
 
 #Struct to hold information on h-grid, located at cell centers.
@@ -282,6 +283,9 @@ function start(params)
     #Remove all points on u- and v-grids with homogenous Dirichlet conditions.
     u_mask[params.u_iszero].=false
     v_mask[params.v_iszero].=false
+      
+    #step thickness setting
+    step_thickness = params.step_thickness
 
     #h-grid
     gh=HGrid(x0=params.x0,
@@ -354,12 +358,38 @@ function start(params)
     return wavi
 end
 
+
+function read_thick!(wavi::AbstractModel,thickness_file)
+    @unpack gh = wavi  
+    gh.h[:] = thickness_file
+    return wavi
+end
+
+function write_vel!(wavi::State, uVel_file_string::String, vVel_file_string::String )
+    @unpack gh,gu,gv,params = wavi  
+      u_out=gu.u[1:end-1,1:end]
+      v_out=gv.v[1:end,1:end-1]
+
+      u_out .= hton.(u_out)
+      v_out .= hton.(v_out)
+
+    ufileID =  open(uVel_file_string,"w")
+      write(ufileID, u_out[:,:])
+    close(ufileID) 
+    vfileID =  open(vVel_file_string,"w")
+    write(vfileID, v_out[:,:])
+    close(vfileID)   
+   
+ end 
+
+
 """
     run!(wavi)
 
 Run WAVI model for one timestep. Input variable is modified.
 """
 function run!(wavi)
+    @unpack params=wavi  
     update_surface_elevation!(wavi)
     update_geometry_on_uv_grids!(wavi)
     update_height_above_floatation!(wavi)
@@ -369,8 +399,10 @@ function run!(wavi)
     update_weertman_c!(wavi)
     update_dsdh!(wavi)
     update_velocities!(wavi)
-    update_dhdt!(wavi)
-    update_thickness!(wavi)
+    if params.step_thickness==true  
+      update_dhdt!(wavi)
+      update_thickness!(wavi)
+    end
     update_wavelets!(wavi)
     return wavi
 end
