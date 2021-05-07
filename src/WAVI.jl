@@ -483,7 +483,7 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 ∂1d(n,dx) = spdiagm(n,n+1,0 => -ones(n), 1 => ones(n))/dx
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
-
+f() = 2
 """
     start(params)
 
@@ -528,6 +528,9 @@ function start(;
 
     #h-grid
     #gh=HGrid(grid, params) #uncomment if using the explicit constructor method
+    #h =  deepcopy(initial_conditions.initial_thickness)
+    h =  deepcopy(initial_conditions.initial_thickness)
+    ηav = deepcopy(initial_conditions.initial_viscosity)
     gh=HGrid(
     x0=grid.x0,
     y0=grid.y0,
@@ -537,8 +540,8 @@ function start(;
     dy=grid.dy,
     mask=h_mask,
     b = bed_array,
-    h = initial_conditions.initial_thickness,
-    ηav = initial_conditions.initial_viscosity,
+    h = h,
+    ηav = ηav,
     )
 
     #u-grid
@@ -980,9 +983,9 @@ end
 """
 
 function get_rhs(wavi::AbstractModel)
-    @unpack gh,gu,gv,gc,params=wavi
+    @unpack gh,gu,gv,gc,params, timestepping_params=wavi
     onesvec=ones(gh.nx*gh.ny)
-    surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
+    surf_elev_adjusted = gh.crop*(gh.s[:] .+ timestepping_params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
         (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂x'*surf_elev_adjusted))
         ;
@@ -1165,9 +1168,9 @@ end
 Update thickness using rate of change of thickness and apply minimum thickness constraint.
 """
 function update_thickness!(wavi::AbstractModel)
-    @unpack gh,gu,gv,params=wavi
+    @unpack gh,gu,gv,params, timestepping_params=wavi
     onesvec=ones(gh.nx*gh.ny)
-    gh.h[gh.mask] .= gh.h[gh.mask] .+ max.(params.minimum_thickness .- gh.h[gh.mask],params.dt*gh.dhdt[gh.mask])
+    gh.h[gh.mask] .= gh.h[gh.mask] .+ max.(params.minimum_thickness .- gh.h[gh.mask],timestepping_params.dt*gh.dhdt[gh.mask])
     return wavi
 end
 """
@@ -1180,6 +1183,7 @@ function update_height_above_floatation!(wavi::AbstractModel)
     gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
     return wavi
 end
+
 """
     update_grounded_fraction_on_huv_grids!(wavi::AbstractModel)
 
@@ -1551,11 +1555,11 @@ end
 Precompute various diagonal matrices used in defining the momentum operator.
 """
 function update_rheological_operators!(wavi::AbstractModel)
-    @unpack gh,gu,gv,params=wavi
+    @unpack gh,gu,gv,params, timestepping_params=wavi
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
-    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * params.dt * gh.dsdh[:])*gh.crop
+    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * timestepping_params.dt * gh.dsdh[:])*gh.crop
     return wavi
 end
 
