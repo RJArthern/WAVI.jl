@@ -43,7 +43,7 @@ function init_simulation_test()
 
     #timestepping parameters
     n_iter0 = 0
-    dt = 10.
+    dt = 0.1
     end_time = 1000.
     chkpt_freq = 100.
     pchkpt_freq = 200.
@@ -56,7 +56,9 @@ function init_simulation_test()
     #output parameters
     outputs = (h = model.gh.h, u = model.gu.u);
     output_freq = 1.
-    output_params = OutputParams(outputs = outputs, output_freq = output_freq)
+    output_params = OutputParams(outputs = outputs, 
+                            output_freq = output_freq,
+                            format = "mat")
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 

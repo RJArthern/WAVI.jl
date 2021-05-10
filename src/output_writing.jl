@@ -1,38 +1,38 @@
 #file containing outputting functions
+"""
+    write_output(simulation::AbstractSimulation)
 
+Output the data from the simulation at the current timestep
+"""
+function write_output(simulation::AbstractSimulation)
+    @unpack output_params, model, clock = simulation
+    output_dict = fetch_output(output_params.outputs)
 
-function write_output(wavi::AbstractModel)
-    #initilize empty dictionary for output
-    dict = Dict()
-    #loop over every entry in the dictionary, for each entry, get the corresponding matrix
-    for (key,val) in wavi.output.out_dict
-        field = fetch_val(wavi,val)
-        dict[key] = field
+    #put the grid co-ordinates and time into output
+    if ~haskey(output_dict, :t); output_dict["t"] = clock.time; end
+    if ~haskey(output_dict, :x); output_dict["x"] = model.grid.xxh; end
+    if ~haskey(output_dict, :y); output_dict["y"] = model.grid.yyh; end
+
+    fname = string(output_params.prefix , lpad(simulation.clock.n_iter, 10,"0"));
+    if output_params.format == "jld2"
+        fname = string(fname, ".jld2")
+        save(fname, output_dict)
+    elseif output_params.format == "mat"
+        fname = string(fname, ".mat")
+        matwrite(fname, output_dict)
     end
-    return dict
 end
 
+"""
+    fetch_output(outputs)
 
-function fetch_val(wavi_,val::Expr)
-    #define a function to eval
-    #wavi = wavi
-    println(val)
-    
-    field_fn = @eval f(wavi)=$val
-            
-    field = field_fn()
-
-    return field
-end
-
-function initialize_output_variables!(wavi)
-    #for each value, evaluate that expression now
-    dict = Dict()
-    
-    for (key,val) in wavi.output.out_dict
-        println(eval(val))
+Return a dictionary with dictionary entries corresponding to outputs
+"""
+function fetch_output(outputs)
+    output_dict = Dict()
+    for (k,v) in zip(keys(outputs), outputs)
+        output_dict[string(k)] = v
     end
-    wavi = @set wavi.output.out_dict_values = dict
-    
-    return nothing
+    return output_dict
 end
+
