@@ -1,5 +1,5 @@
 using WAVI 
-function MISMIP_PLUS_test()
+function init_simulation_test()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -63,8 +63,7 @@ function MISMIP_PLUS_test()
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 
                         output_params = output_params)
-            
-    #perform the simulation
-    run_simulation!(simulation)
+
+
     return simulation
 end

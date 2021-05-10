@@ -1,5 +1,5 @@
 using WAVI 
-function driver()
+function MISMIP_PLUS()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -22,18 +22,6 @@ function driver()
                 u_iszero = u_iszero, 
                 v_iszero = v_iszero)
 
-    #Timestepping Parameters
-    n_iter0 = 0
-    dt = 0.1
-    end_time = 1000.
-    chkpt_freq = 100.
-    pchkpt_freq = 200.
-    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
-                                            dt = dt, 
-                                            end_time = end_time, 
-                                            chkpt_freq = chkpt_freq, 
-                                            pchkpt_freq = pchkpt_freq)
-
     #Bed 
     bed = WAVI.mismip_plus_bed #function definition
 
@@ -47,12 +35,36 @@ function driver()
     params = Params(default_thickness = default_thickness, 
                     accumulation_rate = accumulation_rate)
 
-    #run the simulation
-    wavi = simulation(grid = grid,
+    #make the model
+    model = Model(grid = grid,
                      bed_elevation = bed, 
                      params = params, 
-                     solver_params = solver_params,
-                     timestepping_params = timestepping_params)
+                     solver_params = solver_params)
 
-    return wavi
+    #timestepping parameters
+    n_iter0 = 0
+    dt = 0.1
+    end_time = 1000.
+    chkpt_freq = 100.
+    pchkpt_freq = 200.
+    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
+                                            dt = dt, 
+                                            end_time = end_time, 
+                                            chkpt_freq = chkpt_freq, 
+                                            pchkpt_freq = pchkpt_freq)
+
+    #output parameters
+    outputs = (h = model.gh.h, u = model.gu.u);
+    output_freq = 100.
+    output_params = OutputParams(outputs = outputs, 
+                            output_freq = output_freq,
+                            format = "mat")
+    
+    simulation = Simulation(model = model, 
+                        timestepping_params = timestepping_params, 
+                        output_params = output_params)
+            
+    #perform the simulation
+    run_simulation!(simulation)
+    return simulation
 end

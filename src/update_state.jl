@@ -1,0 +1,151 @@
+
+"""
+update_state!(model::AbstractModel)
+
+Update the model to the current situation
+"""
+function update_state!(model)
+    update_surface_elevation!(model)
+    update_geometry_on_uv_grids!(model)
+    update_height_above_floatation!(model)
+    update_grounded_fraction_on_huv_grids!(model)
+    update_accumulation_rate!(model)
+    update_basal_melt!(model)
+    update_weertman_c!(model)
+    update_dsdh!(model)
+    update_model_velocities!(model)
+    update_dhdt!(model)
+    update_model_wavelets!(model)
+    return nothing
+end
+
+"""
+    update_surface_elevation!(model::AbstractModel)
+
+Adjust surface elevation to hydrostatic equilibrium.
+"""
+function update_surface_elevation!(model::AbstractModel)
+    @unpack gh,params=model
+    gh.s[gh.mask] .= max.(gh.b[gh.mask]+gh.h[gh.mask],
+                          params.sea_level_wrt_geoid .+ gh.h[gh.mask]*(1-params.density_ice./params.density_ocean))
+    return model
+end
+
+"""
+    update_geometry_on_uv_grids!(model::AbstractModel)
+
+Interpolate thickness and surface elvation from h-grid to u- and v-grids.
+
+"""
+function update_geometry_on_uv_grids!(model::AbstractModel)
+    @unpack gh,gu,gv,gc=model
+    onesvec=ones(gh.nx*gh.ny)
+    gu.h[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.h[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    gu.s[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.s[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    gv.h[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.h[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    gv.s[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.s[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    return model
+end
+
+"""
+    update_height_above_floatation!(model::AbstractModel)
+
+Update height above floatation. Zero value is used to define location of grounding line.
+"""
+function update_height_above_floatation!(model::AbstractModel)
+    @unpack gh,params=model
+    gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
+    return model
+end
+
+"""
+    update_grounded_fraction_on_huv_grids!(model::AbstractModel)
+
+Update grounded area fraction on h-, u-, and v-grids for use in subgrid parameterisation.
+"""
+function update_grounded_fraction_on_huv_grids!(model::AbstractModel)
+    @unpack gh,gu,gv = model
+    (gfh,gfu,gfv)=pos_fraction(gh.haf;mask=gh.mask)
+    gh.grounded_fraction[:] .= gfh[:]
+    gu.grounded_fraction[:] .= gfu[:]
+    gv.grounded_fraction[:] .= gfv[:]
+    return model
+end
+
+"""
+    update_accumulation_rate!(model::AbstractModel)
+
+Update the accumulation rate.
+"""
+function update_accumulation_rate!(model::AbstractModel)
+    @unpack gh,params = model
+    gh.accumulation .= params.accumulation_rate
+    return model
+end
+
+
+"""
+    update_basal_melt!(model::AbstractModel)
+
+Update the basal melt rate.
+"""
+function update_basal_melt!(model::AbstractModel)
+    @unpack gh, params = model
+    gh.basal_melt .= params.basal_melt_rate
+    return model
+end
+
+"""
+    update_weertman_c!(model::AbstractModel)
+
+Update coefficient used in the sliding law to account for migration of grounding line.
+"""
+function update_weertman_c!(model::AbstractModel)
+    @unpack gh,params = model
+    gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
+    return model
+end
+
+"""
+    update_dsdh!(model::AbstractModel)
+
+Compute change of surface elevation per unit thickness change, accounting for hydrostatic adjustment.
+"""
+function update_dsdh!(model::AbstractModel)
+    @unpack gh,gu,gv,params = model
+    gh.dsdh .= (1.0 - params.density_ice./params.density_ocean) .+
+           (params.density_ice./params.density_ocean).*gh.grounded_fraction;
+    return model
+end
+
+"""
+    update_model_velocity!(model::AbstractModel)
+
+Wrapper function for that which updates the model velocities
+"""
+function update_model_velocities!(model::AbstractModel)
+    update_velocities!(model)
+    return model
+end
+
+"""
+    update_dhdt!(model::AbstractModel)
+
+Evaluate rate of change of thickness using mass conservation.
+"""
+function update_dhdt!(model::AbstractModel)
+    @unpack gh,gu,gv=model
+    gh.dhdt[gh.mask].=gh.samp*(gh.accumulation[:] .- gh.basal_melt[:] .-
+             (  (gu.∂x*(gu.crop*(gu.h[:].*gu.u[:]))) .+ (gv.∂y*(gv.crop*(gv.h[:].*gv.v[:]))) ) )
+    return model
+end
+
+""" 
+    update_model_wavelets(model::AbstractModel)
+
+Wrapper function for that which updates the model wavelets
+"""
+function update_model_wavelets!(model::AbstractModel)
+    update_wavelets!(model)
+    return model
+end
