@@ -488,7 +488,8 @@ function start(;
     params = Params(),
     solver_params = SolverParams(),
     initial_conditions = InitialConditions(),
-    timestepping_params = TimesteppingParams())
+    timestepping_params = TimesteppingParams(),
+    output = Output())
 
     #check that a grid and bed has been inputted
     ~(grid === nothing) || throw(ArgumentError("You must specify an input grid"))
@@ -697,7 +698,8 @@ function simulation(;
                     params = params, 
                     solver_params = solver_params,
                     initial_conditions = initial_conditions,
-                    timestepping_params = timestepping_params)
+                    timestepping_params = timestepping_params,
+                    output = output)
 
         #initialize things
         chkpt_tag = "A" #initialize the checkpoint tag
