@@ -1,4 +1,3 @@
-#file containing outputting functions
 
 #structure that contains outputting info
 struct Output{T <: Real, N}
@@ -25,9 +24,4 @@ function Output(;
     (format == "jld2" || format == "mat") || ArgumentError("Output format must be jld2 or mat")
 
     return Output(out_dict, out_freq, n_iter_out, format, zipped, prefix)
-end
-
-function write_output(wavi::AbstractModel,output::Output)
-
-    return nothing
 end

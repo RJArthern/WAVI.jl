@@ -1,5 +1,5 @@
 using WAVI 
-function driver()
+function init_wavi_test()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -57,7 +57,8 @@ function driver()
                 params = params, 
                 solver_params = solver_params,  
                 timestepping_params = timestepping_params, 
-                grid = grid);
+                grid = grid,
+                output = output);
 
     return wavi
 end

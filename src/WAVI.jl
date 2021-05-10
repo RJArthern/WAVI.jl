@@ -28,9 +28,8 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 #Concrete types
 
 ##################################################################################
-# include sub-files
-include("./outputs.jl")
-
+#type definitions
+include("./Output.jl")
 
 ##################################################################################
 #grid info
@@ -441,6 +440,7 @@ params::Params{T}
 timestepping_params::TimesteppingParams{T,N}
 solver_params::SolverParams{T,N}
 initial_conditions::InitialConditions{T}
+output::Output{T,N}
 gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
@@ -594,7 +594,7 @@ function start(;
     clock = Clock(n_iter = 0, time = 0.0)
 
     #Use type constructor to build initial state.
-    wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,gh,gu,gv,gc,g3d,wu,wv,clock)
+    wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,output,gh,gu,gv,gc,g3d,wu,wv,clock)
 
     return wavi
 end
@@ -1739,4 +1739,11 @@ function _spdiagm(size, kv::Pair{<:Integer,<:AbstractVector}...)
     return sparse(I, J, V, m, n)
 end
 
+
+##################################################################################
+# include sub-files
+include("./output_writing.jl")
+
 end
+
+
