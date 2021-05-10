@@ -10,7 +10,7 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, State, Params, TimesteppingParams, Grid, SolverParams, InitialConditions, simulation
+export start, run!, State, Params, TimesteppingParams, Grid, SolverParams, InitialConditions, simulation, Output
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -26,6 +26,9 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 #Concrete types
 
+##################################################################################
+# include sub-files
+include("./outputs.jl")
 
 
 ##################################################################################
@@ -669,7 +672,8 @@ function simulation(;
     params = nothing,
     solver_params = nothing,
     initial_conditions = nothing,
-    timestepping_params = nothing)
+    timestepping_params = nothing,
+    output = nothing)
 
     ~(timestepping_params === nothing) || error("Must pass timestepping params")
 
@@ -686,6 +690,7 @@ function simulation(;
         if (solver_params === nothing); solver_params = SolverParams(); end 
         if (initial_conditions === nothing); initial_conditions = InitialConditions(); end #don't worry about strange defaults here, these will be picked up by start
         if (timestepping_params === nothing); timestepping_params = TimesteppingParams(); end 
+        if (output == nothing); output = Output(); end
         wavi = start(grid = grid, 
                     bed_elevation = bed_elevation,
                     params = params, 
