@@ -593,6 +593,12 @@ function start(;
     #Default clock
     clock = Clock(n_iter = 0, time = 0.0)
 
+    #initialize number of steps in output
+    if output.out_freq !== Inf #set the output number of timesteps, if it has been specifies
+        n_iter_out = round(Int, output.out_freq/timestepping_params.dt) #compute the output timestep
+        output = @set output.n_iter_out = n_iter_out
+    end
+
     #Use type constructor to build initial state.
     wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,output,gh,gu,gv,gc,g3d,wu,wv,clock)
 
@@ -703,10 +709,6 @@ function simulation(;
 
         #initialize things
         chkpt_tag = "A" #initialize the checkpoint tag
-        if output.out_freq !== Inf #set the output number of timesteps, if it has been specifies
-            n_iter_out = round(Int, output.out_freq/timestepping_params.dt) #compute the output timestep
-            output = @set output.n_iter_out = n_iter_out
-        end
         println("running simulation...")
 
         #timestepping loop
