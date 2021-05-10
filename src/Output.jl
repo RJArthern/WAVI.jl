@@ -1,9 +1,9 @@
 
 #structure that contains outputting info
-struct Output{T <: Real, N}
+struct Output{T <: Real, R <: Real}
     out_dict::Dict       #dictionary of entries defining names and quantities to be outputted
     out_freq::T         #output time 
-    n_iter_out::N       #number of steps per output
+    n_iter_out::R       #number of steps per output
     format::String      #specify output format [mat/jld]
     zipped::Bool        #dump files at each timestep or zip the files
     prefix::String      #file prefix

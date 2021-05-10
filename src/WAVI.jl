@@ -434,13 +434,13 @@ wavelets::Array{T,2} = zeros(nx,ny); @assert size(wavelets)==(nx,ny)
 end
 
 #Struct to hold model state comprised of all the above information.
-@with_kw struct State{T <: Real, N <: Integer} <: AbstractModel{T,N}
+@with_kw struct State{T <: Real, N <: Integer, R <: Real} <: AbstractModel{T,N}
 grid::Grid{T,N}
 params::Params{T}
 timestepping_params::TimesteppingParams{T,N}
 solver_params::SolverParams{T,N}
 initial_conditions::InitialConditions{T}
-output::Output{T,N}
+output::Output{T,R}
 gh::HGrid{T,N}
 gu::UGrid{T,N}
 gv::VGrid{T,N}
