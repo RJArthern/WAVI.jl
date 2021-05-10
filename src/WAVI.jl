@@ -2,7 +2,8 @@ module WAVI
 
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
-      IterativeSolvers, Interpolations, BenchmarkTools, Reexport, NetCDF, JLD2, HDF5, Setfield
+      IterativeSolvers, Interpolations, BenchmarkTools, Reexport,
+      NetCDF, JLD2, HDF5, Setfield, MAT
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!
@@ -698,11 +699,19 @@ function simulation(;
                     initial_conditions = initial_conditions,
                     timestepping_params = timestepping_params)
 
-        #do the run
+        #initialize things
         chkpt_tag = "A" #initialize the checkpoint tag
+        if output.out_freq !== Inf #set the output number of timesteps, if it has been specifies
+            n_iter_out = round(Int, output.out_freq/timestepping_params.dt) #compute the output timestep
+            output = @set output.n_iter_out = n_iter_out
+        end
         println("running simulation...")
+
+        #timestepping loop
         for i = 1:timestepping_params.n_iter_total
             run!(wavi)
+
+            #check if we have hit a temporary checkpoint
             if mod(i,timestepping_params.n_iter_chkpt) == 0
                 #output a temporary checkpoint
                 fname = string("Chkpt",chkpt_tag, ".jld2")
@@ -710,13 +719,19 @@ function simulation(;
                 chkpt_tag = (chkpt_tag == "A") ? "B" : "A"
                 println("making temporary checkpoint at iteration number $(wavi.clock.n_iter)")
             end
+
+            #check if we have hit a permanent checkpoint
             if mod(i,timestepping_params.n_iter_pchkpt) == 0
                 #output a permanent checkpoint
                 n_iter_string =  lpad(wavi.clock.n_iter, 10, "0"); #filename as a string with 10 digits
                 fname = string("PChkpt_",n_iter_string, ".jld2")
                 @save fname wavi
                 println("making permanent checkpoint at iteration number $(wavi.clock.n_iter)")
+            end
 
+            #check if we have hit an output timestep
+            if mod(i,output.n_iter_out) == 0
+                write_output(wavi, output,clock)
             end
         end
         

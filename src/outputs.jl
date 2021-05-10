@@ -21,7 +21,13 @@ function Output(;
     #default the n_iter_out to Inf (this will be updated in the simulation)
     n_iter_out = Inf
 
+    #check the format
+    (format == "jld2" || format == "mat") || ArgumentError("Output format must be jld2 or mat")
+
     return Output(out_dict, out_freq, n_iter_out, format, zipped, prefix)
 end
 
-#function write_output(wavi::AbstractModel,output::Output
+function write_output(wavi::AbstractModel,output::Output)
+
+    return nothing
+end
