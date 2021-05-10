@@ -16,11 +16,14 @@ function Simulation(;
     #initialize the clock
     clock = Clock(n_iter = 0, time = 0.0)
 
+    #set the timestep in model parameters (hack to allow model to see the timestep in velocity solve)
+    model = @set model.params.dt = timestepping_params.dt
+
     #initialize number of steps in output
-    #if output_params.output_freq !== Inf #set the output number of timesteps, if it has been specifies
-    #    n_iter_out = round(Int, output_params.output_freq/timestepping_params.dt) #compute the output timestep
-    #    output_params = @set output_params.n_iter_out = n_iter_out
-    #end
+    if output_params.output_freq !== Inf #set the output number of timesteps, if it has been specifies
+        n_iter_out = round(Int, output_params.output_freq/timestepping_params.dt) #compute the output timestep
+        output_params = @set output_params.n_iter_out = n_iter_out
+    end
 
     return Simulation(model, timestepping_params, output_params, clock)
 end

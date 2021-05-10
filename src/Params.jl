@@ -7,6 +7,7 @@
 #starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
 
 @with_kw struct Params{T <: Real}
+    dt::T = 1.0
     g::T = 9.81
     density_ice::T = 918.0
     density_ocean::T = 1028.0
