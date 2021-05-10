@@ -12,7 +12,7 @@ import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
 export start, run!, Model, Params, TimesteppingParams, 
-Grid, SolverParams, InitialConditions, simulation, OutputParams
+Grid, SolverParams, InitialConditions, OutputParams, Simulation
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -123,7 +123,7 @@ function mismip_plus_bed(x,y)
     simulation
     
 """
-function simulation(; 
+function run_simulation(; 
     grid = nothing,
     bed_elevation = nothing,
     params = nothing,

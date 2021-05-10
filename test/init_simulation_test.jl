@@ -1,5 +1,5 @@
 using WAVI 
-function driver()
+function init_simulation_test()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -22,18 +22,6 @@ function driver()
                 u_iszero = u_iszero, 
                 v_iszero = v_iszero)
 
-    #Timestepping Parameters
-    n_iter0 = 0
-    dt = 0.1
-    end_time = 1000.
-    chkpt_freq = 100.
-    pchkpt_freq = 200.
-    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
-                                            dt = dt, 
-                                            end_time = end_time, 
-                                            chkpt_freq = chkpt_freq, 
-                                            pchkpt_freq = pchkpt_freq)
-
     #Bed 
     bed = WAVI.mismip_plus_bed #function definition
 
@@ -48,15 +36,32 @@ function driver()
                     accumulation_rate = accumulation_rate)
 
     #make the model
-    wavi = Model(grid = grid,
+    model = Model(grid = grid,
                      bed_elevation = bed, 
                      params = params, 
                      solver_params = solver_params)
 
-    
-    
-    simulation = Simulation(wavi,output_params,timestepping_params)
-    #run!(simulation)
+    #timestepping parameters
+    n_iter0 = 0
+    dt = 0.1
+    end_time = 1000.
+    chkpt_freq = 100.
+    pchkpt_freq = 200.
+    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
+                                            dt = dt, 
+                                            end_time = end_time, 
+                                            chkpt_freq = chkpt_freq, 
+                                            pchkpt_freq = pchkpt_freq)
 
-    return wavi
+    #output parameters
+    outputs = (h = model.gh.h, u = model.gu.u);
+    output_freq = 1.
+    output_params = OutputParams(outputs = outputs, output_freq = output_freq)
+    
+    simulation = Simulation(model = model, 
+                        timestepping_params = timestepping_params, 
+                        output_params = output_params)
+
+
+    return simulation
 end
