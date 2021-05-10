@@ -19,7 +19,6 @@ function update_thickness!(simulation::AbstractSimulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
 model.gh.h[model.gh.mask] = model.gh.h[model.gh.mask] .+ max.(model.params.minimum_thickness .- model.gh.h[model.gh.mask],timestepping_params.dt*model.gh.dhdt[model.gh.mask])
-println("hello")
 return simulation
 end
 
@@ -40,8 +39,9 @@ end
     run_simulation(simulation)
 Perform the simulation specified by the simulation
 """
-function run_simulation(simulation::Simulation)
+function run_simulation!(simulation::Simulation)
     @unpack model, timestepping_params, output_params = simulation
+    chkpt_tag = "A"
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
 
@@ -51,7 +51,7 @@ function run_simulation(simulation::Simulation)
             fname = string("Chkpt",chkpt_tag, ".jld2")
             @save fname simulation
             chkpt_tag = (chkpt_tag == "A") ? "B" : "A"
-            println("making temporary checkpoint at iteration number $(simulation.clock.n_iter)")
+            println("making temporary checkpoint at timestep number $(simulation.clock.n_iter)")
         end
 
         #check if we have hit a permanent checkpoint
@@ -60,12 +60,14 @@ function run_simulation(simulation::Simulation)
             n_iter_string =  lpad(simulation.clock.n_iter, 10, "0"); #filename as a string with 10 digits
             fname = string("PChkpt_",n_iter_string, ".jld2")
             @save fname simulation
-            println("making permanent checkpoint at iteration number $(simulation.clock.n_iter)")
+            println("making permanent checkpoint at timestep number $(simulation.clock.n_iter)")
         end
 
         #check if we have hit an output timestep
         if mod(i,simulation.output_params.n_iter_out) == 0
             write_output(simulation)
+            println("outputting at timestep number $(simulation.clock.n_iter)")
+
         end
         end
         

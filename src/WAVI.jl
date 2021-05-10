@@ -12,7 +12,7 @@ import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
 export update_state!, timestep!, Model, Params, TimesteppingParams, 
-Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation
+Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation!
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -46,11 +46,11 @@ include("./Simulation.jl")
 #Functions
 include("output_writing.jl")
 include("preconditioners.jl")
-include("run_simulation.jl")
 include("update_state.jl")
 include("update_velocities.jl")
 include("utilities.jl")
 include("wavelets.jl")
+include("run_simulation.jl")
 
 
 """

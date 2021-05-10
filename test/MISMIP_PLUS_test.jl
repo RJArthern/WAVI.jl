@@ -1,5 +1,5 @@
 using WAVI 
-function init_simulation_test()
+function MISMIP_PLUS_test()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -43,8 +43,8 @@ function init_simulation_test()
 
     #timestepping parameters
     n_iter0 = 0
-    dt = 10.
-    end_time = 1000.
+    dt = 0.1
+    end_time = 100.
     chkpt_freq = 100.
     pchkpt_freq = 200.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
@@ -56,7 +56,9 @@ function init_simulation_test()
     #output parameters
     outputs = (h = model.gh.h, u = model.gu.u);
     output_freq = 1.
-    output_params = OutputParams(outputs = outputs, output_freq = output_freq)
+    output_params = OutputParams(outputs = outputs, 
+                            output_freq = output_freq,
+                            format = "mat")
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 
@@ -64,7 +66,5 @@ function init_simulation_test()
             
     #perform the simulation
     run_simulation!(simulation)
-
-
     return simulation
 end

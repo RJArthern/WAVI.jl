@@ -44,7 +44,7 @@ function init_simulation_test()
     #timestepping parameters
     n_iter0 = 0
     dt = 0.1
-    end_time = 1000.
+    end_time = 100.
     chkpt_freq = 100.
     pchkpt_freq = 200.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
