@@ -1,18 +1,38 @@
 #file containing outputting functions
 
 
-function write_output(wavi::AbstractModel,output::Output,clock::Clock)
+function write_output(wavi::AbstractModel)
+    #initilize empty dictionary for output
+    dict = Dict()
     #loop over every entry in the dictionary, for each entry, get the corresponding matrix
-    for (key,val) in output.out_dict
+    for (key,val) in wavi.output.out_dict
         field = fetch_val(wavi,val)
-        save_field(output,clock)
+        dict[key] = field
     end
-    return nothing
+    return dict
 end
 
 
-function fetch_val(wavi,val::Expr)
+function fetch_val(wavi_,val::Expr)
+    #define a function to eval
+    #wavi = wavi
+    println(val)
+    
+    field_fn = @eval f(wavi)=$val
+            
+    field = field_fn()
 
+    return field
+end
 
+function initialize_output_variables!(wavi)
+    #for each value, evaluate that expression now
+    dict = Dict()
+    
+    for (key,val) in wavi.output.out_dict
+        println(eval(val))
+    end
+    wavi = @set wavi.output.out_dict_values = dict
+    
     return nothing
 end

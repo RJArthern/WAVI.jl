@@ -1,5 +1,5 @@
 using WAVI 
-function init_wavi_test()
+function init_model_test()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -22,18 +22,6 @@ function init_wavi_test()
                 u_iszero = u_iszero, 
                 v_iszero = v_iszero)
 
-    #Timestepping Parameters
-    n_iter0 = 0
-    dt = 0.1
-    end_time = 1000.
-    chkpt_freq = 100.
-    pchkpt_freq = 200.
-    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
-                                            dt = dt, 
-                                            end_time = end_time, 
-                                            chkpt_freq = chkpt_freq, 
-                                            pchkpt_freq = pchkpt_freq)
-
     #Bed 
     bed = WAVI.mismip_plus_bed #function definition
 
@@ -47,18 +35,11 @@ function init_wavi_test()
     params = Params(default_thickness = default_thickness, 
                     accumulation_rate = accumulation_rate)
 
-    #outputting
-    out_freq = 1.
-    out_dict = Dict("h" => :(wavi.gh.h), "u" => :(wavi.gu.u))
-    output = Output(out_freq = out_freq, out_dict = out_dict)
-    
-    #initialize the run 
-    wavi = start(bed_elevation = bed, 
-                params = params, 
-                solver_params = solver_params,  
-                timestepping_params = timestepping_params, 
-                grid = grid,
-                output = output);
+    #make the model
+    model = Model(grid = grid,
+                     bed_elevation = bed, 
+                     params = params, 
+                     solver_params = solver_params)
 
-    return wavi
+    return model
 end

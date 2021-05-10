@@ -11,7 +11,8 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
-export start, run!, State, Params, TimesteppingParams, Grid, SolverParams, InitialConditions, simulation, Output
+export start, run!, Model, Params, TimesteppingParams, 
+Grid, SolverParams, InitialConditions, simulation, OutputParams
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -20,6 +21,7 @@ export start, run!, State, Params, TimesteppingParams, Grid, SolverParams, Initi
 abstract type AbstractGrid{T <: Real, N <: Integer} end
 abstract type AbstractModel{T <: Real, N <: Integer} end
 abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
+abstract type AbstractSimulation{T <: Real, N <: Integer, R <: Real} end
 
 #Type alias, just for abreviation
 const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,SparseMatrixCSC{T,N}},
@@ -29,443 +31,16 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 ##################################################################################
 #type definitions
-include("./Output.jl")
+include("./OutputParams.jl")
+include("./Grid.jl")
+include("./Params.jl")
+include("./Clock.jl")
+include("./InitialConditions.jl")
+include("./ModelGrids.jl")
+include("./WaveletGrids.jl")
+include("./Model.jl")
+include("./Simulation.jl")
 
-##################################################################################
-#grid info
-struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
-    nx::N
-    ny::N
-    nσ::N 
-    dx::T
-    dy::T
-    x0::T
-    y0::T
-    h_mask::Array{Bool,2}
-    u_iszero::Array{Bool,2} #zero boundary condition locations on u
-    v_iszero::Array{Bool,2} #zero boundary condition locations on u
-    xxh::Array{T,2}         #x co-ordinates matrix of h grid
-    yyh::Array{T,2}         #y co-ordinates matrix of h grid
-    xxu::Array{T,2}         #x co-ordinates matrix of u grid
-    yyu::Array{T,2}         #y co-ordinates matrix of u grid
-    xxv::Array{T,2}         #x co-ordinates matrix of v grid
-    yyv::Array{T,2}         #y co-ordinates matrix of v grid
-    xxc::Array{T,2}         #x co-ordinates matrix of c grid
-    yyc::Array{T,2}         #y co-ordinates matrix of c grid
-    σ::Vector{T}           #sigma levels
-    ζ::Vector{T}            #reverse sigma levels
-    quadrature_weights::Vector{T} #quadrature weights
-end
-
-
-#grid constructor 
-function Grid(; 
-                nx = 80,
-                ny = 10,
-                dx = 8000.0,
-                dy = 8000.0,
-                nσ = 4,
-                x0 = 0.0,
-                y0 = -40000.0,
-                h_mask = trues(nx,ny),
-                u_iszero = falses(nx+1,ny),
-                v_iszero = falses(nx,ny+1))
-
-    #check the sizes of inputs
-    @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
-    @assert size(u_iszero)==(nx+1,ny)
-    @assert size(v_iszero)==(nx,ny+1)
-
-    #map bit arrays to boolean
-    h_mask = convert(Array{Bool,2}, h_mask)
-    u_iszero = convert(Array{Bool,2}, u_iszero)
-    v_iszero = convert(Array{Bool,2}, v_iszero)
-
-
-    #compute grid co-ordinates
-    xxh=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxh)==(nx,ny)
-    yyh=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyh)==(nx,ny)
-
-    xxu=[x0+(i-1.0)*dx for i=1:nx, j=1:ny]; @assert size(xxu)==(nx,ny)
-    yyu=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyu)==(nx,ny)
-
-    xxv=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxv)==(nx,ny)
-    yyv=[y0+(j-1.0)*dy for i=1:nx, j=1:ny]; @assert size(yyv)==(nx,ny)
-
-    xxc=[x0+i*dx for i=1:nx, j=1:ny]; @assert size(xxc)==(nx,ny)
-    yyc=[y0+j*dy for i=1:nx, j=1:ny]; @assert size(yyc)==(nx,ny)
-    
-    #sigma grid info
-    σ = collect(range(0.0,length=nσ,stop=1.0)); @assert length(σ) == nσ
-    ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
-    quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(quadrature_weights) == nσ
-
-    return Grid(nx,ny,nσ,dx,dy,x0,y0,h_mask,u_iszero,v_iszero,
-                xxh,yyh,xxu,yyu,xxv,yyv,xxc,yyc,σ,ζ,quadrature_weights)
-end
-
-
-
-#Struct to hold model parameters.
-#Format: fieldname::Type = default_value.
-#T & N are type parameters, usually real numbers (e.g. Float64) and integers (e.g. Int64) respectively.
-
-#bed_elevation::Array{T,2} = zeros(nx,ny); @assert size(bed_elevation)==(nx,ny)
-#starting_thickness::Array{T,2} = zeros(nx,ny); @assert size(starting_thickness)==(nx,ny)
-
-@with_kw struct Params{T <: Real}
-g::T = 9.81
-density_ice::T = 918.0
-density_ocean::T = 1028.0
-gas_const=8.314;
-sec_per_year::T = 3600*24*365.25
-default_thickness::T = 100.
-default_viscosity::T = 1.0e7
-default_temperature::T = 265.700709
-default_damage::T = 0.0
-accumulation_rate::T = 0.0
-basal_melt_rate::T = 0.0
-glen_a_activation_energy::T = 5.8631e+04
-glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
-glen_temperature_ref::T = 263.15
-glen_n::T = 3.0
-glen_reg_strain_rate::T = 1.0e-5
-weertman_c::T = 1e4
-weertman_m::T = 3.0
-weertman_reg_speed::T = 1.0e-5
-sea_level_wrt_geoid::T = 0.0
-minimum_thickness::T = 50.0
-end
-
-#structure to store initial conditions
-@with_kw struct InitialConditions{T <: Real}
-    initial_thickness::Array{T,2} = zeros(10,10)
-    initial_viscosity::Array{T,2} = zeros(10,10) #placeholder array
-    initial_temperature::Array{T,2} = zeros(10,10)
-    initial_damage::Array{T,2} = zeros(10,10)
-end
-
-
-#structure to hold the solver parameters
-@with_kw struct SolverParams{T <: Real, N <: Integer}
-    n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
-    tol_picard::T = 1e-5
-    maxiter_picard::N = 30
-    tol_coarse::T = 1e-5
-    maxiter_coarse::N = 1000
-    levels::N = 3
-    wavelet_threshold::T = 10.0
-    nsmooth::N = 5
-    smoother_omega::T = 1.0
-    stencil_margin::N = 3
-end
-
-struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
-    n_iter0::N      #initial iteration number
-    dt::T           #timestep
-    end_time::T     #end time of this simulation
-    t0::T           #start time of this simulation 
-    chkpt_freq::T   #temporary checkpoint frequency
-    pchkpt_freq::T  #permanent checkpoint frequency  
-    n_iter_total::TO #total number of timesteps counting from zero
-    n_iter_chkpt::C #number of iterations per temporary checkpoint
-    n_iter_pchkpt::P#number of iterations per permanent checkpoint
-end
-
-function TimesteppingParams(;
-                        n_iter0 = 0,
-                        dt = 1.0,
-                        end_time = 1.0,
-                        t0 = nothing,
-                        chkpt_freq = Inf,
-                        pchkpt_freq = Inf)
-
-    #(n_iter0 > 0) || ArgumentError("n_iter0 must be a positive number")
-
-    #if n_iter0 > 0, check file exists and get start time, else throw error 
-
-
-    #initialize t0 (really you should read start time from pickup file)
-    t0 = n_iter0 > 0 ? n_iter0 * dt : 0 
-    t0 = map(typeof(dt), t0)
-
-    #compute number of timesteps (total and per checkpoint)
-    end_time == Inf ? n_iter_total = Inf : n_iter_total  = round(Int, end_time/dt)
-    chkpt_freq == Inf ? n_iter_chkpt = Inf : n_iter_chkpt  = round(Int, chkpt_freq/dt)
-    pchkpt_freq == Inf ? n_iter_pchkpt = Inf : n_iter_pchkpt = round(Int, pchkpt_freq/dt)
-    
-    return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq, n_iter_total, n_iter_chkpt, n_iter_pchkpt)
-end
-
-
-#mutable clock structure to store time info
-mutable struct Clock{T <: Real, N <: Integer}
-    n_iter::N
-    time::T
-end
-
-#clock constructor
-function Clock(;
-                n_iter = 0,
-                time = 0)
-    return Clock(n_iter, time)
-end
-
-########### H grid explicit constructor ###########
-#Struct to hold information on h-grid, located at cell centers.
-#struct HGrid{T <: Real, N <: Integer}
-#mask::Array{Bool,2}
-#n::N
-#crop::Diagonal{T,Array{T,1}}
-#samp::SparseMatrixCSC{T,N} 
-#spread::SparseMatrixCSC{T,N}
-#b::Array{T,2} 
-#h::Array{T,2} 
-#s::Array{T,2} 
-#dhdt::Array{T,2} 
-#accumulation::Array{T,2}
-#basal_melt::Array{T,2}
-#haf::Array{T,2}
-#grounded_fraction::Array{T,2}
-#dsdh::Array{T,2}
-#shelf_strain_rate::Array{T,2} 
-#av_speed::Array{T,2}
-#bed_speed::Array{T,2}
-#weertman_c::Array{T,2}
-#β::Array{T,2} 
-#βeff::Array{T,2} 
-#τbed::Array{T,2}
-#ηav::Array{T,2}
-#quad_f2::Array{T,2}
-#dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} 
-#dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}}
-#end
-
-#H grid constructor
-#function HGrid(grid::Grid{T,N}, params) where {T <: Real, N <: Integer}
-#    #unpack grid size
-#    nx = grid.nx
-#    ny = grid.ny
-
-#    #fill fields
-#    mask = grid.h_mask
-#    n = count(mask);                 @assert n == count(mask)
-#    crop = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-#    samp = crop[mask[:],:];          @assert samp == crop[mask[:],:]
-#    spread = sparse(samp');          @assert spread == sparse(samp')
-#    b = grid.bed_elevation;             @assert size(b)==(nx,ny)
-#    h = params.starting_thickness;   @assert size(h)==(nx,ny)
-#    s = zeros(nx,ny);                @assert size(s)==(nx,ny)
-#    dhdt = zeros(nx,ny);             @assert size(dhdt)==(nx,ny)
-#    accumulation = zeros(nx,ny);     @assert size(accumulation)==(nx,ny)
-#    basal_melt = zeros(nx,ny);       @assert size(basal_melt)==(nx,ny)
-#    haf = zeros(nx,ny);              @assert size(haf)==(nx,ny)
-#    grounded_fraction = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-#    dsdh = ones(nx,ny);              @assert size(dsdh)==(nx,ny)
-#    shelf_strain_rate = zeros(nx,ny);@assert size(shelf_strain_rate)==(nx,ny)
-#    av_speed = zeros(nx,ny);         @assert size(av_speed)==(nx,ny)
-#    bed_speed = zeros(nx,ny);        @assert size(bed_speed)==(nx,ny)
-#    weertman_c = zeros(nx,ny);       @assert size(weertman_c)==(nx,ny)
-#    β = zeros(nx,ny);                @assert size(β)==(nx,ny)
-#    βeff = zeros(nx,ny);             @assert size(βeff)==(nx,ny)
-#    τbed = zeros(nx,ny);             @assert size(τbed)==(nx,ny)
-#    ηav = fill(params.starting_viscosity,nx,ny)
-#    quad_f2 = h./(3*ηav);           @assert size(quad_f2)==(nx,ny)
-#    dneghηav = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-#    dimplicit = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-#
-#    return HGrid(mask,n,crop,samp,spread,b,h,s,dhdt,accumulation,basal_melt,haf,
-#        grounded_fraction,dsdh,shelf_strain_rate,av_speed,bed_speed,weertman_c,β,
-#        βeff,τbed,ηav,quad_f2,dneghηav,dimplicit)
-#end
-
-
-#Struct to hold information on h-grid, located at cell centers.
-@with_kw struct HGrid{T <: Real, N <: Integer}
-    nx::N
-    ny::N
-    x0::T = 0.0
-    y0::T = 0.0
-    dx::T = 1.0
-    dy::T = 1.0
-    xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-    yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-    mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny); @assert mask == clip(mask)
-    n::N = count(mask); @assert n == count(mask)
-    crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-    samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-    spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-    b::Array{T,2} = params.bed_elevation; @assert size(b)==(nx,ny)
-    h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-    s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-    dhdt::Array{T,2} = zeros(nx,ny); @assert size(dhdt)==(nx,ny)
-    accumulation::Array{T,2} = zeros(nx,ny); @assert size(accumulation)==(nx,ny)
-    basal_melt::Array{T,2} = zeros(nx,ny); @assert size(basal_melt)==(nx,ny)
-    haf::Array{T,2} = zeros(nx,ny); @assert size(haf)==(nx,ny)
-    grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-    dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)
-    shelf_strain_rate::Array{T,2} = zeros(nx,ny); @assert size(shelf_strain_rate)==(nx,ny)
-    av_speed::Array{T,2} = zeros(nx,ny); @assert size(av_speed)==(nx,ny)
-    bed_speed::Array{T,2} = zeros(nx,ny); @assert size(bed_speed)==(nx,ny)
-    weertman_c::Array{T,2} = zeros(nx,ny); @assert size(weertman_c)==(nx,ny)
-    β::Array{T,2} = zeros(nx,ny); @assert size(β)==(nx,ny)
-    βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-    τbed::Array{T,2} = zeros(nx,ny); @assert size(τbed)==(nx,ny)
-    ηav::Array{T,2}; @assert size(ηav)==(nx,ny)
-    quad_f2::Array{T,2} = h./(3*ηav); @assert size(quad_f2)==(nx,ny)
-    dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-    dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-    end
-    
-#Struct to hold information on u-grid, located at grid-East and grid-West cell faces.
-@with_kw struct UGrid{T <: Real, N <: Integer}
-nx::N
-ny::N
-x0::T = 0.0
-y0::T = 0.0
-dx::T = 1.0
-dy::T = 1.0
-xx::Array{T,2}=[x0+(i-1.0)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-n::N = count(mask); @assert n == count(mask)
-crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-cent::KronType{T,N} = spI(ny) ⊗ c(nx-1)
-∂x::KronType{T,N} = spI(ny) ⊗ ∂1d(nx-1,dx)
-∂y::KronType{T,N} = ∂1d(ny-1,dy) ⊗ χ(nx-2)
-levels::N
-dwt::KronType{T,N} = wavelet_matrix(ny,levels,"forward" ) ⊗ wavelet_matrix(nx,levels,"forward")
-s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-dnegβeff::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(-βeff[:])*crop)
-u::Array{T,2} = zeros(nx,ny); @assert size(u)==(nx,ny)
-end
-
-#Struct to hold information on v-grid, located at grid-North and grid-South cell faces.
-@with_kw struct VGrid{T <: Real, N <: Integer}
-nx::N
-ny::N
-x0::T = 0.0
-y0::T = 0.0
-dx::T = 1.0
-dy::T = 1.0
-xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-yy::Array{T,2}=[y0+(j-1.0)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-n::N = count(mask); @assert n == count(mask)
-crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-cent::KronType{T,N} = c(ny-1) ⊗ spI(nx)
-∂x::KronType{T,N} = χ(ny-2) ⊗ ∂1d(nx-1,dx)
-∂y::KronType{T,N} = ∂1d(ny-1,dy) ⊗ spI(nx)
-levels::N
-dwt::KronType{T,N} = wavelet_matrix(ny,levels,"forward" ) ⊗ wavelet_matrix(nx,levels,"forward")
-s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-dnegβeff::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(-βeff[:])*crop)
-v::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-end
-
-#Struct to hold information on c-grid, located at cell corners.
-@with_kw struct CGrid{T <: Real, N <: Integer}
-nx::N
-ny::N
-x0::T = 0.0
-y0::T = 0.0
-dx::T = 1.0
-dy::T = 1.0
-xx::Array{T,2}=[x0+i*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-yy::Array{T,2}=[y0+j*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-n::N = count(mask); @assert n == count(mask)
-crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-cent::KronType{T,N} = sparse(c(ny)') ⊗ sparse(c(nx)')
-end
-
-#Struct to hold information on 3d-grid, (extends h-grid to multiple sigma levels).
-@with_kw struct SigmaGrid{T <: Real, N <: Integer}
-nx::N
-ny::N
-nσ::N
-σ::Vector{T} = collect(range(0.0,length=nσ,stop=1.0)); @assert length(σ) == nσ
-ζ::Vector{T} = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
-quadrature_weights::Vector{T} = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(quadrature_weights) == nσ
-η::Array{T,3} = fill(params.starting_viscosity,nx,ny,nσ); @assert size(η)==(nx,ny,nσ)
-θ::Array{T,3} = fill(params.starting_temperature,nx,ny,nσ); @assert size(θ)==(nx,ny,nσ)
-Φ::Array{T,3} = fill(params.starting_damage,nx,ny,nσ); @assert size(Φ)==(nx,ny,nσ)
-glen_b::Array{T,3} = glen_b.(θ,Φ); @assert size(glen_b)==(nx,ny,nσ)
-end
-
-#Struct to hold information on wavelet-grid (u-component).
-@with_kw struct UWavelets{T <: Real, N <: Integer}
-nx::N
-ny::N
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-n::Base.RefValue{N} = Ref(count(mask)); @assert n[] == count(mask)
-crop::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(Diagonal(float(mask[:]))); @assert crop[] == Diagonal(float(mask[:]))
-samp::Base.RefValue{SparseMatrixCSC{T,N}} = Ref(crop[][mask[:],:]); @assert samp[] == crop[][mask[:],:]
-spread::Base.RefValue{SparseMatrixCSC{T,N}} = Ref(sparse(samp[]')); @assert spread[] == sparse(samp[]')
-levels::N
-idwt::KronType{T,N} = wavelet_matrix(ny,levels,"reverse" ) ⊗ wavelet_matrix(nx,levels,"reverse")
-wavelets::Array{T,2} = zeros(nx,ny); @assert size(wavelets)==(nx,ny)
-end
-
-#Struct to hold information on wavelet-grid (v-component).
-@with_kw struct VWavelets{T <: Real, N <: Integer}
-nx::N
-ny::N
-mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-n::Base.RefValue{N} = Ref(count(mask)); @assert n[] == count(mask)
-crop::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(Diagonal(float(mask[:]))); @assert crop[] == Diagonal(float(mask[:]))
-samp::Base.RefValue{SparseMatrixCSC{T,N}} = Ref(crop[][mask[:],:]); @assert samp[] == crop[][mask[:],:]
-spread::Base.RefValue{SparseMatrixCSC{T,N}} = Ref(sparse(samp[]')); @assert spread[] == sparse(samp[]')
-levels::N
-idwt::KronType{T,N} = wavelet_matrix(ny,levels,"reverse" ) ⊗ wavelet_matrix(nx,levels,"reverse")
-wavelets::Array{T,2} = zeros(nx,ny); @assert size(wavelets)==(nx,ny)
-end
-
-#Struct to hold model state comprised of all the above information.
-@with_kw struct State{T <: Real, N <: Integer, R <: Real} <: AbstractModel{T,N}
-grid::Grid{T,N}
-params::Params{T}
-timestepping_params::TimesteppingParams{T,N}
-solver_params::SolverParams{T,N}
-initial_conditions::InitialConditions{T}
-output::Output{T,R}
-gh::HGrid{T,N}
-gu::UGrid{T,N}
-gv::VGrid{T,N}
-gc::CGrid{T,N}
-g3d::SigmaGrid{T,N}   
-wu::UWavelets{T,N}
-wv::VWavelets{T,N}
-clock::Clock{T,N}
-end
-
-#Struct to hold information about wavelet-based multigrid preconditioner.
-@with_kw struct Preconditioner{T <: Real, N <: Integer} <: AbstractPreconditioner{T,N}
-op::LinearMap{T}
-op_diag::Vector{T} = diag(sparse(op))
-nsmooth::N = 5
-sweep::Vector{N}
-sweep_order::Vector{N} = unique(sweep)
-smoother_omega::T = 1.0
-restrict::LinearMap{T}
-prolong::LinearMap{T}
-op_coarse::LinearMap{T} = restrict*op*prolong
-correction_coarse::Vector{T} = zeros(T,size(op_coarse,2))
-tol_coarse::T = 1e-7
-maxiter_coarse::N = 1000
-end
 
 
 #Functions
@@ -477,133 +52,7 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
 f() = 2
-"""
-    start(params)
 
-Create WAVI State from input parameters.
-"""
-function start(;
-    grid = nothing, 
-    bed_elevation = nothing,
-    params = Params(),
-    solver_params = SolverParams(),
-    initial_conditions = InitialConditions(),
-    timestepping_params = TimesteppingParams(),
-    output = Output())
-
-    #check that a grid and bed has been inputted
-    ~(grid === nothing) || throw(ArgumentError("You must specify an input grid"))
-    ~(bed_elevation === nothing) || throw(ArgumentError("You must input a bed elevation"))
-    
-    #check types
-    #if a functional bed has been specified, convert to an array
-    bed_array = zeros(grid.nx,grid.nx) #initialize a bed array
-    try
-    bed_array = get_bed_elevation(bed_elevation, grid)
-    catch
-    throw(ArgumentError("bed elevation must be of type function or array"))
-    end
-            #check the size of the bed
-    #(Base.size(bed_array) = (grid.nx, grid.ny)) || throw(ArgumentError("Bed and grid sizes must be identical"))
-    
-
-    #Check initial conditions, and revert to default values if not
-    initial_conditions = check_initial_conditions(initial_conditions, params, grid)
-
-    #Define masks for points on h-, u-, v- and c-grids that lie in model domain.
-    h_mask = grid.h_mask 
-    u_mask = get_u_mask(h_mask)
-    v_mask = get_v_mask(h_mask)
-    c_mask = get_c_mask(h_mask)
-
-    #Remove all points on u- and v-grids with homogenous Dirichlet conditions.
-    u_mask[grid.u_iszero].=false
-    v_mask[grid.v_iszero].=false
-
-    #h-grid
-    #gh=HGrid(grid, params) #uncomment if using the explicit constructor method
-    #h =  deepcopy(initial_conditions.initial_thickness)
-    h =  deepcopy(initial_conditions.initial_thickness)
-    ηav = deepcopy(initial_conditions.initial_viscosity)
-    gh=HGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny,
-    dx=grid.dx,
-    dy=grid.dy,
-    mask=h_mask,
-    b = bed_array,
-    h = h,
-    ηav = ηav,
-    )
-
-    #u-grid
-    gu=UGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx+1,
-    ny=grid.ny,
-    dx=grid.dx,
-    dy=grid.dy,
-    mask=u_mask,
-    levels=solver_params.levels
-    )
-
-    #v-grid
-    gv=VGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny+1,
-    dx=grid.dx,
-    dy=grid.dy,
-    mask=v_mask,
-    levels=solver_params.levels
-    )
-
-    #c-grid
-    gc=CGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx-1,
-    ny=grid.ny-1,
-    dx=grid.dx,
-    dy=grid.dy,
-    mask=c_mask
-    )
-
-    #3D-grid
-    g3d=SigmaGrid(
-    nx=grid.nx,
-    ny=grid.ny,
-    nσ=grid.nσ,
-    η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
-    θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
-    Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),
-    glen_b = fill(glen_b(params.default_temperature,params.default_damage,params),grid.nx,grid.ny,grid.nσ)
-    )
-
-    #Wavelet-grid, u-component.
-    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=solver_params.levels)
-
-    #Wavelet-grid, v-component.
-    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=solver_params.levels)
-
-    #Default clock
-    clock = Clock(n_iter = 0, time = 0.0)
-
-    #initialize number of steps in output
-    if output.out_freq !== Inf #set the output number of timesteps, if it has been specifies
-        n_iter_out = round(Int, output.out_freq/timestepping_params.dt) #compute the output timestep
-        output = @set output.n_iter_out = n_iter_out
-    end
-
-    #Use type constructor to build initial state.
-    wavi=State(grid,params,timestepping_params,solver_params,initial_conditions,output,gh,gu,gv,gc,g3d,wu,wv,clock)
-
-    return wavi
-end
 
 """
     check_initial_conditions(initial_conditions, params)
@@ -712,11 +161,11 @@ function simulation(;
         println("running simulation...")
 
         #timestepping loop
-        for i = 1:timestepping_params.n_iter_total
+        for i = 1:wavi.timestepping_params.n_iter_total
             run!(wavi)
 
             #check if we have hit a temporary checkpoint
-            if mod(i,timestepping_params.n_iter_chkpt) == 0
+            if mod(i,wavi.timestepping_params.n_iter_chkpt) == 0
                 #output a temporary checkpoint
                 fname = string("Chkpt",chkpt_tag, ".jld2")
                 @save fname wavi
@@ -725,7 +174,7 @@ function simulation(;
             end
 
             #check if we have hit a permanent checkpoint
-            if mod(i,timestepping_params.n_iter_pchkpt) == 0
+            if mod(i,wavi.timestepping_params.n_iter_pchkpt) == 0
                 #output a permanent checkpoint
                 n_iter_string =  lpad(wavi.clock.n_iter, 10, "0"); #filename as a string with 10 digits
                 fname = string("PChkpt_",n_iter_string, ".jld2")
@@ -734,8 +183,8 @@ function simulation(;
             end
 
             #check if we have hit an output timestep
-            if mod(i,output.n_iter_out) == 0
-                write_output(wavi, output,clock)
+            if mod(i,wavi.output.n_iter_out) == 0
+                write_output(wavi)
             end
         end
         

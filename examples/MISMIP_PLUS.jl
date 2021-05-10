@@ -48,11 +48,13 @@ function driver()
                     accumulation_rate = accumulation_rate)
 
     #run the simulation
-    wavi = simulation(grid = grid,
+    wavi = Model(grid = grid,
                      bed_elevation = bed, 
                      params = params, 
-                     solver_params = solver_params,
-                     timestepping_params = timestepping_params)
+                     solver_params = solver_params)
+
+    simulation = Simulation(wavi,outputs,timestepping_params)
+    #run!(simulation)
 
     return wavi
 end
