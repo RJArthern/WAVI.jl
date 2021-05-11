@@ -35,7 +35,7 @@ function Simulation(;
 
             return simulation 
         catch 
-            println("Pickup error, terminating run")
+            Throw(error("Pickup error, terminating run"))
         end
     
     

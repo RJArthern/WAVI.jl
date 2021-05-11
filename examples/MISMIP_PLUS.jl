@@ -42,7 +42,7 @@ function MISMIP_PLUS()
                      solver_params = solver_params)
 
     #timestepping parameters
-    n_iter0 = 100
+    n_iter0 = 0
     dt = 0.1
     end_time = 20.
     chkpt_freq = 1.
