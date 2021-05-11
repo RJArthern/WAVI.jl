@@ -71,8 +71,37 @@ function run_simulation!(simulation::Simulation)
             println("outputting at timestep number $(simulation.clock.n_iter)")
 
         end
+
+        #check the dump velocity flag at the final timestep
+        if (i == timestepping_params.n_iter_total) && output_params.dump_vel
+            write_vel(simulation)
         end
+    end
         
     return simulation
 end
 
+"""
+    function write_vel(simulation)
+
+Write the velocity at the the final timestep of the simulation (used in the coupled wavi-mitgcm model to communicate with streamice)
+"""
+function write_vel(simulation::Simulation)
+    @unpack model = simulation  
+    uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
+    vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
+    
+    u_out=model.gu.u[1:end-1,1:end]
+    v_out=model.gv.v[1:end,1:end-1]
+
+    u_out .= hton.(u_out)
+    v_out .= hton.(v_out)
+
+    ufileID =  open(uVel_file_string,"w")
+      write(ufileID, u_out[:,:])
+    close(ufileID) 
+    vfileID =  open(vVel_file_string,"w")
+    write(vfileID, v_out[:,:])
+    close(vfileID)   
+
+ end 
