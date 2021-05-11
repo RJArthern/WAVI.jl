@@ -32,6 +32,8 @@ function Simulation(;
                 simulation = @set simulation.output_params = output_params
                 println("WARNING: output parameters updated in simulation after pickup")
             end
+
+            return simulation 
         catch 
             println("Pickup error, terminating run")
         end
@@ -50,10 +52,10 @@ function Simulation(;
             n_iter_out = round(Int, output_params.output_freq/timestepping_params.dt) #compute the output timestep
             output_params = @set output_params.n_iter_out = n_iter_out
         end
-
+        return Simulation(model, timestepping_params, output_params, clock)
     else
         throw(ArgumentError("n_iter0 must be a non-negative integer"))
     end
 
-    return Simulation(model, timestepping_params, output_params, clock)
+    
 end
