@@ -47,15 +47,16 @@
 end
 
 struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
-    n_iter0::N      #initial iteration number
-    dt::T           #timestep
-    end_time::T     #end time of this simulation
-    t0::T           #start time of this simulation 
-    chkpt_freq::T   #temporary checkpoint frequency
-    pchkpt_freq::T  #permanent checkpoint frequency  
-    n_iter_total::TO #total number of timesteps counting from zero
-    n_iter_chkpt::C #number of iterations per temporary checkpoint
-    n_iter_pchkpt::P#number of iterations per permanent checkpoint
+    n_iter0::N           #initial iteration number
+    dt::T                #timestep
+    end_time::T          #end time of this simulation
+    t0::T                #start time of this simulation 
+    chkpt_freq::T        #temporary checkpoint frequency
+    pchkpt_freq::T       #permanent checkpoint frequency  
+    n_iter_total::TO     #total number of timesteps counting from zero
+    n_iter_chkpt::C      #number of iterations per temporary checkpoint
+    n_iter_pchkpt::P     #number of iterations per permanent checkpoint
+    step_thickness::Bool #toggle whether to step the thickness at each timestep or not
 end
 
 function TimesteppingParams(;
@@ -64,7 +65,8 @@ function TimesteppingParams(;
                         end_time = 1.0,
                         t0 = nothing,
                         chkpt_freq = Inf,
-                        pchkpt_freq = Inf)
+                        pchkpt_freq = Inf,
+                        step_thickness = true)
 
     #(n_iter0 > 0) || ArgumentError("n_iter0 must be a positive number")
 
@@ -80,5 +82,6 @@ function TimesteppingParams(;
     chkpt_freq == Inf ? n_iter_chkpt = Inf : n_iter_chkpt  = round(Int, chkpt_freq/dt)
     pchkpt_freq == Inf ? n_iter_pchkpt = Inf : n_iter_pchkpt = round(Int, pchkpt_freq/dt)
     
-    return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq, n_iter_total, n_iter_chkpt, n_iter_pchkpt)
+    return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq,
+                                 n_iter_total, n_iter_chkpt, n_iter_pchkpt, step_thickness)
 end

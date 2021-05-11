@@ -6,7 +6,9 @@ Perform one timestep of the simulation
 function timestep!(simulation)
     @unpack model,timestepping_params = simulation
     update_state!(model)
-    update_thickness!(simulation)
+    if timestepping_params.step_thickness
+        update_thickness!(simulation)
+    end
     update_clock!(simulation)
 end
 
