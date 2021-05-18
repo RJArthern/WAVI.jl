@@ -63,10 +63,10 @@ grid = Grid(nx = nx,
 
 
 #Bed 
-#bed = WAVI.mismip_plus_bed #function definition (hard coded into WAVI for ease, can also read bed here)
-bed_elevation= Array{Float64}(undef, nx, ny);
-read!("bathyREAL_408.box", bed_elevation)
-bed_elevation .= ntoh.(bed_elevation)
+bed = WAVI.mismip_plus_bed #function definition (hard coded into WAVI for ease, can also read bed here)
+#bed_elevation= Array{Float64}(undef, nx, ny);
+#read!("bathyREAL_408.box", bed_elevation)
+#bed_elevation .= ntoh.(bed_elevation)
 
 #solver parameters
 maxiter_picard = 1
@@ -84,7 +84,7 @@ model = Model(grid = grid,
 
 #timestepping parameters
 n_iter0 = 0 #CHANGE ME FOR A PICKUP
-step_thickness = false
+step_thickness = false #default = true!
 dt = 0.1
 end_time = 40.
 chkpt_freq = 100.
@@ -93,7 +93,8 @@ timestepping_params = TimesteppingParams(n_iter0 = n_iter0,
                                         dt = dt, 
                                         end_time = end_time, 
                                         chkpt_freq = chkpt_freq, 
-                                        pchkpt_freq = pchkpt_freq)
+                                        pchkpt_freq = pchkpt_freq,
+                                        step_thickness = step_thickness)
 
 #### output parameters ###
 #outputs = (h = model.gh.h, u = model.gu.u);

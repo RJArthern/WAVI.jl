@@ -64,7 +64,7 @@ function MISMIP_PLUS()
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 
                         output_params = output_params)
-                    
+                
             
     #perform the simulation
     run_simulation!(simulation)
