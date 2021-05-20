@@ -16,6 +16,7 @@ Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation!
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
+@reexport using Setfield
 
 #Abstract types
 abstract type AbstractGrid{T <: Real, N <: Integer} end

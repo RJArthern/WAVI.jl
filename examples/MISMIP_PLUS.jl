@@ -44,7 +44,7 @@ function MISMIP_PLUS()
     #timestepping parameters
     n_iter0 = 0
     dt = 0.1
-    end_time = 1000.
+    end_time = 40.
     chkpt_freq = 100.
     pchkpt_freq = 200.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
@@ -58,11 +58,13 @@ function MISMIP_PLUS()
     output_freq = 100.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
-                            format = "mat")
+                            format = "mat",
+                            dump_vel = true)
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 
                         output_params = output_params)
+                
             
     #perform the simulation
     run_simulation!(simulation)
