@@ -25,6 +25,8 @@
     dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)
     shelf_strain_rate::Array{T,2} = zeros(nx,ny); @assert size(shelf_strain_rate)==(nx,ny)
     av_speed::Array{T,2} = zeros(nx,ny); @assert size(av_speed)==(nx,ny)
+    u::Array{T,2} = zeros(nx,ny); @assert size(u)==(nx,ny)
+    v::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
     bed_speed::Array{T,2} = zeros(nx,ny); @assert size(bed_speed)==(nx,ny)
     weertman_c::Array{T,2} = zeros(nx,ny); @assert size(weertman_c)==(nx,ny)
     β::Array{T,2} = zeros(nx,ny); @assert size(β)==(nx,ny)

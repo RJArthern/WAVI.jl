@@ -91,8 +91,8 @@ function write_vel(simulation::Simulation)
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out=model.gu.u[1:end-1,1:end]
-    v_out=model.gv.v[1:end,1:end-1]
+    u_out=model.gh.u 
+    v_out=model.gh.v
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)

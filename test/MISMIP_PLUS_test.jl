@@ -42,11 +42,11 @@ function MISMIP_PLUS_test()
                      solver_params = solver_params)
 
     #timestepping parameters
-    n_iter0 = 1000
+    n_iter0 = 0
     dt = 0.1
     end_time = 120.
-    chkpt_freq = 10.
-    pchkpt_freq = 20.
+    chkpt_freq = 1000.
+    pchkpt_freq = 2000.
     timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -55,7 +55,7 @@ function MISMIP_PLUS_test()
 
     #output parameters
     outputs = (h = model.gh.h, u = model.gu.u);
-    output_freq = 5.
+    output_freq = 500.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             format = "mat")

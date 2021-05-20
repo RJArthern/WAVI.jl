@@ -14,6 +14,7 @@ function update_state!(model)
     update_weertman_c!(model)
     update_dsdh!(model)
     update_model_velocities!(model)
+    update_velocities_on_h_grid!(model)
     update_dhdt!(model)
     update_model_wavelets!(model)
     return nothing
@@ -121,13 +122,24 @@ end
 """
     update_model_velocity!(model::AbstractModel)
 
-Wrapper function for that which updates the model velocities
+Wrapper function for that which updates the model velocities on the u, v grids (update_velocities in separate file)
 """
 function update_model_velocities!(model::AbstractModel)
     update_velocities!(model)
     return model
 end
 
+"""
+    update_velocities_on_h_grid!(model::AbstractModel)
+
+Update the velocities on the h grid 
+"""
+function update_velocities_on_h_grid!(model)
+    @unpack gh,gu,gv = model
+    gh.u .= (gu.u[1:end-1,:] + gu.u[2:end,:])./2
+    gh.v .= (gv.v[:,1:end-1] + gv.v[:, 2:end])./2
+    return model
+end
 """
     update_dhdt!(model::AbstractModel)
 
