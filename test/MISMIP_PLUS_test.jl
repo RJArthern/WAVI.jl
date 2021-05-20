@@ -54,11 +54,15 @@ function MISMIP_PLUS_test()
                                             pchkpt_freq = pchkpt_freq)
 
     #output parameters
+    folder = "outputs"
+    isdir(folder) && rm(folder, force = true, recursive = true)
+    mkdir(folder) #make a clean folder for outputs
     outputs = (h = model.gh.h, u = model.gu.u);
-    output_freq = 500.
+    output_freq = 5.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
-                            format = "mat")
+                            format = "mat",
+                            output_path = folder)
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 

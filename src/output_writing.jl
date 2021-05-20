@@ -13,7 +13,7 @@ function write_output(simulation::AbstractSimulation)
     if ~haskey(output_dict, :x); output_dict["x"] = model.grid.xxh; end
     if ~haskey(output_dict, :y); output_dict["y"] = model.grid.yyh; end
 
-    fname = string(output_params.prefix , lpad(simulation.clock.n_iter, 10,"0"));
+    fname = string(output_params.output_path,output_params.prefix , lpad(simulation.clock.n_iter, 10,"0"));
     if output_params.format == "jld2"
         fname = string(fname, ".jld2")
         save(fname, output_dict)
