@@ -58,8 +58,9 @@ function MISMIP_PLUS()
     output_freq = 100.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
-                            format = "mat",
-                            dump_vel = true)
+                            output_format = "mat",
+                            dump_vel = true,
+                            zip_format = "nc")
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 

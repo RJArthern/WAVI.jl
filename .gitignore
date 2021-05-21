@@ -5,3 +5,4 @@ Manifest.toml
 *.mat
 *.tif
 *.jld2
+*.nc
