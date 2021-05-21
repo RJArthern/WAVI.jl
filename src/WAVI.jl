@@ -32,7 +32,7 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 
 ##################################################################################
 #type definitions
-include("./OutputParams.jl")
+include("./OutputParams/OutputParams.jl")
 include("./Grid.jl")
 include("./Params.jl")
 include("./Clock.jl")
@@ -45,7 +45,8 @@ include("./Simulation.jl")
 
 
 #Functions
-include("output_writing.jl")
+include("./OutputParams/output_writing.jl")
+include("./OutputParams/zipping_output.jl")
 include("preconditioners.jl")
 include("update_state.jl")
 include("update_velocities.jl")

@@ -77,6 +77,9 @@ function run_simulation!(simulation::Simulation)
             write_vel(simulation)
         end
     end
+
+    #zip the simulation output (no zipping handled by zip_output)
+    zip_output(simulation)
         
     return simulation
 end

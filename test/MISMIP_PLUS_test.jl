@@ -26,7 +26,7 @@ function MISMIP_PLUS_test()
     bed = WAVI.mismip_plus_bed #function definition
 
     #solver parameters
-    maxiter_picard = 1
+    maxiter_picard = 5
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     #Physical parameters
@@ -57,12 +57,17 @@ function MISMIP_PLUS_test()
     folder = "outputs"
     isdir(folder) && rm(folder, force = true, recursive = true)
     mkdir(folder) #make a clean folder for outputs
-    outputs = (h = model.gh.h, u = model.gu.u);
+    outputs = (h   = model.gh.h,
+                u  = model.gh.u,
+                v  = model.gh.v,
+                uu = model.gu.u,
+                vv = model.gv.v);
     output_freq = 5.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
-                            format = "mat",
-                            output_path = folder)
+                            output_format = "mat",
+                            output_path = folder,
+                            zip_format = "nc")
     
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params, 
@@ -72,3 +77,5 @@ function MISMIP_PLUS_test()
     run_simulation!(simulation)
     return simulation
 end
+
+simulation = MISMIP_PLUS_test();
