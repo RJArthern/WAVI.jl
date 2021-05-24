@@ -47,7 +47,7 @@
 end
 
 struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
-    n_iter0::N           #initial iteration number
+    niter0::N           #initial iteration number
     dt::T                #timestep
     end_time::T          #end time of this simulation
     t0::T                #start time of this simulation 
@@ -60,7 +60,7 @@ struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
 end
 
 function TimesteppingParams(;
-                        n_iter0 = 0,
+                        niter0 = 0,
                         dt = 1.0,
                         end_time = 1.0,
                         t0 = nothing,
@@ -68,13 +68,13 @@ function TimesteppingParams(;
                         pchkpt_freq = Inf,
                         step_thickness = true)
 
-    #(n_iter0 > 0) || ArgumentError("n_iter0 must be a positive number")
+    #(niter0 > 0) || ArgumentError("niter0 must be a positive number")
 
-    #if n_iter0 > 0, check file exists and get start time, else throw error 
+    #if niter0 > 0, check file exists and get start time, else throw error 
 
 
     #initialize t0 (really you should read start time from pickup file)
-    t0 = n_iter0 > 0 ? n_iter0 * dt : 0 
+    t0 = niter0 > 0 ? niter0 * dt : 0 
     t0 = map(typeof(dt), t0)
 
     #compute number of timesteps (total and per checkpoint)
@@ -82,6 +82,6 @@ function TimesteppingParams(;
     chkpt_freq == Inf ? n_iter_chkpt = Inf : n_iter_chkpt  = round(Int, chkpt_freq/dt)
     pchkpt_freq == Inf ? n_iter_pchkpt = Inf : n_iter_pchkpt = round(Int, pchkpt_freq/dt)
     
-    return TimesteppingParams(n_iter0, dt, end_time, t0, chkpt_freq, pchkpt_freq,
+    return TimesteppingParams(niter0, dt, end_time, t0, chkpt_freq, pchkpt_freq,
                                  n_iter_total, n_iter_chkpt, n_iter_pchkpt, step_thickness)
 end

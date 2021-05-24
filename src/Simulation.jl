@@ -14,9 +14,9 @@ function Simulation(;
 
     (timestepping_params !== nothing) || throw(ArgumentError("You must specify a timestepping parameters"))
 
-    if timestepping_params.n_iter0 > 0
-        n_iter_string =  lpad(timestepping_params.n_iter0, 10, "0"); #filename as a string with 10 digits
-        println("detected n_iter0 > 0 (n_iter0 = $(timestepping_params.n_iter0)). Looking for pickup...")
+    if timestepping_params.niter0 > 0
+        n_iter_string =  lpad(timestepping_params.niter0, 10, "0"); #filename as a string with 10 digits
+        println("detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup...")
         try 
             @load string("PChkpt_",n_iter_string, ".jld2") simulation
             println("Pickup successful")
@@ -39,8 +39,8 @@ function Simulation(;
         end
     
     
-    elseif iszero(timestepping_params.n_iter0)
-        println("detected n_iter0 = 0, initializng clean simulation")
+    elseif iszero(timestepping_params.niter0)
+        println("detected niter0 = 0, initializng clean simulation")
         #initialize the clock
         clock = Clock(n_iter = 0, time = 0.0)
 
@@ -54,7 +54,7 @@ function Simulation(;
         end
         return Simulation(model, timestepping_params, output_params, clock)
     else
-        throw(ArgumentError("n_iter0 must be a non-negative integer"))
+        throw(ArgumentError("niter0 must be a non-negative integer"))
     end
 
     

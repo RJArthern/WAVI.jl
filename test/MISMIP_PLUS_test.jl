@@ -42,12 +42,12 @@ function MISMIP_PLUS_test()
                      solver_params = solver_params)
 
     #timestepping parameters
-    n_iter0 = 0
+    niter0 = 0
     dt = 0.1
     end_time = 120.
     chkpt_freq = 1000.
     pchkpt_freq = 2000.
-    timestepping_params = TimesteppingParams(n_iter0 = n_iter0, 
+    timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
                                             chkpt_freq = chkpt_freq, 
