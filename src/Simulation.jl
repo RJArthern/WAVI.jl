@@ -8,7 +8,7 @@ end
 function Simulation(;
                     model = nothing,
                     timestepping_params = nothing,
-                    output_params = Output_params(),
+                    output_params = OutputParams(),
                     pickup_model_update_flag = false,
                     pickup_output_update_flag = false)
 
