@@ -57,11 +57,11 @@ function MISMIP_PLUS_test()
     folder = "outputs"
     isdir(folder) && rm(folder, force = true, recursive = true)
     mkdir(folder) #make a clean folder for outputs
-    outputs = (h   = model.gh.h,
-                u  = model.gh.u,
-                v  = model.gh.v,
-                uu = model.gu.u,
-                vv = model.gv.v);
+    outputs = (h   = model.fields.gh.h,
+                u  = model.fields.gh.u,
+                v  = model.fields.gh.v,
+                uu = model.fields.gu.u,
+                vv = model.fields.gv.v);
     output_freq = 5.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,

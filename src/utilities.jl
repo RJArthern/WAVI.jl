@@ -10,7 +10,7 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 Function to multiply a vector by the momentum operator.
 """
 function opvec(model::AbstractModel,vec::AbstractVector)
-    @unpack gh,gu,gv,gc=model
+    @unpack gh,gu,gv,gc=model.fields
     @assert length(vec)==(gu.n+gv.n)
     uspread=gu.spread*vec[1:gu.n]
     vspread=gv.spread*vec[(gu.n+1):(gu.n+gv.n)]
@@ -35,7 +35,7 @@ end
 Function to restrict a vector from the fine grid to the coarse grid, used in multigrid preconditioner.
 """
 function restrictvec(model::AbstractModel,vec::AbstractVector)
-    @unpack wu,wv,gu,gv=model
+    @unpack wu,wv,gu,gv=model.fields
     @assert length(vec)==(gu.n+gv.n)
     vecx=vec[1:gu.n]
     vecy=vec[(gu.n+1):(gu.n+gv.n)]
@@ -55,7 +55,7 @@ end
 Function to prolong a vector from the coarse grid to the fine grid, used in multigrid preconditioner.
 """
 function prolongvec(model::AbstractModel,waveletvec::AbstractVector)
-    @unpack wu,wv,gu,gv=model
+    @unpack wu,wv,gu,gv=model.fields
     @assert length(waveletvec)==(wu.n[]+wv.n[])
     waveletvecx = waveletvec[1:wu.n[]]
     waveletvecy = waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]

@@ -6,7 +6,8 @@
 """
 function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T, N}
 
-    @unpack gu,gv,wu,wv,params,solver_params=model
+    @unpack gu,gv,wu,wv=model.fields
+    @unpack params,solver_params=model
 
     m,n=size(op)
     @assert m == n == gu.n + gv.n
@@ -74,8 +75,9 @@ end
  Get diagonal of operator for use in preconditioner.
 
 """
-function get_op_diag(wavi::AbstractModel,op::LinearMap)
-    @unpack gu,gv,params,solver_params=wavi
+function get_op_diag(model::AbstractModel,op::LinearMap)
+    @unpack gu,gv=model.fields
+    @unpack params,solver_params=model
     m,n=size(op)
     @assert m == n == gu.n + gv.n
     op_diag=zeros(eltype(op),n)

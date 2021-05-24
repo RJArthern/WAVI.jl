@@ -4,7 +4,8 @@
 Compute wavelet transform of velocities to define the coarse grid used in multigrid preconditioner.
 """
 function update_wavelets!(model::AbstractModel)
-    @unpack wu,wv,gu,gv,params,solver_params=model
+    @unpack wu,wv,gu,gv=model.fields
+    @unpack params,solver_params=model
 
     wu.wavelets[:] .= gu.dwt*(gu.crop*gu.u[:])
     wv.wavelets[:] .= gv.dwt*(gv.crop*gv.v[:])
