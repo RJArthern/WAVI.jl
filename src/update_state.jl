@@ -26,7 +26,8 @@ end
 Adjust surface elevation to hydrostatic equilibrium.
 """
 function update_surface_elevation!(model::AbstractModel)
-    @unpack gh,params=model
+    @unpack params=model
+    @unpack gh=model.fields
     gh.s[gh.mask] .= max.(gh.b[gh.mask]+gh.h[gh.mask],
                           params.sea_level_wrt_geoid .+ gh.h[gh.mask]*(1-params.density_ice./params.density_ocean))
     return model
@@ -39,7 +40,7 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 
 """
 function update_geometry_on_uv_grids!(model::AbstractModel)
-    @unpack gh,gu,gv,gc=model
+    @unpack gh,gu,gv,gc=model.fields
     onesvec=ones(gh.nx*gh.ny)
     gu.h[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.h[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.s[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.s[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
@@ -54,7 +55,8 @@ end
 Update height above floatation. Zero value is used to define location of grounding line.
 """
 function update_height_above_floatation!(model::AbstractModel)
-    @unpack gh,params=model
+    @unpack params=model
+    @unpack gh=model.fields
     gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
     return model
 end
@@ -65,7 +67,7 @@ end
 Update grounded area fraction on h-, u-, and v-grids for use in subgrid parameterisation.
 """
 function update_grounded_fraction_on_huv_grids!(model::AbstractModel)
-    @unpack gh,gu,gv = model
+    @unpack gh,gu,gv = model.fields
     (gfh,gfu,gfv)=pos_fraction(gh.haf;mask=gh.mask)
     gh.grounded_fraction[:] .= gfh[:]
     gu.grounded_fraction[:] .= gfu[:]
@@ -79,7 +81,8 @@ end
 Update the accumulation rate.
 """
 function update_accumulation_rate!(model::AbstractModel)
-    @unpack gh,params = model
+    @unpack params = model
+    @unpack gh=model.fields
     gh.accumulation .= params.accumulation_rate
     return model
 end
@@ -91,7 +94,8 @@ end
 Update the basal melt rate.
 """
 function update_basal_melt!(model::AbstractModel)
-    @unpack gh, params = model
+    @unpack params = model
+    @unpack gh = model.fields
     gh.basal_melt .= params.basal_melt_rate
     return model
 end
@@ -102,7 +106,8 @@ end
 Update coefficient used in the sliding law to account for migration of grounding line.
 """
 function update_weertman_c!(model::AbstractModel)
-    @unpack gh,params = model
+    @unpack gh=model.fields
+    @unpack params=model
     gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
     return model
 end
@@ -113,7 +118,8 @@ end
 Compute change of surface elevation per unit thickness change, accounting for hydrostatic adjustment.
 """
 function update_dsdh!(model::AbstractModel)
-    @unpack gh,gu,gv,params = model
+    @unpack gh,gu,gv=model.fields
+    @unpack params = model
     gh.dsdh .= (1.0 - params.density_ice./params.density_ocean) .+
            (params.density_ice./params.density_ocean).*gh.grounded_fraction;
     return model
@@ -135,7 +141,7 @@ end
 Update the velocities on the h grid 
 """
 function update_velocities_on_h_grid!(model)
-    @unpack gh,gu,gv = model
+    @unpack gh,gu,gv = model.fields
     gh.u .= (gu.u[1:end-1,:] + gu.u[2:end,:])./2
     gh.v .= (gv.v[:,1:end-1] + gv.v[:, 2:end])./2
     return model
@@ -146,7 +152,7 @@ end
 Evaluate rate of change of thickness using mass conservation.
 """
 function update_dhdt!(model::AbstractModel)
-    @unpack gh,gu,gv=model
+    @unpack gh,gu,gv=model.fields
     gh.dhdt[gh.mask].=gh.samp*(gh.accumulation[:] .- gh.basal_melt[:] .-
              (  (gu.∂x*(gu.crop*(gu.h[:].*gu.u[:]))) .+ (gv.∂y*(gv.crop*(gv.h[:].*gv.v[:]))) ) )
     return model

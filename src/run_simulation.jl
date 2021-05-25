@@ -20,7 +20,7 @@ Update thickness using rate of change of thickness and apply minimum thickness c
 function update_thickness!(simulation::AbstractSimulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
-model.gh.h[model.gh.mask] = model.gh.h[model.gh.mask] .+ max.(model.params.minimum_thickness .- model.gh.h[model.gh.mask],timestepping_params.dt*model.gh.dhdt[model.gh.mask])
+model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
 return simulation
 end
 
@@ -94,8 +94,8 @@ function write_vel(simulation::Simulation)
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out=model.gh.u 
-    v_out=model.gh.v
+    u_out=model.fields.gh.u 
+    v_out=model.fields.gh.v
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)

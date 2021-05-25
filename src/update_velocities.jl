@@ -5,8 +5,8 @@ Solve momentum equation to update the velocities, plus Picard iteration for non-
 
 """
 function update_velocities!(model::AbstractModel)
-@unpack gu,gv,wu,wv,params,solver_params=model
-
+@unpack params,solver_params=model
+@unpack gu,gv,wu,wv = model.fields
 n = gu.n + gv.n
 
 x=get_start_guess(model)
@@ -54,7 +54,7 @@ end
 
 """
 function get_start_guess(model::AbstractModel)
-    @unpack gu,gv=model
+    @unpack gu,gv=model.fields
     @assert eltype(gu.u)==eltype(gv.v)
     n = gu.n + gv.n
     x=[gu.samp*gu.u[:];gv.samp*gv.v[:]]
@@ -69,7 +69,8 @@ end
 
 """
 function get_rhs(model::AbstractModel)
-    @unpack gh,gu,gv,gc,params=model
+    @unpack gh,gu,gv,gc=model.fields
+    @unpack params=model
     onesvec=ones(gh.nx*gh.ny)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
@@ -97,7 +98,7 @@ end
 Set velocities to particular values. Input vector x represents stacked u and v components at valid grid points.
 """
 function set_velocities!(model::AbstractModel,x)
-    @unpack gh,gu,gv,gc=model
+    @unpack gh,gu,gv,gc=model.fields
     gu.u[:] .= gu.spread*x[1:gu.n]
     gv.v[:] .= gv.spread*x[(gu.n+1):(gu.n+gv.n)]
     return model
@@ -109,7 +110,7 @@ end
 Find the effective strain rate for 'ice shelf' parts of strain rate tensor, neglecting all vertical shear.
 """
 function update_shelf_strain_rate!(model::AbstractModel)
-    @unpack gh,gu,gv,gc=model
+    @unpack gh,gu,gv,gc=model.fields
     gh.shelf_strain_rate[:] .= sqrt.( (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).^2 .+
                                       (gh.crop*(gv.∂y*(gv.crop*gv.v[:]))).^2 .+
                                 (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).*(gh.crop*(gv.∂y*(gv.crop*gv.v[:]))) .+
@@ -123,7 +124,7 @@ end
 Find the depth-averaged speed on the h-grid using components on u- and v- grids
 """
 function update_av_speed!(model::AbstractModel)
-    @unpack gh,gu,gv=model
+    @unpack gh,gu,gv=model.fields
     gh.av_speed[:] .= sqrt.( (gh.crop*(gu.cent*(gu.crop*gu.u[:]))).^2 .+ (gh.crop*(gv.cent*(gv.crop*gv.v[:]))).^2 )
     return model
 end
@@ -134,7 +135,7 @@ end
 Find the sliding speed at the bed on the h-grid using the average speed.
 """
 function update_bed_speed!(model::AbstractModel)
-    @unpack gh=model
+    @unpack gh=model.fields
     gh.bed_speed .= gh.av_speed ./ (1.0 .+ gh.quad_f2 .* gh.β)
     return model
 end
@@ -145,7 +146,8 @@ end
 Find the drag coefficient at the bed using the sliding law.
 """
 function update_β!(model::AbstractModel)
-    @unpack gh,params=model
+    @unpack gh=model.fields
+    @unpack params=model
     gh.β .= gh.weertman_c .* ( sqrt.(gh.bed_speed.^2 .+  params.weertman_reg_speed^2 ) ).^(1.0/params.weertman_m - 1.0)
     return model
 end
@@ -157,7 +159,7 @@ end
 Find the shear stress at the bed.
 """
 function update_basal_drag!(model::AbstractModel)
-    @unpack gh=model
+    @unpack gh=model.fields
     gh.τbed .= gh.β .* gh.bed_speed
     return model
 end
@@ -170,7 +172,8 @@ end
 Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
 """
 function inner_update_viscosity!(model::AbstractModel)
-    @unpack gh,g3d,params,solver_params=model
+    @unpack gh,g3d=model.fields
+    @unpack params,solver_params=model
     for k=1:g3d.nσ
         for j=1:g3d.ny
             for i=1:g3d.nx
@@ -197,7 +200,7 @@ end
 Use quadrature to compute the depth averaged viscosity.
 """
 function update_av_viscosity!(model::AbstractModel)
-    @unpack gh,g3d=model
+    @unpack gh,g3d=model.fields
     gh.ηav .= zero(gh.ηav)
     for k=1:g3d.nσ
        for j = 1:g3d.ny
@@ -216,7 +219,7 @@ end
 Use quadrature to compute f2 function, used to relate average velocities to basal velocities.
 """
 function update_quadrature_f2!(model::AbstractModel)
-    @unpack gh,g3d=model
+    @unpack gh,g3d=model.fields
     gh.quad_f2 .= zero(gh.quad_f2)
     for k=1:g3d.nσ
        for j = 1:g3d.ny
@@ -234,7 +237,7 @@ end
 Compute the effective drag coefficient.
 """
 function update_βeff!(model::AbstractModel)
-    @unpack gh=model
+    @unpack gh=model.fields
     gh.βeff .= gh.β ./ (1.0 .+ gh.quad_f2 .* gh.β)
     return model
 end
@@ -247,7 +250,7 @@ end
 Interpolate the effective drag coefficient onto u- and v-grids, accounting for grounded fraction.
 """
 function update_βeff_on_uv_grids!(model::AbstractModel)
-    @unpack gh,gu,gv=model
+    @unpack gh,gu,gv=model.fields
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
 
     T=eltype(gh.grounded_fraction)
@@ -275,7 +278,8 @@ end
 Precompute various diagonal matrices used in defining the momentum operator.
 """
 function update_rheological_operators!(model::AbstractModel)
-    @unpack gh,gu,gv,params=model
+    @unpack gh,gu,gv=model.fields
+    @unpack params=model
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
@@ -291,7 +295,7 @@ end
 
 """
 function get_op(model::AbstractModel{T,N}) where {T,N}
-    @unpack gu,gv=model
+    @unpack gu,gv=model.fields
     n = gu.n + gv.n
     op_fun(x) = opvec(model,x)
     op=LinearMap{T}(op_fun,n;issymmetric=true,ismutating=false,ishermitian=true,isposdef=true)
