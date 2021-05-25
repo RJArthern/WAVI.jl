@@ -39,6 +39,7 @@ include("./Clock.jl")
 include("./InitialConditions.jl")
 include("./ModelGrids.jl")
 include("./WaveletGrids.jl")
+include("./Fields.jl")
 include("./Model.jl")
 include("./Simulation.jl")
 
