@@ -44,7 +44,7 @@ function MISMIP_PLUS_test()
     #timestepping parameters
     niter0 = 0
     dt = 0.1
-    end_time = 120.
+    end_time = 500.
     chkpt_freq = 1000.
     pchkpt_freq = 2000.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
@@ -62,7 +62,7 @@ function MISMIP_PLUS_test()
                 v  = model.fields.gh.v,
                 uu = model.fields.gu.u,
                 vv = model.fields.gv.v);
-    output_freq = 5.
+    output_freq = 1000.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             output_format = "mat",
@@ -78,4 +78,4 @@ function MISMIP_PLUS_test()
     return simulation
 end
 
-simulation = MISMIP_PLUS_test();
+@time simulation = MISMIP_PLUS_test();

@@ -1,5 +1,5 @@
 using WAVI 
-function MISMIP_PLUS()
+function MISMIP_PLUS_Ice1r()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -41,6 +41,14 @@ function MISMIP_PLUS()
                      params = params, 
                      solver_params = solver_params)
 
+    #embed the model with some extra physics
+    m1(draft,cavity_thickness) = 0.2*tanh(cavity_thickness/75).*max((-100-draft), 0)
+    draft = -(ρi / ρw) * model.fields.gh.h
+    cavity_thickness = (draft .- model.fields.gh.bed_elevation)
+    melt_rate = m1(draft, cavity_thickness)
+    model.extra_physics["melt_rate_model"] = AnalyticMeltRate(melt_partial_cell = true, 
+                                                      melt_rate = melt_rate);
+
     #timestepping parameters
     niter0 = 0
     dt = 0.1
@@ -76,4 +84,4 @@ function MISMIP_PLUS()
     return simulation
 end
 
-@time simulation = MISMIP_PLUS();
+@time simulation = MISMIP_PLUS_Ice1r();
