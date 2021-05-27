@@ -16,14 +16,24 @@ using Test, WAVI
     draft = -(ρi / ρw) * model.fields.gh.h
     cavity_thickness = (draft .- model.fields.gh.b)
     arguments = (draft = draft, cavity_thickness = cavity_thickness)
-    model.extra_physics["melt_rate_model"] = AnalyticMeltRate(melt_rate_function = m1,
-                                                            function_arguments = arguments)
+    add_melt_rate_model!(model, AnalyticMeltRate(melt_rate_function = m1,function_arguments = arguments))
     @test model.extra_physics["melt_rate_model"] isa WAVI.AbstractMeltRateModel
+
+    #check that we get a warning if we try to add another melt rate model
+    @test_logs (:info, "Model already contained a melt rate model. Overwritten to that just specified...") add_melt_rate_model!(model, AnalyticMeltRate(melt_rate_function = m1,function_arguments = arguments))
+
 
     @info "Testing analytic melt rate construction errors"
     @test_throws ArgumentError AnalyticMeltRate()
     @test_throws ArgumentError AnalyticMeltRate(function_arguments = arguments)
     @test_throws ArgumentError AnalyticMeltRate(melt_rate_function = m1)
+    @test_throws ArgumentError AnalyticMeltRate(melt_rate_function = m1, function_arguments = (draft = draft, cavity_thickness = cavity_thickness, x = 1) )
+
+    #check that melt rate model not added when grid dimensions incompatible
+    arguments = (draft = zeros(5,5), cavity_thickness = zeros(5,5))
+    model = Model(grid = grid, bed_elevation = bed_elevation);
+    add_melt_rate_model!(model, AnalyticMeltRate(melt_rate_function = m1,function_arguments = arguments))
+    @test_throws KeyError model.extra_physics["melt_rate_model"]
     end
 
 end

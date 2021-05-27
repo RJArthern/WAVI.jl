@@ -46,8 +46,9 @@ function MISMIP_PLUS_Ice1r()
     draft = -(ρi / ρw) * model.fields.gh.h
     cavity_thickness = (draft .- model.fields.gh.bed_elevation)
     melt_rate = m1(draft, cavity_thickness)
-    model.extra_physics["melt_rate_model"] = AnalyticMeltRate(melt_partial_cell = true, 
-                                                      melt_rate = melt_rate);
+    melt_rate_model = AnalyticMeltRate(melt_partial_cell = true, melt_rate = melt_rate)
+    add_melt_rate_model!(model,melt_rate_model)
+
 
     #timestepping parameters
     niter0 = 0

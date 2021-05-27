@@ -1,5 +1,5 @@
 
-export AnalyticMeltRate
+export AnalyticMeltRate, add_melt_rate_model!
 #include("./")
 
 struct AnalyticMeltRate{PC, F, A, M} <: AbstractMeltRateModel{PC,M}
@@ -31,6 +31,18 @@ end
 
 #function get_basal_melt(melt_model::GeometricMeltRateModel, model)
     
- 
+
+
+"""
+    function add_melt_rate_model!(model, melt_rate_model)
+
+Interface to endow the model with a melt rate model
+"""
+function add_melt_rate_model!(model, melt_rate_model)
+    ~("melt_rate_model" in keys(model.extra_physics)) || @info "Model already contained a melt rate model. Overwritten to that just specified..."
+    size(melt_rate_model.melt_rate) == (model.grid.nx, model.grid.ny) ?  model.extra_physics["melt_rate_model"] = melt_rate_model  : @warn "Melt rate grid size does not match model grid size....\n ignoring this melt rate model"
+   
+    return nothing
+end
                             
                             
