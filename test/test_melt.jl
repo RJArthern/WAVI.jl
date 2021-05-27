@@ -36,4 +36,22 @@ using Test, WAVI
     @test_throws KeyError model.extra_physics["melt_rate_model"]
     end
 
+    @testset "test updates of analytic melt rate" begin 
+        @info "Testing analytic melt rate update"
+        grid = Grid()
+        bed_elevation = zeros(grid.nx, grid.ny)
+        model = Model(grid = grid, bed_elevation = bed_elevation)
+        add_melt_rate_model!(model, AnalyticMeltRate(melt_rate_function = (x)->x,function_arguments = (x = model.fields.gh.h,))) #melt model sending the melt rate to the thickness
+        model.fields.gh.h .= 400 #change the thickness artifically
+        @test all(model.extra_physics["melt_rate_model"].melt_rate .== 400) #use of pointers means the melt rate should also update
+        #...but we can also do it explicity
+        WAVI.update_melt_rate_model!(model.extra_physics["melt_rate_model"],model)
+        @test all(model.extra_physics["melt_rate_model"].melt_rate .== 400) 
+        
+        #check that this then passes through to the model gh field
+        WAVI.update_basal_melt!(model)
+        @test all(model.fields.gh.basal_melt .== 400)
+
+
+    end
 end

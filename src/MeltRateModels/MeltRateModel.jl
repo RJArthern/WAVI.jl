@@ -29,7 +29,11 @@ function AnalyticMeltRate(;
 end
 
 
-#function get_basal_melt(melt_model::GeometricMeltRateModel, model)
+function update_melt_rate_model!(melt_model::AnalyticMeltRate, model)
+    @unpack melt_rate, function_arguments, melt_rate_function = melt_model
+    melt_rate .= melt_rate_function(function_arguments...) #this is not actually necessary because the melt rate function updates automatically when arguments are updated.. 
+    return nothing
+end
     
 
 

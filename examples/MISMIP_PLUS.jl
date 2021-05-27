@@ -57,9 +57,9 @@ function MISMIP_PLUS()
     folder = "outputs"
     isdir(folder) && rm(folder, force = true, recursive = true)
     mkdir(folder) #make a clean folder for outputs
-    outputs = (h   = model.fields.gh.h,
-                u  = model.fields.gh.u,
-                v  = model.fields.gh.v) #output velocities and thickness
+    outputs = (h = model.fields.gh.h,
+               u = model.fields.gh.u,
+               v = model.fields.gh.v) #output velocities and thickness
     output_freq = 1000.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,

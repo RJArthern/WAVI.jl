@@ -94,9 +94,13 @@ end
 Update the basal melt rate.
 """
 function update_basal_melt!(model::AbstractModel)
-    @unpack params = model
     @unpack gh = model.fields
-    gh.basal_melt .= params.basal_melt_rate
+    if "melt_rate_model" in keys(model.extra_physics)
+        update_melt_rate_model!(model.extra_physics["melt_rate_model"], model)
+        gh.basal_melt .= model.extra_physics["melt_rate_model"].melt_rate
+    else
+        gh.basal_melt .= 0
+    end
     return model
 end
 
