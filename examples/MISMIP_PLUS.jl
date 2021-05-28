@@ -26,7 +26,7 @@ function MISMIP_PLUS()
     bed = WAVI.mismip_plus_bed #function definition
 
     #solver parameters
-    maxiter_picard = 5
+    maxiter_picard = 1
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     #Physical parameters
@@ -44,8 +44,8 @@ function MISMIP_PLUS()
     #timestepping parameters
     niter0 = 0
     dt = 0.1
-    end_time = 200.
-    chkpt_freq = 1000.
+    end_time = 1000.
+    chkpt_freq = 2000.
     pchkpt_freq = 2000.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
@@ -59,8 +59,9 @@ function MISMIP_PLUS()
     mkdir(folder) #make a clean folder for outputs
     outputs = (h = model.fields.gh.h,
                u = model.fields.gh.u,
-               v = model.fields.gh.v) #output velocities and thickness
-    output_freq = 1000.
+               v = model.fields.gh.v,
+               b = model.fields.gh.b) #output velocities and thickness
+    output_freq = 100.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             output_format = "mat",
