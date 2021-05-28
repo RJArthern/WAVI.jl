@@ -14,5 +14,18 @@ using Test, WAVI
         @test 480000<glxtest[4]<540000
         @test 430000<glxtest[2]<460000
         @test 430000<glxtest[3]<460000
+
+        #check the melt rate for ice_1r is doing something sensible
+        function m1(h, b)
+            draft = -(918.0 / 1028.0) * h
+            cavity_thickness = draft .- b
+            cavity_thickness = max.(cavity_thickness, 0)
+            m =  0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
+            return m
+        end
+        melt = m1.(simulation.model.fields.gh.h, simulation.model.fields.gh.h)
+        @test all(melt .>= 0)
+        @test maximum(melt) < 100
+
     end
 end
