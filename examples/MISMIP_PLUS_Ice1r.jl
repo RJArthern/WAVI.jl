@@ -1,5 +1,5 @@
 using WAVI 
-function MISMIP_PLUS_test()
+function MISMIP_PLUS_Ice1r()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -26,7 +26,7 @@ function MISMIP_PLUS_test()
     bed = WAVI.mismip_plus_bed #function definition
 
     #solver parameters
-    maxiter_picard = 5
+    maxiter_picard = 1
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     #Physical parameters
@@ -41,11 +41,25 @@ function MISMIP_PLUS_test()
                      params = params, 
                      solver_params = solver_params)
 
+    #embed the model with melt rate model
+    function m1(h, b)
+        draft = -(918.0 / 1028.0) * h
+        cavity_thickness = draft .- b
+        cavity_thickness = max.(cavity_thickness, 0)
+        m =  0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
+        return m
+    end
+    arguments = (h = model.fields.gh.h, b = model.fields.gh.b)
+    melt_rate_model = AnalyticMeltRate(melt_partial_cell = true, 
+                                    melt_rate_function = m1, 
+                                    function_arguments = arguments)
+    add_melt_rate_model!(model,melt_rate_model)
+
     #timestepping parameters
     niter0 = 0
     dt = 0.1
-    end_time = 500.
-    chkpt_freq = 1000.
+    end_time = 1000.
+    chkpt_freq = 2000.
     pchkpt_freq = 2000.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
@@ -60,9 +74,9 @@ function MISMIP_PLUS_test()
     outputs = (h   = model.fields.gh.h,
                 u  = model.fields.gh.u,
                 v  = model.fields.gh.v,
-                uu = model.fields.gu.u,
-                vv = model.fields.gv.v);
-    output_freq = 1000.
+                melt = model.fields.gh.basal_melt,
+                grfrac = model.fields.gh.grounded_fraction)
+    output_freq = 100.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             output_format = "mat",
@@ -78,4 +92,4 @@ function MISMIP_PLUS_test()
     return simulation
 end
 
-@time simulation = MISMIP_PLUS_test();
+@time simulation = MISMIP_PLUS_Ice1r();

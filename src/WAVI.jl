@@ -23,6 +23,8 @@ abstract type AbstractGrid{T <: Real, N <: Integer} end
 abstract type AbstractModel{T <: Real, N <: Integer} end
 abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
 abstract type AbstractSimulation{T <: Real, N <: Integer, R <: Real} end
+abstract type AbstractMeltRateModel{PC <: Bool, M} end
+
 
 #Type alias, just for abreviation
 const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,SparseMatrixCSC{T,N}},
@@ -39,8 +41,11 @@ include("./Clock.jl")
 include("./InitialConditions.jl")
 include("./ModelGrids.jl")
 include("./WaveletGrids.jl")
+include("./Fields.jl")
 include("./Model.jl")
+include("./MeltRateModels/MeltRateModel.jl")
 include("./Simulation.jl")
+
 
 
 

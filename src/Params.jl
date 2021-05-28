@@ -18,7 +18,6 @@
     default_temperature::T = 265.700709
     default_damage::T = 0.0
     accumulation_rate::T = 0.0
-    basal_melt_rate::T = 0.0
     glen_a_activation_energy::T = 5.8631e+04
     glen_a_ref::T = 4.9e-16 *sec_per_year * 1.0e-9
     glen_temperature_ref::T = 263.15
