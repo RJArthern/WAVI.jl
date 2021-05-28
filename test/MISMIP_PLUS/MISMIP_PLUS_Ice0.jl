@@ -1,5 +1,5 @@
 using WAVI 
-function MISMIP_PLUS_test()
+function MISMIP_PLUS_Ice0()
     #Grid and boundary conditions
     nx = 80
     ny = 10
@@ -26,7 +26,7 @@ function MISMIP_PLUS_test()
     bed = WAVI.mismip_plus_bed #function definition
 
     #solver parameters
-    maxiter_picard = 5
+    maxiter_picard = 1
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     #Physical parameters
@@ -42,40 +42,16 @@ function MISMIP_PLUS_test()
                      solver_params = solver_params)
 
     #timestepping parameters
-    niter0 = 0
-    dt = 0.1
-    end_time = 500.
-    chkpt_freq = 1000.
-    pchkpt_freq = 2000.
-    timestepping_params = TimesteppingParams(niter0 = niter0, 
-                                            dt = dt, 
-                                            end_time = end_time, 
-                                            chkpt_freq = chkpt_freq, 
-                                            pchkpt_freq = pchkpt_freq)
-
-    #output parameters
-    folder = "outputs"
-    isdir(folder) && rm(folder, force = true, recursive = true)
-    mkdir(folder) #make a clean folder for outputs
-    outputs = (h   = model.fields.gh.h,
-                u  = model.fields.gh.u,
-                v  = model.fields.gh.v,
-                uu = model.fields.gu.u,
-                vv = model.fields.gv.v);
-    output_freq = 1000.
-    output_params = OutputParams(outputs = outputs, 
-                            output_freq = output_freq,
-                            output_format = "mat",
-                            output_path = folder,
-                            zip_format = "nc")
+    dt = 0.5
+    end_time = 10000.
+    timestepping_params = TimesteppingParams(dt = dt, end_time = end_time)
     
     simulation = Simulation(model = model, 
-                        timestepping_params = timestepping_params, 
-                        output_params = output_params)
+                        timestepping_params = timestepping_params)
             
     #perform the simulation
     run_simulation!(simulation)
     return simulation
 end
 
-@time simulation = MISMIP_PLUS_test();
+#@time simulation = MISMIP_PLUS_test();

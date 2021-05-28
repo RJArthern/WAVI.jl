@@ -27,23 +27,6 @@ using Test, TestSetExtensions, SafeTestsets, LinearAlgebra
         @test  relerr_v < 3.0e-4
     end
 
-    @safetestset "MISMIP+" begin
-
-        using WAVI
-
-        include("MISMIP_PLUS_test.jl")
-        wavi=MISMIP_PLUS_test(20000)
-        glx=WAVI.get_glx(wavi)
-        glxtest=glx[[1,div(wavi.gh.ny,2),div(wavi.gh.ny,2)+1,wavi.gh.ny]]
-        @test length(glx) == wavi.params.ny #check that the grounding line covers the whole domain in the y-direction
-        @test (glxtest[4]-glxtest[1])/(glxtest[4]+glxtest[1]) < 1e-4
-        @test (glxtest[2]-glxtest[3])/(glxtest[2]+glxtest[3]) < 1e-4
-        @test 480000<glxtest[1]<540000
-        @test 480000<glxtest[4]<540000
-        @test 430000<glxtest[2]<460000
-        @test 430000<glxtest[3]<460000
-    end
-
     @safetestset "Pos Fraction" begin
         using WAVI
         z=[-1.0 -1.0 -1.0;-1.0 1.0 -1.0;-1.0 -1.0 -1.0]
