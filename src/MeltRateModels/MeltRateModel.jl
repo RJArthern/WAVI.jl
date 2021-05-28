@@ -1,8 +1,8 @@
-export AnalyticMeltRate, InputFileMeltRateModel, add_melt_rate_model!
+export AnalyticMeltRate, BinfileMeltRate, add_melt_rate_model!
 
 #add each of the individual melt rate models
 include("analytic_melt_rate_model.jl")
-include("input_file_melt_rate_model.jl")
+include("binfile_melt_rate.jl")
 
 """
     function add_melt_rate_model!(model, melt_rate_model)
