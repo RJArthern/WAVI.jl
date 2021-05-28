@@ -134,6 +134,8 @@ using Test, WAVI
         binfile_melt_rate = BinfileMeltRate(input_filename = filename, nx = grid.nx+1, ny = grid.ny+1)
         add_melt_rate_model!(model, binfile_melt_rate)
         @test_throws KeyError model.extra_physics["melt_rate_model"]
+
+        rm(filename)
         
     end
 
