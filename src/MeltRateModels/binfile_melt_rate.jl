@@ -39,8 +39,10 @@ end
 function update_melt_rate_model!(melt_model::BinfileMeltRate, model)
     @unpack melt_rate, input_filename = melt_model
     #read the input file
+    file_size = stat(input_filename).size #bytes in input file must match matrix returned
     read!(input_filename, melt_rate)
     melt_rate .= hton.(melt_rate)
+    (file_size == sizeof(melt_rate)) || throw(DimensionMismatch("Size of input file incompatible with specified nx, ny"))
 
 #    if melt_model.melt_partial_cell
 #        melt_rate .= melt_rate.* (1 .- model.fields.gh.grounded_fraction)

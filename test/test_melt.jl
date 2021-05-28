@@ -70,7 +70,7 @@ using Test, WAVI
 
     end
 
-    @testset "test binary input file melt rate construction" begin 
+    @testset "test binary input file melt rate construction and update" begin 
 
         @info "Testing binary input file construction and update"
         grid = Grid()
@@ -106,6 +106,15 @@ using Test, WAVI
         @test all(model.extra_physics["melt_rate_model"].melt_rate .== 2)
         @test all(binfile_melt_rate.melt_rate .== 2)
 
+        #change the binary file to one of the wrong size, and check we return an error when updating
+        m = 2 .* ones(grid.nx+1, grid.ny+1)
+        m .= hton.(m)
+        mfileID =  open(filename,"w")
+          write(mfileID, m[:,:])
+        close(mfileID)
+        @test_throws DimensionMismatch update_state!(model)
+
+        #remove the file we just made
         rm(filename)
 
         
