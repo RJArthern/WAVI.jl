@@ -33,37 +33,20 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 #Concrete types
 
 ##################################################################################
-#type definitions
-include("./OutputParams/OutputParams.jl")
-include("./Grid.jl")
-include("./Params.jl")
-include("./SolverParams.jl")
-include("./TimesteppingParams.jl")
-include("./Clock.jl")
-include("./InitialConditions.jl")
-include("./Fields/HGrid.jl")
-include("./Fields/CGrid.jl")
-include("./Fields/UGrid.jl")
-include("./Fields/VGrid.jl")
-include("./Fields/SigmaGrid.jl")
-include("./WaveletGrids.jl")
-include("./Fields/Fields.jl")
-include("./Model.jl")
-include("./MeltRateModels/MeltRateModel.jl")
-include("./Simulation.jl")
-
-
-
-
-#Functions
-include("./OutputParams/output_writing.jl")
-include("./OutputParams/zipping_output.jl")
-include("preconditioners.jl")
-include("update_state.jl")
-include("update_velocities.jl")
+#include all of the code
+include("OutputParams/OutputParams.jl")
+include("Grid.jl")
+include("Params.jl")
+include("SolverParams.jl")
+include("TimesteppingParams.jl")
+include("Clock.jl")
+include("InitialConditions.jl")
+include("Wavelets/WaveletGrids.jl")
+include("Fields/Fields.jl")
+include("Models/Model.jl")
+include("MeltRateModels/MeltRateModel.jl")
+include("Simulations/Simulation.jl")
 include("utilities.jl")
-include("wavelets.jl")
-include("run_simulation.jl")
 
 
 """

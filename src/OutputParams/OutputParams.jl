@@ -52,3 +52,6 @@ function OutputParams(;
 
     return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, zip_format)
 end
+
+include("output_writing.jl")
+include("zipping_output.jl")

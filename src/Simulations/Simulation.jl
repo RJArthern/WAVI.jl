@@ -59,3 +59,5 @@ function Simulation(;
 
     
 end
+
+include("run_simulation.jl")

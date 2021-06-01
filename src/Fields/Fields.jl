@@ -1,4 +1,10 @@
 #Struct to hold model state
+include("HGrid.jl")
+include("CGrid.jl")
+include("VGrid.jl")
+include("UGrid.jl")
+include("SigmaGrid.jl")
+
 struct Fields{T <: Real, N <: Real}
     gh::HGrid{T,N}
     gu::UGrid{T,N}
