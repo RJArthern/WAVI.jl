@@ -33,6 +33,7 @@ function update_clock!(simulation::AbstractSimulation)
     @unpack clock,timestepping_params=simulation
     clock.n_iter += 1
     clock.time += timestepping_params.dt
+    println(clock.time)
     return simulation
 end
 

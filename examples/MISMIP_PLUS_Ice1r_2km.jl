@@ -1,8 +1,8 @@
 using WAVI 
-function MISMIP_PLUS_Ice1r()
+function MISMIP_PLUS_Ice1r_2km()
     #Grid and boundary conditions
-    nx = 80
-    ny = 10
+    nx = 320
+    ny = 40
     nσ = 4
     x0 = 0.0
     y0 = -40000.0
@@ -23,23 +23,28 @@ function MISMIP_PLUS_Ice1r()
                 v_iszero = v_iszero)
 
     #Bed 
-    bed = WAVI.mismip_plus_bed #function definition
+    bed = WAVI.mismip_plus_bed #function definition of bed
+
+    #Initial conditions from Ice0 
+    h_init = Array{Float64}(undef, nx, ny);
+    read!("examples\\MISMIP_ice0_final.bin", h_init)
+    h_init = ntoh.(h_init);
+    initial_conditions = InitialConditions(initial_thickness = h_init)
 
     #solver parameters
-    maxiter_picard = 1
+    maxiter_picard = 30
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     #Physical parameters
-    default_thickness = 100.0 #set the initial condition this way
     accumulation_rate = 0.3
-    params = Params(default_thickness = default_thickness, 
-                    accumulation_rate = accumulation_rate)
+    params = Params(accumulation_rate = accumulation_rate)
 
     #make the model
     model = Model(grid = grid,
                      bed_elevation = bed, 
                      params = params, 
-                     solver_params = solver_params)
+                     solver_params = solver_params, 
+                     initial_conditions = initial_conditions)
 
     #embed the model with melt rate model
     function m1(h, b)
@@ -57,10 +62,10 @@ function MISMIP_PLUS_Ice1r()
 
     #timestepping parameters
     niter0 = 0
-    dt = 0.1
-    end_time = 1000.
-    chkpt_freq = 2000.
-    pchkpt_freq = 2000.
+    dt = 0.001
+    end_time = 1.
+    chkpt_freq = 0.1
+    pchkpt_freq = 0.1
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -76,7 +81,7 @@ function MISMIP_PLUS_Ice1r()
                 v  = model.fields.gh.v,
                 melt = model.fields.gh.basal_melt,
                 grfrac = model.fields.gh.grounded_fraction)
-    output_freq = 100.
+    output_freq = 0.1
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             output_format = "mat",
@@ -92,4 +97,4 @@ function MISMIP_PLUS_Ice1r()
     return simulation
 end
 
-@time simulation = MISMIP_PLUS_Ice1r();
+@time simulation = MISMIP_PLUS_Ice1r_2km();

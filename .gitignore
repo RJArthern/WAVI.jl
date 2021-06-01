@@ -7,3 +7,4 @@ Manifest.toml
 #*.jld2
 *.nc
 *.md
+*.bin
