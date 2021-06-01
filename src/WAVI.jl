@@ -37,6 +37,8 @@ const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,Sp
 include("./OutputParams/OutputParams.jl")
 include("./Grid.jl")
 include("./Params.jl")
+include("./SolverParams.jl")
+include("./TimesteppingParams.jl")
 include("./Clock.jl")
 include("./InitialConditions.jl")
 include("./Fields/HGrid.jl")
