@@ -43,10 +43,10 @@ function MISMIP_PLUS()
 
     #timestepping parameters
     niter0 = 0
-    dt = 0.1
-    end_time = 1000.
-    chkpt_freq = 2000.
-    pchkpt_freq = 2000.
+    dt = 0.5
+    end_time = 2.
+    chkpt_freq = 1.
+    pchkpt_freq = 1.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -54,18 +54,17 @@ function MISMIP_PLUS()
                                             pchkpt_freq = pchkpt_freq)
 
     #output parameters
-    folder = "outputs"
-    isdir(folder) && rm(folder, force = true, recursive = true)
-    mkdir(folder) #make a clean folder for outputs
+    #folder = "outputs"
+    #isdir(folder) && rm(folder, force = true, recursive = true)
+    #mkdir(folder) #make a clean folder for outputs
     outputs = (h = model.fields.gh.h,
                u = model.fields.gh.u,
                v = model.fields.gh.v,
                b = model.fields.gh.b) #output velocities and thickness
-    output_freq = 100.
+    output_freq = 1.
     output_params = OutputParams(outputs = outputs, 
                             output_freq = output_freq,
                             output_format = "mat",
-                            output_path = folder,
                             zip_format = "nc")
     
     simulation = Simulation(model = model, 

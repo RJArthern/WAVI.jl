@@ -15,7 +15,7 @@ end
 function OutputParams(; 
     outputs = (),
     output_freq = Inf, 
-    output_format = "none",
+    output_format = "jld2",
     prefix = "outfile", 
     output_path = "./",
     dump_vel = false,
