@@ -46,7 +46,7 @@ function MISMIP_PLUS_Ice1r_2km()
                      solver_params = solver_params, 
                      initial_conditions = initial_conditions)
 
-    #embed the model with melt rate model
+    #embed the ice model with melt rate model
     function m1(h, b)
         draft = -(918.0 / 1028.0) * h
         cavity_thickness = draft .- b
