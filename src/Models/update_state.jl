@@ -142,12 +142,21 @@ end
 """
     update_velocities_on_h_grid!(model::AbstractModel)
 
-Update the velocities on the h grid 
+Update the velocities (depth averaged, surface and bed) on the h grid 
 """
 function update_velocities_on_h_grid!(model)
     @unpack gh,gu,gv = model.fields
-    gh.u .= (gu.u[1:end-1,:] + gu.u[2:end,:])./2
-    gh.v .= (gv.v[:,1:end-1] + gv.v[:, 2:end])./2
+    #depth averaged velocities
+    gh.u[:] .= gu.cent*gu.u[:] #(gu.u[1:end-1,:] + gu.u[2:end,:])./2
+    gh.v[:] .= gv.cent*gv.v[:] #(gv.v[:,1:end-1] + gv.v[:, 2:end])./2
+
+    #bed velocities
+    gh.ub .= gh.u ./ (1 .+ (gh.β .* gh.quad_f2))
+    gh.vb .= gh.v ./ (1 .+ (gh.β .* gh.quad_f2))
+
+    #surface velocities
+    gh.us .= gh.ub .* (1 .+ (gh.β .* gh.quad_f1))
+    gh.vs .= gh.vb .* (1 .+ (gh.β .* gh.quad_f1))
     return model
 end
 """
