@@ -8,3 +8,8 @@ Manifest.toml
 *.nc
 *.md
 *.bin
+
+#testing driver scripts
+driver_updated.jl 
+*.box
+*.data
