@@ -1,52 +1,52 @@
 #Struct to hold information on h-grid, located at cell centers.
 #@with_kw struct HGrid{T <: Real, N <: Integer}
-#nx::N
-#ny::N
+#Nx::N
+#Ny::N
 #x0::T = 0.0
 #y0::T = 0.0
 #dx::T = 1.0
 #dy::T = 1.0
-#xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-#yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-#mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny); @assert mask == clip(mask)
+#xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:Nx, j=1:Ny]; @assert size(xx)==(Nx,Ny)
+#yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:Nx, j=1:Ny]; @assert size(yy)==(Nx,Ny)
+#mask::Array{Bool,2} = trues(Nx,Ny); @assert size(mask)==(Nx,Ny); @assert mask == clip(mask)
 #n::N = count(mask); @assert n == count(mask)
 #crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
 #samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
 #spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-#b::Array{T,2} = params.bed_elevation; @assert size(b)==(nx,ny)
-#h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-#s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-#dhdt::Array{T,2} = zeros(nx,ny); @assert size(dhdt)==(nx,ny)
-#accumulation::Array{T,2} = zeros(nx,ny); @assert size(accumulation)==(nx,ny)
-#basal_melt::Array{T,2} = zeros(nx,ny); @assert size(basal_melt)==(nx,ny)
-#haf::Array{T,2} = zeros(nx,ny); @assert size(haf)==(nx,ny)
-#grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-#dsdh::Array{T,2} = ones(nx,ny); @assert size(dsdh)==(nx,ny)
-#shelf_strain_rate::Array{T,2} = zeros(nx,ny); @assert size(shelf_strain_rate)==(nx,ny)
-#av_speed::Array{T,2} = zeros(nx,ny); @assert size(av_speed)==(nx,ny)
-#u::Array{T,2} = zeros(nx,ny); @assert size(u)==(nx,ny)
-#v::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#us::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#vs::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#ub::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#vb::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#bed_speed::Array{T,2} = zeros(nx,ny); @assert size(bed_speed)==(nx,ny)
-#weertman_c::Array{T,2} = zeros(nx,ny); @assert size(weertman_c)==(nx,ny)
-#β::Array{T,2} = zeros(nx,ny); @assert size(β)==(nx,ny)
-#βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-#τbed::Array{T,2} = zeros(nx,ny); @assert size(τbed)==(nx,ny)
-#ηav::Array{T,2}; @assert size(ηav)==(nx,ny)
-#quad_f1::Array{T,2} = zeros(nx,ny); @assert size(quad_f1)==(nx,ny)
-#quad_f2::Array{T,2} = h./(3*ηav); @assert size(quad_f2)==(nx,ny)
-#dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-#dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(nx*ny))*crop)
+#b::Array{T,2} = params.bed_elevation; @assert size(b)==(Nx,Ny)
+#h::Array{T,2} = zeros(Nx,Ny); @assert size(h)==(Nx,Ny)
+#s::Array{T,2} = zeros(Nx,Ny); @assert size(s)==(Nx,Ny)
+#dhdt::Array{T,2} = zeros(Nx,Ny); @assert size(dhdt)==(Nx,Ny)
+#accumulation::Array{T,2} = zeros(Nx,Ny); @assert size(accumulation)==(Nx,Ny)
+#basal_melt::Array{T,2} = zeros(Nx,Ny); @assert size(basal_melt)==(Nx,Ny)
+#haf::Array{T,2} = zeros(Nx,Ny); @assert size(haf)==(Nx,Ny)
+#grounded_fraction::Array{T,2} = ones(Nx,Ny); @assert size(grounded_fraction)==(Nx,Ny)
+#dsdh::Array{T,2} = ones(Nx,Ny); @assert size(dsdh)==(Nx,Ny)
+#shelf_strain_rate::Array{T,2} = zeros(Nx,Ny); @assert size(shelf_strain_rate)==(Nx,Ny)
+#av_speed::Array{T,2} = zeros(Nx,Ny); @assert size(av_speed)==(Nx,Ny)
+#u::Array{T,2} = zeros(Nx,Ny); @assert size(u)==(Nx,Ny)
+#v::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
+#us::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
+#vs::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
+#ub::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
+#vb::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
+#bed_speed::Array{T,2} = zeros(Nx,Ny); @assert size(bed_speed)==(Nx,Ny)
+#weertman_c::Array{T,2} = zeros(Nx,Ny); @assert size(weertman_c)==(Nx,Ny)
+#β::Array{T,2} = zeros(Nx,Ny); @assert size(β)==(Nx,Ny)
+#βeff::Array{T,2} = zeros(Nx,Ny); @assert size(βeff)==(Nx,Ny)
+#τbed::Array{T,2} = zeros(Nx,Ny); @assert size(τbed)==(Nx,Ny)
+#ηav::Array{T,2}; @assert size(ηav)==(Nx,Ny)
+#quad_f1::Array{T,2} = zeros(Nx,Ny); @assert size(quad_f1)==(Nx,Ny)
+#quad_f2::Array{T,2} = h./(3*ηav); @assert size(quad_f2)==(Nx,Ny)
+#dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
+#dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
 #end
 
 
 
 struct HGrid{T <: Real, N  <: Integer}
-    nx::N
-    ny::N
+    Nx::N
+    Ny::N
     mask::Array{Bool,2}
     n::N 
     crop::Diagonal{T,Array{T,1}}
@@ -82,83 +82,83 @@ struct HGrid{T <: Real, N  <: Integer}
 end
 
 
-#Hgrid constructor. Note to self, we keep nx and ny here to increase transparency in velocity solve
+#Hgrid constructor. Note to self, we keep Nx and Ny here to increase transparency in velocity solve
 function HGrid(;
-                nx, 
-                ny,
-                mask = trues(nx,ny),
+                Nx, 
+                Ny,
+                mask = trues(Nx,Ny),
                 b,
-                h = zeros(nx,ny),
-                ηav = zeros(nx,ny))
+                h = zeros(Nx,Ny),
+                ηav = zeros(Nx,Ny))
     
     #construct operators
     n = count(mask);
     crop = Diagonal(float(mask[:]));
     samp = crop[mask[:],:]; 
     spread = sparse(samp');
-    dneghηav = Ref(crop*Diagonal(zeros(nx*ny))*crop)
-    dimplicit = Ref(crop*Diagonal(zeros(nx*ny))*crop)
+    dneghηav = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
+    dimplicit = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
      
     #construct quantities not passed
-    s = zeros(nx,ny)
-    dhdt = zeros(nx,ny) 
-    accumulation = zeros(nx,ny)
-    basal_melt = zeros(nx,ny)
-    haf = zeros(nx,ny)
-    grounded_fraction = ones(nx,ny)
-    dsdh = ones(nx,ny)
-    shelf_strain_rate = zeros(nx,ny)
-    av_speed = zeros(nx,ny) 
-    u = zeros(nx,ny) 
-    v = zeros(nx,ny);
-    us = zeros(nx,ny); 
-    vs = zeros(nx,ny);
-    ub = zeros(nx,ny); 
-    vb= zeros(nx,ny);
-    bed_speed = zeros(nx,ny)
-    weertman_c = zeros(nx,ny)
-    β = zeros(nx,ny)
-    βeff = zeros(nx,ny);
-    τbed = zeros(nx,ny);
-    ηav; @assert size(ηav)==(nx,ny)
-    quad_f1 = zeros(nx,ny); 
+    s = zeros(Nx,Ny)
+    dhdt = zeros(Nx,Ny) 
+    accumulation = zeros(Nx,Ny)
+    basal_melt = zeros(Nx,Ny)
+    haf = zeros(Nx,Ny)
+    grounded_fraction = ones(Nx,Ny)
+    dsdh = ones(Nx,Ny)
+    shelf_strain_rate = zeros(Nx,Ny)
+    av_speed = zeros(Nx,Ny) 
+    u = zeros(Nx,Ny) 
+    v = zeros(Nx,Ny);
+    us = zeros(Nx,Ny); 
+    vs = zeros(Nx,Ny);
+    ub = zeros(Nx,Ny); 
+    vb= zeros(Nx,Ny);
+    bed_speed = zeros(Nx,Ny)
+    weertman_c = zeros(Nx,Ny)
+    β = zeros(Nx,Ny)
+    βeff = zeros(Nx,Ny);
+    τbed = zeros(Nx,Ny);
+    ηav; @assert size(ηav)==(Nx,Ny)
+    quad_f1 = zeros(Nx,Ny); 
     quad_f2 = h./(3*ηav); 
 
 
     #check sizes of everything
-    @assert size(mask)==(nx,ny); @assert mask == clip(mask)
+    @assert size(mask)==(Nx,Ny); @assert mask == clip(mask)
     @assert n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
     @assert spread == sparse(samp')
-    @assert size(b)==(nx,ny)
-    @assert size(h)==(nx,ny)
-    @assert size(s)==(nx,ny)
-    @assert size(dhdt)==(nx,ny)
-    @assert size(accumulation)==(nx,ny)
-    @assert size(basal_melt)==(nx,ny)
-    @assert size(haf)==(nx,ny)
-    @assert size(grounded_fraction)==(nx,ny)
-    @assert size(dsdh)==(nx,ny)
-    @assert size(shelf_strain_rate)==(nx,ny)
-    @assert size(u)==(nx,ny)
-    @assert size(v)==(nx,ny)
-    @assert size(av_speed)==(nx,ny) 
-    @assert size(ub)==(nx,ny)
-    @assert size(vb)==(nx,ny)
-    @assert size(us)==(nx,ny)
-    @assert size(vs)==(nx,ny)
-    @assert size(bed_speed)==(nx,ny)
-    @assert size(weertman_c)==(nx,ny)
-    @assert size(β)==(nx,ny)
-    @assert size(βeff)==(nx,ny)
-    @assert size(τbed)==(nx,ny)
-    @assert size(quad_f1)==(nx,ny)
-    @assert size(quad_f2)==(nx,ny)
+    @assert size(b)==(Nx,Ny)
+    @assert size(h)==(Nx,Ny)
+    @assert size(s)==(Nx,Ny)
+    @assert size(dhdt)==(Nx,Ny)
+    @assert size(accumulation)==(Nx,Ny)
+    @assert size(basal_melt)==(Nx,Ny)
+    @assert size(haf)==(Nx,Ny)
+    @assert size(grounded_fraction)==(Nx,Ny)
+    @assert size(dsdh)==(Nx,Ny)
+    @assert size(shelf_strain_rate)==(Nx,Ny)
+    @assert size(u)==(Nx,Ny)
+    @assert size(v)==(Nx,Ny)
+    @assert size(av_speed)==(Nx,Ny) 
+    @assert size(ub)==(Nx,Ny)
+    @assert size(vb)==(Nx,Ny)
+    @assert size(us)==(Nx,Ny)
+    @assert size(vs)==(Nx,Ny)
+    @assert size(bed_speed)==(Nx,Ny)
+    @assert size(weertman_c)==(Nx,Ny)
+    @assert size(β)==(Nx,Ny)
+    @assert size(βeff)==(Nx,Ny)
+    @assert size(τbed)==(Nx,Ny)
+    @assert size(quad_f1)==(Nx,Ny)
+    @assert size(quad_f2)==(Nx,Ny)
 
 return HGrid(
-            nx,
-            ny,
+            Nx,
+            Ny,
             mask,
             n,
             crop,

@@ -71,7 +71,7 @@ end
 function get_rhs(model::AbstractModel)
     @unpack gh,gu,gv,gc=model.fields
     @unpack params=model
-    onesvec=ones(gh.nx*gh.ny)
+    onesvec=ones(gh.Nx*gh.Ny)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
         (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂x'*surf_elev_adjusted))
@@ -257,7 +257,7 @@ function update_βeff_on_uv_grids!(model::AbstractModel)
 
     T=eltype(gh.grounded_fraction)
 
-    onesvec=ones(T,gh.nx*gh.ny)
+    onesvec=ones(T,gh.Nx*gh.Ny)
     gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     ipolgfu=zeros(T,gu.nx,gu.ny);
     ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
