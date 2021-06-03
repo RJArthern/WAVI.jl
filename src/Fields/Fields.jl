@@ -37,12 +37,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     h =  deepcopy(initial_conditions.initial_thickness)
     ηav = deepcopy(initial_conditions.initial_viscosity)
     gh=HGrid(
-    x0=grid.x0,
-    y0=grid.y0,
     nx=grid.nx,
     ny=grid.ny,
-    dx=grid.dx,
-    dy=grid.dy,
     mask=h_mask,
     b = bed_array,
     h = h,
