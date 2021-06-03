@@ -64,21 +64,19 @@ using WAVI, Test
     end
 
     simulation = version_update_test();
-    example_output = load("./test/version_update_test_verification/MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
-    @test all(isapprox.(simulation.model.fields.gh.h, example_output["h"], rtol = 1e-6)) 
-    @test all(isapprox.(simulation.model.fields.gu.u, example_output["u"], rtol = 1e-4)) 
-    @test all(isapprox.(simulation.model.fields.gv.v, example_output["v"], rtol = 1e-3)) 
-    @test all(isapprox.(simulation.model.fields.gh.ηav, example_output["viscosity"], rtol = 1e-5)) 
-    @test all(isapprox.(simulation.model.fields.gh.grounded_fraction, example_output["grounded_fraction"], rtol = 1e-5)) 
-    @test all(isapprox.(simulation.model.fields.gh.bed_speed, example_output["bed_speed"], rtol = 1e-5)) 
 
-    #only for julia version 1.5.1
-    #@test simulation.model.fields.gh.h == example_output["h"]
-    #@test simulation.model.fields.gu.u == example_output["u"]
-    #@test simulation.model.fields.gv.v == example_output["v"]
-    #@test simulation.model.fields.gh.ηav == example_output["viscosity"]
-    #@test simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
-    #@test simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
+    example_output = Dict();
+    if VERSION == v"1.6.1"
+    example_output = load("./test/version_update_test_verification/v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    elseif  VERSION == v"1.5.1"
+    example_output = load("./test/version_update_test_verification/v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    end
+    @test simulation.model.fields.gh.h == example_output["h"]
+    @test simulation.model.fields.gu.u == example_output["u"]
+    @test simulation.model.fields.gv.v == example_output["v"]
+    @test simulation.model.fields.gh.ηav == example_output["viscosity"]
+    @test simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
+    @test simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
 end
 
 
