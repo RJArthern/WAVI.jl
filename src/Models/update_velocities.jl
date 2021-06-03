@@ -28,7 +28,7 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     update_basal_drag!(model)
     inner_update_viscosity!(model)
     update_av_viscosity!(model)
-    update_quadrature_f2!(model)
+    update_quadrature_falpha!(model)
     update_βeff!(model)
     update_βeff_on_uv_grids!(model)
     update_rheological_operators!(model)
@@ -214,16 +214,18 @@ end
 
 
 """
-    update_quadrature_f2!(model::AbstractModel)
+    update_quadrature_falpha!(model::AbstractModel)
 
-Use quadrature to compute f2 function, used to relate average velocities to basal velocities.
+Use quadrature to compute falpha functions, used to relate average velocities, basal velocities, and surface velocities to one another
 """
-function update_quadrature_f2!(model::AbstractModel)
+function update_quadrature_falpha!(model::AbstractModel)
     @unpack gh,g3d=model.fields
+    gh.quad_f1 .= zero(gh.quad_f1)
     gh.quad_f2 .= zero(gh.quad_f2)
     for k=1:g3d.nσ
        for j = 1:g3d.ny
           for i = 1:g3d.nx
+                gh.quad_f1[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*g3d.ζ[k]/g3d.η[i,j,k]
                 gh.quad_f2[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*(g3d.ζ[k])^2/g3d.η[i,j,k]
           end
        end
