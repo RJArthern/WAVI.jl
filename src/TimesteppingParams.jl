@@ -21,10 +21,6 @@ function TimesteppingParams(;
                         pchkpt_freq = Inf,
                         step_thickness = true)
 
-    #(niter0 > 0) || ArgumentError("niter0 must be a positive number")
-
-    #if niter0 > 0, check file exists and get start time, else throw error 
-
 
     #initialize t0 (really you should read start time from pickup file)
     t0 = niter0 > 0 ? niter0 * dt : 0 
