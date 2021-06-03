@@ -24,7 +24,7 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     op_diag=get_op_diag(model,op)
 
     #Four colour Jacobi preconditioner. Red-Black checkerboard Jacobi for each velocity component.
-    sweep=[[1 .+ mod(i-j,2) for i=1:gu.nx, j=1:gu.ny][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nx, j=1:gv.ny][gv.mask]]
+    sweep=[[1 .+ mod(i-j,2) for i=1:gu.Nx, j=1:gu.Ny][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nx, j=1:gv.ny][gv.mask]]
     sweep_order=[1,3,2,4]
 
     p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order,
@@ -82,7 +82,7 @@ function get_op_diag(model::AbstractModel,op::LinearMap)
     @assert m == n == gu.n + gv.n
     op_diag=zeros(eltype(op),n)
     sm=solver_params.stencil_margin
-    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nx, j=1:gu.ny][gu.mask];
+    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.Nx, j=1:gu.Ny][gu.mask];
            [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nx, j=1:gv.ny][gv.mask] ]
     e=zeros(Bool,n)
     for i = unique(sweep)

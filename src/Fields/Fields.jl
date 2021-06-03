@@ -47,10 +47,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #u-grid
     gu=UGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx+1,
-    ny=grid.ny,
+    Nx=grid.nx+1,
+    Ny=grid.ny,
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,

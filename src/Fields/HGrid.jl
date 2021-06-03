@@ -133,6 +133,10 @@ function HGrid(;
     @assert size(quad_f2)==(Nx,Ny)
     @assert size(ηav)==(Nx,Ny)
 
+    #make sure boolean type rather than bitarray
+    mask = convert(Array{Bool,2}, mask)
+
+
 return HGrid(
             Nx,
             Ny,

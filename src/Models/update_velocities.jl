@@ -259,7 +259,7 @@ function update_βeff_on_uv_grids!(model::AbstractModel)
 
     onesvec=ones(T,gh.Nx*gh.Ny)
     gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
-    ipolgfu=zeros(T,gu.nx,gu.ny);
+    ipolgfu=zeros(T,gu.Nx,gu.Ny);
     ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
