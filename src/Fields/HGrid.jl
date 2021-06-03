@@ -1,88 +1,66 @@
-#Struct to hold information on h-grid, located at cell centers.
-#@with_kw struct HGrid{T <: Real, N <: Integer}
-#Nx::N
-#Ny::N
-#x0::T = 0.0
-#y0::T = 0.0
-#dx::T = 1.0
-#dy::T = 1.0
-#xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:Nx, j=1:Ny]; @assert size(xx)==(Nx,Ny)
-#yy::Array{T,2}=[y0+(j-0.5)*dy for i=1:Nx, j=1:Ny]; @assert size(yy)==(Nx,Ny)
-#mask::Array{Bool,2} = trues(Nx,Ny); @assert size(mask)==(Nx,Ny); @assert mask == clip(mask)
-#n::N = count(mask); @assert n == count(mask)
-#crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-#samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-#spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-#b::Array{T,2} = params.bed_elevation; @assert size(b)==(Nx,Ny)
-#h::Array{T,2} = zeros(Nx,Ny); @assert size(h)==(Nx,Ny)
-#s::Array{T,2} = zeros(Nx,Ny); @assert size(s)==(Nx,Ny)
-#dhdt::Array{T,2} = zeros(Nx,Ny); @assert size(dhdt)==(Nx,Ny)
-#accumulation::Array{T,2} = zeros(Nx,Ny); @assert size(accumulation)==(Nx,Ny)
-#basal_melt::Array{T,2} = zeros(Nx,Ny); @assert size(basal_melt)==(Nx,Ny)
-#haf::Array{T,2} = zeros(Nx,Ny); @assert size(haf)==(Nx,Ny)
-#grounded_fraction::Array{T,2} = ones(Nx,Ny); @assert size(grounded_fraction)==(Nx,Ny)
-#dsdh::Array{T,2} = ones(Nx,Ny); @assert size(dsdh)==(Nx,Ny)
-#shelf_strain_rate::Array{T,2} = zeros(Nx,Ny); @assert size(shelf_strain_rate)==(Nx,Ny)
-#av_speed::Array{T,2} = zeros(Nx,Ny); @assert size(av_speed)==(Nx,Ny)
-#u::Array{T,2} = zeros(Nx,Ny); @assert size(u)==(Nx,Ny)
-#v::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
-#us::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
-#vs::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
-#ub::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
-#vb::Array{T,2} = zeros(Nx,Ny); @assert size(v)==(Nx,Ny)
-#bed_speed::Array{T,2} = zeros(Nx,Ny); @assert size(bed_speed)==(Nx,Ny)
-#weertman_c::Array{T,2} = zeros(Nx,Ny); @assert size(weertman_c)==(Nx,Ny)
-#β::Array{T,2} = zeros(Nx,Ny); @assert size(β)==(Nx,Ny)
-#βeff::Array{T,2} = zeros(Nx,Ny); @assert size(βeff)==(Nx,Ny)
-#τbed::Array{T,2} = zeros(Nx,Ny); @assert size(τbed)==(Nx,Ny)
-#ηav::Array{T,2}; @assert size(ηav)==(Nx,Ny)
-#quad_f1::Array{T,2} = zeros(Nx,Ny); @assert size(quad_f1)==(Nx,Ny)
-#quad_f2::Array{T,2} = h./(3*ηav); @assert size(quad_f2)==(Nx,Ny)
-#dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
-#dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
-#end
-
-
-
 struct HGrid{T <: Real, N  <: Integer}
-    Nx::N
-    Ny::N
-    mask::Array{Bool,2}
-    n::N 
-    crop::Diagonal{T,Array{T,1}}
-    samp::SparseMatrixCSC{T,N} 
-    spread::SparseMatrixCSC{T,N} 
-    b::Array{T,2} 
-    h::Array{T,2} 
-    s::Array{T,2} 
-    dhdt::Array{T,2} 
-    accumulation::Array{T,2} 
-    basal_melt::Array{T,2}
-    haf::Array{T,2} 
-    grounded_fraction::Array{T,2}
-    dsdh::Array{T,2}
-    shelf_strain_rate::Array{T,2} 
-    av_speed::Array{T,2} 
-    u::Array{T,2}
-    v::Array{T,2} 
-    us::Array{T,2}
-    vs::Array{T,2}
-    ub::Array{T,2}
-    vb::Array{T,2}
-    bed_speed::Array{T,2} 
-    weertman_c::Array{T,2}
-    β::Array{T,2}
-    βeff::Array{T,2} 
-    τbed::Array{T,2} 
-    ηav::Array{T,2}
-    quad_f1::Array{T,2} 
-    quad_f2::Array{T,2} 
-    dneghηav::Base.RefValue{Diagonal{T,Array{T,1}}}
-    dimplicit::Base.RefValue{Diagonal{T,Array{T,1}}}
+                   Nx :: N                                     # Number of grid cells in x-direction in HGrid
+                   Ny :: N                                     # Number of grid cells in y-direction in HGrid
+                 mask :: Array{Bool,2}                         # Mask specifying the model domain
+                    n :: N                                     # Total number of cells in the model domain
+                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: maps to HGrid (trivial for HGrid)
+                 samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
+               spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
+                    b :: Array{T,2}                            # Bed elevation
+                    h :: Array{T,2}                            # Ice thickness 
+                    s :: Array{T,2}                            # Current surface elevation
+                 dhdt :: Array{T,2}                            # Time rate of change of thickness 
+         accumulation :: Array{T,2}                            # Accumulation rate 
+           basal_melt :: Array{T,2}                            # Basal melt rate    
+                  haf :: Array{T,2}                            # Grid cell height above floatation
+    grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction 
+                 dsdh :: Array{T,2}                            # Cange of surface elevation per unit thickness change
+    shelf_strain_rate :: Array{T,2}                            # Strain rate appropriate for shelf (no basal drag) 
+             av_speed :: Array{T,2}                            # Depth averaged speed 
+                    u :: Array{T,2}                            # Depth averaged x-velocity 
+                    v :: Array{T,2}                            # Depth averaged y-velocity 
+                   us :: Array{T,2}                            # x-velocity at the surface 
+                   vs :: Array{T,2}                            # y-velocity at the surface 
+                   ub :: Array{T,2}                            # x-velocity at the bed 
+                   vb :: Array{T,2}                            # y-velocity at the bed
+            bed_speed :: Array{T,2}                            # Ice speed at the bed
+           weertman_c :: Array{T,2}                            # Weertman drag coefficients 
+                    β :: Array{T,2}                            # Raw β value (eqn 8 in Arthern 2015 JGeophysRes)
+                 βeff :: Array{T,2}                            # Effective β value (eqn 12 in Arthern 2015 JGeophysRes)
+                 τbed :: Array{T,2}                            # Stress at the bed
+                  ηav :: Array{T,2}                            # Depth averaged viscosity
+              quad_f1 :: Array{T,2}                            # F1 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
+              quad_f2 :: Array{T,2}                            # F2 quadrature field (eqn 7 in Arthern 2015 JGeophysRes)
+             dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-h × ηav)
+            dimplicit :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-ρi × g × dt × dshs)
 end
 
 
-#Hgrid constructor. Note to self, we keep Nx and Ny here to increase transparency in velocity solve
+"""
+    HGrid(;
+            Nx, 
+            Ny,
+            mask = trues(Nx,Ny),
+            b,
+            h,
+            ηav = zeros(Nx,Ny))
+
+Construct a WAVI.jl HGrid with size (Nx,Ny)
+HGrid stores fields that are defined on the problem's H grid. 
+(Co-ordinates of HGrid stored in a Grid under xxh, yyh fields)
+
+Keyword arguments
+=================
+    - 'Nx': (required) Number of grid cells in x-direction in HGrid (should be same as grid.nx)
+            Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
+    - 'Ny': (required) Number of grid cells in y-direction in HGrid (should be same as grid.ny)
+    - 'mask': Mask specifying the model domain
+    - 'b': (requried) Bed elevation (bottom bathymetry)
+    - 'h': (required) initial thickness of the ice
+    - 'ηav': depth averaged visosity initially
+"""
+
+
 function HGrid(;
                 Nx, 
                 Ny,
@@ -110,20 +88,18 @@ function HGrid(;
     shelf_strain_rate = zeros(Nx,Ny)
     av_speed = zeros(Nx,Ny) 
     u = zeros(Nx,Ny) 
-    v = zeros(Nx,Ny);
-    us = zeros(Nx,Ny); 
-    vs = zeros(Nx,Ny);
-    ub = zeros(Nx,Ny); 
-    vb= zeros(Nx,Ny);
+    v = zeros(Nx,Ny)
+    us = zeros(Nx,Ny) 
+    vs = zeros(Nx,Ny)
+    ub = zeros(Nx,Ny) 
+    vb= zeros(Nx,Ny)
     bed_speed = zeros(Nx,Ny)
     weertman_c = zeros(Nx,Ny)
     β = zeros(Nx,Ny)
-    βeff = zeros(Nx,Ny);
-    τbed = zeros(Nx,Ny);
-    ηav; @assert size(ηav)==(Nx,Ny)
-    quad_f1 = zeros(Nx,Ny); 
-    quad_f2 = h./(3*ηav); 
-
+    βeff = zeros(Nx,Ny)
+    τbed = zeros(Nx,Ny)
+    quad_f1 = zeros(Nx,Ny)
+    quad_f2 = h./(3*ηav)
 
     #check sizes of everything
     @assert size(mask)==(Nx,Ny); @assert mask == clip(mask)
@@ -155,6 +131,7 @@ function HGrid(;
     @assert size(τbed)==(Nx,Ny)
     @assert size(quad_f1)==(Nx,Ny)
     @assert size(quad_f2)==(Nx,Ny)
+    @assert size(ηav)==(Nx,Ny)
 
 return HGrid(
             Nx,
