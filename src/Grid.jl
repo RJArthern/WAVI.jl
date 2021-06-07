@@ -20,6 +20,10 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
+                    Cxl::R              #lower x extent value of coupled child domain
+                    Cxu::R              #upper x extent value of coupled child domain
+                    Cyl::R              #lower y extent value of coupled child domain
+                    Cyu::R              #upper y extent value of coupled child domain
 end
 
 """
@@ -33,7 +37,11 @@ end
     y0 = -40000.0,
     h_mask = trues(nx,ny),
     u_iszero = falses(nx+1,ny),
-    v_iszero = falses(nx,ny+1))
+    v_iszero = falses(nx,ny+1),
+    Cxl = 1,
+    Cxu = nx,
+    Cyl = 1,
+    Cyu = ny)
 
 Construct a WAVI.jl grid.
 
