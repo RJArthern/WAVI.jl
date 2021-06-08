@@ -71,7 +71,11 @@ function Grid(;
     y0 = -40000.0,
     h_mask = trues(nx,ny),
     u_iszero = falses(nx+1,ny),
-    v_iszero = falses(nx,ny+1))
+    v_iszero = falses(nx,ny+1)
+    Cxl = 1,
+    Cxu = nx,
+    Cyl = 1,
+    Cyu = ny)
 
 #check the sizes of inputs
 @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
