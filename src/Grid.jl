@@ -39,9 +39,9 @@ end
     u_iszero = falses(nx+1,ny),
     v_iszero = falses(nx,ny+1),
     Cxl = 1,
-    Cxu = nx,
+    Cxu = 80,
     Cyl = 1,
-    Cyu = ny)
+    Cyu = 10)
 
 Construct a WAVI.jl grid.
 
@@ -126,5 +126,9 @@ return Grid(nx,
             yyc,
             σ,
             ζ,
-            quadrature_weights)
+            quadrature_weights,
+            Cxl,
+            Cxu,
+            Cyl,
+            Cyu)
 end
