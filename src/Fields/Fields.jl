@@ -74,9 +74,9 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #3D-grid
     g3d=SigmaGrid(
-    nx=grid.nx,
-    ny=grid.ny,
-    nσ=grid.nσ,
+    Nx=grid.nx,
+    Ny=grid.ny,
+    Nσ=grid.nσ,
     η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
     θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
     Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),

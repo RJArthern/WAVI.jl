@@ -174,9 +174,9 @@ Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
 function inner_update_viscosity!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     @unpack params,solver_params=model
-    for k=1:g3d.nσ
-        for j=1:g3d.ny
-            for i=1:g3d.nx
+    for k=1:g3d.Nσ
+        for j=1:g3d.Ny
+            for i=1:g3d.Nx
                 if gh.mask[i,j]
                     for iter=1:solver_params.n_iter_viscosity
                         g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * (
@@ -202,9 +202,9 @@ Use quadrature to compute the depth averaged viscosity.
 function update_av_viscosity!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     gh.ηav .= zero(gh.ηav)
-    for k=1:g3d.nσ
-       for j = 1:g3d.ny
-          for i = 1:g3d.nx
+    for k=1:g3d.Nσ
+       for j = 1:g3d.Ny
+          for i = 1:g3d.Nx
                 gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k]
           end
        end
@@ -222,9 +222,9 @@ function update_quadrature_falpha!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     gh.quad_f1 .= zero(gh.quad_f1)
     gh.quad_f2 .= zero(gh.quad_f2)
-    for k=1:g3d.nσ
-       for j = 1:g3d.ny
-          for i = 1:g3d.nx
+    for k=1:g3d.Nσ
+       for j = 1:g3d.Ny
+          for i = 1:g3d.Nx
                 gh.quad_f1[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*g3d.ζ[k]/g3d.η[i,j,k]
                 gh.quad_f2[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*(g3d.ζ[k])^2/g3d.η[i,j,k]
           end
