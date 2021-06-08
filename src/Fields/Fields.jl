@@ -18,7 +18,7 @@ end
 """
     setup_fields(grid, initial_conditions, solver_params, params, bed_array)
 
-Acts as a constructor for the fields (no explicit constructor as only ever called when setting up a model)
+Acts as a constructor for the fields (no explicit constructor as fields `only ever called when setting up a model)
 """
 
 function setup_fields(grid, initial_conditions, solver_params, params, bed_array)
