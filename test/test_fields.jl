@@ -47,14 +47,22 @@ using Test, WAVI
 
     @testset "Testing CGrid" begin 
         @info "Testing CGrid constuction..."
-        ugrid = WAVI.CGrid(Nx = 10, Ny = 10, mask = trues(10,10))
-        @test ugrid isa WAVI.CGrid
+        cgrid = WAVI.CGrid(Nx = 10, Ny = 10, mask = trues(10,10))
+        @test cgrid isa WAVI.CGrid
         end
 
-    @testset "Testing UGrid errors" begin 
-        @info "Testing UGrid size input errors..."
+    @testset "Testing CGrid errors" begin 
+        @info "Testing CGrid size input errors..."
         @test_throws DimensionMismatch WAVI.CGrid(Nx = 11, Ny = 10, mask = trues(10,10))
         @test_throws DimensionMismatch WAVI.CGrid(Nx = 10, Ny = 11, mask = trues(10,10))
         @test_throws DimensionMismatch WAVI.CGrid(Nx = 10, Ny = 10, mask = trues(11,10))
     end
+
+    @testset "Testing SigmaGrid" begin 
+        @info "Testing SigmaGrid constuction..."
+        params = Params()
+        sigmagrid = WAVI.SigmaGrid(Nx = 10, Ny = 10, Nσ = 10,η = ones(10,10,10), θ = ones(10,10,10), Φ = ones(10,10,10), glen_b = fill(WAVI.glen_b(params.default_temperature,params.default_damage,params),10,10,10))
+        @test sigmagrid isa WAVI.SigmaGrid
+        end
+
 end
