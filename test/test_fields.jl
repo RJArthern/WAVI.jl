@@ -34,8 +34,8 @@ using Test, WAVI
     
     @testset "Testing VGrid" begin 
         @info "Testing VGrid constuction..."
-        ugrid = WAVI.VGrid(Nx = 10, Ny = 10, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
-        @test ugrid isa WAVI.VGrid
+        vgrid = WAVI.VGrid(Nx = 10, Ny = 10, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
+        @test vgrid isa WAVI.VGrid
         end
 
     @testset "Testing UGrid errors" begin 
@@ -43,5 +43,18 @@ using Test, WAVI
         @test_throws DimensionMismatch WAVI.VGrid(Nx = 11, Ny = 10, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
         @test_throws DimensionMismatch WAVI.VGrid(Nx = 10, Ny = 11, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
         @test_throws DimensionMismatch WAVI.VGrid(Nx = 10, Ny = 10, mask = trues(11,10), levels = 5, dx = 10., dy = 10.)
+    end
+
+    @testset "Testing CGrid" begin 
+        @info "Testing CGrid constuction..."
+        ugrid = WAVI.CGrid(Nx = 10, Ny = 10, mask = trues(10,10))
+        @test ugrid isa WAVI.CGrid
+        end
+
+    @testset "Testing UGrid errors" begin 
+        @info "Testing UGrid size input errors..."
+        @test_throws DimensionMismatch WAVI.CGrid(Nx = 11, Ny = 10, mask = trues(10,10))
+        @test_throws DimensionMismatch WAVI.CGrid(Nx = 10, Ny = 11, mask = trues(10,10))
+        @test_throws DimensionMismatch WAVI.CGrid(Nx = 10, Ny = 10, mask = trues(11,10))
     end
 end

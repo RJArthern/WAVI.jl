@@ -30,13 +30,13 @@ end
 
 Construct a WAVI.jl UGrid with size (Nx,Ny)
 UGrid stores fields that are defined on the problem's U grid. 
-(Co-ordinates of HGrid stored in a Grid under xxhu yyu fields)
+(Co-ordinates of UGrid stored in a Grid under xxu and yyu fields)
 
 Keyword arguments
 =================
     - 'Nx': (required) Number of grid cells in x-direction in UGrid (should be same as grid.nx + 1)
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
-    - 'Ny': (required) Number of grid cells in y-direction in HGrid (should be same as grid.ny)
+    - 'Ny': (required) Number of grid cells in y-direction in UGrid (should be same as grid.ny)
     - 'mask': Mask specifying the model domain with respect to U grid
     - levels: (required) Number of vertical levels 
     - dx: (required) Grid spacing in the x direction

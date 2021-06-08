@@ -67,12 +67,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #c-grid
     gc=CGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx-1,
-    ny=grid.ny-1,
-    dx=grid.dx,
-    dy=grid.dy,
+    Nx=grid.nx-1,
+    Ny=grid.ny-1,
     mask=c_mask
     )
 
