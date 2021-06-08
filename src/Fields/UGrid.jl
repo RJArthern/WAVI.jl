@@ -50,6 +50,9 @@ function UGrid(;
                 dx,
                 dy)
 
+    #check the sizes of inputs
+    (size(mask) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+
     #construct operators
     n = count(mask)
     crop = Diagonal(float(mask[:]))

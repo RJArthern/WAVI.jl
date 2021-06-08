@@ -3,7 +3,7 @@ struct HGrid{T <: Real, N  <: Integer}
                    Ny :: N                                     # Number of grid cells in y-direction in HGrid
                  mask :: Array{Bool,2}                         # Mask specifying the model domain
                     n :: N                                     # Total number of cells in the model domain
-                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: maps to HGrid (trivial for HGrid)
+                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
                     b :: Array{T,2}                            # Bed elevation
@@ -68,7 +68,10 @@ function HGrid(;
                 b,
                 h = zeros(Nx,Ny),
                 ηav = zeros(Nx,Ny))
-    
+
+    #check the sizes of inputs
+    (size(mask) == size(b) == size(h) == size(ηav) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+
     #construct operators
     n = count(mask);
     crop = Diagonal(float(mask[:]));
