@@ -20,10 +20,10 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
-                    Cxl::R              #lower x extent value of coupled child domain
-                    Cxu::R              #upper x extent value of coupled child domain
-                    Cyl::R              #lower y extent value of coupled child domain
-                    Cyu::R              #upper y extent value of coupled child domain
+                   Cxl :: N              #lower x extent value of coupled child domain
+                   Cxu :: N              #upper x extent value of coupled child domain
+                   Cyl :: N              #lower y extent value of coupled child domain
+                   Cyu :: N              #upper y extent value of coupled child domain
 end
 
 """
