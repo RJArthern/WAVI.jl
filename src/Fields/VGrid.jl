@@ -1,31 +1,3 @@
-#Struct to hold information on v-grid, located at grid-North and grid-South cell faces.
-#@with_kw struct VGrid{T <: Real, N <: Integer}
-#    nx::N
-#   ny::N
-#    x0::T = 0.0
-#    y0::T = 0.0
-#    dx::T = 1.0
-#    dy::T = 1.0
-#    xx::Array{T,2}=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xx)==(nx,ny)
-#    yy::Array{T,2}=[y0+(j-1.0)*dy for i=1:nx, j=1:ny]; @assert size(yy)==(nx,ny)
-#    mask::Array{Bool,2} = trues(nx,ny); @assert size(mask)==(nx,ny)
-#    n::N = count(mask); @assert n == count(mask)
-#    crop::Diagonal{T,Array{T,1}} = Diagonal(float(mask[:])); @assert crop == Diagonal(float(mask[:]))
-#    samp::SparseMatrixCSC{T,N} = crop[mask[:],:]; @assert samp == crop[mask[:],:]
-#    spread::SparseMatrixCSC{T,N} = sparse(samp'); @assert spread == sparse(samp')
-#    cent::KronType{T,N} = c(ny-1) ⊗ spI(nx)
-#    ∂x::KronType{T,N} = χ(ny-2) ⊗ ∂1d(nx-1,dx)
-#    ∂y::KronType{T,N} = ∂1d(ny-1,dy) ⊗ spI(nx)
-#    levels::N
-#    dwt::KronType{T,N} = wavelet_matrix(ny,levels,"forward" ) ⊗ wavelet_matrix(nx,levels,"forward")
-#    s::Array{T,2} = zeros(nx,ny); @assert size(s)==(nx,ny)
-#    h::Array{T,2} = zeros(nx,ny); @assert size(h)==(nx,ny)
-#    grounded_fraction::Array{T,2} = ones(nx,ny); @assert size(grounded_fraction)==(nx,ny)
-#    βeff::Array{T,2} = zeros(nx,ny); @assert size(βeff)==(nx,ny)
-#    dnegβeff::Base.RefValue{Diagonal{T,Array{T,1}}} = Ref(crop*Diagonal(-βeff[:])*crop)
-#    v::Array{T,2} = zeros(nx,ny); @assert size(v)==(nx,ny)
-#    end
-
 struct VGrid{T <: Real, N <: Int}
                    Nx :: N                                     # Number of frid cells in x-direction in UGrid
                    Ny :: N                                     # Number of grid cells in y-direction in UGrid 
@@ -37,7 +9,7 @@ struct VGrid{T <: Real, N <: Int}
                  cent :: KronType{T,N}                         # Map from U grid to H grid 
                    ∂x :: KronType{T,N}                         # Matrix representation of differentiation wrt x 
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
-               levels :: N                                     # Number of levels in the vertical
+               levels :: N                                     # Number of levels in the preconditioner
                   dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
@@ -67,7 +39,7 @@ Keyword arguments
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
     - 'Ny': (required) Number of grid cells in y-direction in VGrid (should be same as grid.ny + 1)
     - 'mask': Mask specifying the model domain with respect to V grid
-    - levels: (required) Number of vertical levels 
+    - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
 """

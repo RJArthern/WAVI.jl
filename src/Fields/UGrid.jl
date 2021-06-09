@@ -9,14 +9,14 @@ struct UGrid{T <: Real, N <: Integer}
                  cent :: KronType{T,N}                         # Map from U grid to H grid 
                    ∂x :: KronType{T,N}                         # Matrix representation of differentiation wrt x 
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
-               levels :: N                                     # Number of levels in the vertical
+               levels :: N                                     # Number of levels in the preconditioner
                   dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
                  βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
              dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
-                    u :: Array{T,2}
+                    u :: Array{T,2}                            # Ice velocities in x direction
 end
     
 """
@@ -38,7 +38,7 @@ Keyword arguments
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
     - 'Ny': (required) Number of grid cells in y-direction in UGrid (should be same as grid.ny)
     - 'mask': Mask specifying the model domain with respect to U grid
-    - levels: (required) Number of vertical levels 
+    - levels: (required) Number of levels in the preconditioner
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
 """
