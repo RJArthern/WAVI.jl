@@ -24,7 +24,7 @@ Keyword arguments
 - 'Nσ': (required) Number of grid cells in the vertical
 - 'σ' : Vertical levels
 - 'ζ' : Reverse vertical levels
-- 'quadrature_weights' : weights associated with sigma levels, used in computation of integrals over thickness
+- 'quadrature_weights' : (required) weights associated with sigma levels, used in computation of integrals over thickness
 - 'η' : (required) three dimensional viscosity field
 - 'θ' : (required) three dimensional temperature field
 - 'Φ' : (required) three dimensional damage field

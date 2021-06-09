@@ -63,12 +63,14 @@ function Grid(;
     y0 = -40000.0,
     h_mask = trues(nx,ny),
     u_iszero = falses(nx+1,ny),
-    v_iszero = falses(nx,ny+1))
+    v_iszero = falses(nx,ny+1),
+    quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1))
 
 #check the sizes of inputs
 @assert size(h_mask)==(nx,ny);@assert h_mask == clip(h_mask)
 @assert size(u_iszero)==(nx+1,ny)
 @assert size(v_iszero)==(nx,ny+1)
+@assert length(quadrature_weights) = nσ
 
 #map bit arrays to boolean
 h_mask = convert(Array{Bool,2}, h_mask)
@@ -92,7 +94,6 @@ yyc=[y0+j*dy for i=1:nx, j=1:ny]; @assert size(yyc)==(nx,ny)
 #sigma grid info
 σ = collect(range(0.0,length=nσ,stop=1.0)); @assert length(σ) == nσ
 ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
-quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1); @assert length(quadrature_weights) == nσ
 
 return Grid(nx,
             ny,

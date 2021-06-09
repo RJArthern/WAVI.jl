@@ -80,7 +80,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
     θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
     Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),
-    glen_b = fill(glen_b(params.default_temperature,params.default_damage,params),grid.nx,grid.ny,grid.nσ)
+    glen_b = fill(glen_b(params.default_temperature,params.default_damage,params),grid.nx,grid.ny,grid.nσ),
+    quadrature_weights = grid.quadrature_weights
     )
 
     #Wavelet-grid, u-component.
