@@ -18,7 +18,7 @@ end
 """
     setup_fields(grid, initial_conditions, solver_params, params, bed_array)
 
-Acts as a constructor for the fields (no explicit constructor as only ever called when setting up a model)
+Acts as a constructor for the fields (no explicit constructor as fields `only ever called when setting up a model)
 """
 
 function setup_fields(grid, initial_conditions, solver_params, params, bed_array)
@@ -37,12 +37,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     h =  deepcopy(initial_conditions.initial_thickness)
     ηav = deepcopy(initial_conditions.initial_viscosity)
     gh=HGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny,
-    dx=grid.dx,
-    dy=grid.dy,
+    Nx=grid.nx,
+    Ny=grid.ny,
     mask=h_mask,
     b = bed_array,
     h = h,
@@ -51,10 +47,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #u-grid
     gu=UGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx+1,
-    ny=grid.ny,
+    Nx=grid.nx+1,
+    Ny=grid.ny,
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
@@ -63,10 +57,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #v-grid
     gv=VGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny+1,
+    Nx=grid.nx,
+    Ny=grid.ny+1,
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
@@ -75,20 +67,16 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #c-grid
     gc=CGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx-1,
-    ny=grid.ny-1,
-    dx=grid.dx,
-    dy=grid.dy,
+    Nx=grid.nx-1,
+    Ny=grid.ny-1,
     mask=c_mask
     )
 
     #3D-grid
     g3d=SigmaGrid(
-    nx=grid.nx,
-    ny=grid.ny,
-    nσ=grid.nσ,
+    Nx=grid.nx,
+    Ny=grid.ny,
+    Nσ=grid.nσ,
     η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
     θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
     Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),
@@ -96,9 +84,9 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     )
 
     #Wavelet-grid, u-component.
-    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=solver_params.levels)
+    wu=UWavelets(Nx=grid.nx+1,Ny=grid.ny,levels=solver_params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=solver_params.levels)
+    wv=VWavelets(Nx=grid.nx,Ny=grid.ny+1,levels=solver_params.levels)
     return Fields(gh,gu,gv,gc,g3d,wu,wv)
 end
