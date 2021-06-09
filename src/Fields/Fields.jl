@@ -87,6 +87,6 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     wu=UWavelets(Nx=grid.nx+1,Ny=grid.ny,levels=solver_params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=solver_params.levels)
+    wv=VWavelets(Nx=grid.nx,Ny=grid.ny+1,levels=solver_params.levels)
     return Fields(gh,gu,gv,gc,g3d,wu,wv)
 end
