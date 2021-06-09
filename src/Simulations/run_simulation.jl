@@ -107,4 +107,16 @@ function write_vel(simulation::Simulation)
     write(vfileID, v_out[:,:])
     close(vfileID)   
 
+    u_out_b=model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+    h_out_b=model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+    uvol_out_b=h_out_b[:].*u_out_b
+    
+    uvol_out_b .= hton.(uvol_out_b)
+    
+    uVolb_file_string = string(simulation.output_params.prefix,  "_Ubvol.bin")
+    
+    uVolbfileID =  open(uVolb_file_string,"w")
+      write(uVolbfileID, uvol_out[:,:])
+    close(uVolfileID) 
+    
  end 
