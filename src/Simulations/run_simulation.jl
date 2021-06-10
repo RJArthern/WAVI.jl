@@ -107,7 +107,7 @@ function write_vel(simulation::Simulation)
     write(vfileID, v_out[:,:])
     close(vfileID)   
     
-    if Cxl > 1
+    if model.grid.Cxl > 1
     
      u_out_b=model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      h_out_b=model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
