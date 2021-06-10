@@ -119,7 +119,7 @@ function write_vel(simulation::Simulation)
     
      uVolbfileID =  open(uVolb_file_string,"w")
      write(uVolbfileID, uvol_out_b[:,:])
-     close(uVolfileID) 
+     close(uVolbfileID) 
     
     end
  end 
