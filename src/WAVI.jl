@@ -1,6 +1,7 @@
 module WAVI
 
 #Useful packages
+using Core: Argument
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
       IterativeSolvers, Interpolations, BenchmarkTools, Reexport,
       NetCDF, JLD2, Setfield, MAT

@@ -111,7 +111,16 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
     #create the nc file variables
     output_dict = Dict() #dictionary for the output values
     output_vars = Dict() #dictionary for the output variables
-    for key in keys(matread(filenames[1]))
+    
+    #get the keys
+    if format == "mat"
+        filekeys = keys(matread(filenames[1]))
+    elseif format == "jld2"
+        filekeys = keys(load(filenames[1]))
+        println(typeof(filekeys))
+    end
+
+    for key in filekeys
         if ~(key in ["x", "y", "t"]) #if this isn't a spatial dimensions
             var_out = zeros(length(x), length(y), length(t))
     
