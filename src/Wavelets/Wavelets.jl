@@ -1,5 +1,5 @@
 include("UWavelets.jl")
 include("VWavelets.jl")
-include("Preconditioners.jl")
+include("preconditioners.jl")
 include("update_preconditioners.jl")
 include("update_wavelets.jl")
