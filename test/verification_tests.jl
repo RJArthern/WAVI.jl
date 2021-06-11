@@ -2,7 +2,7 @@ using Base: _InitialValue
 
 
 
-using Test, WAVI
+using Test, WAVI, LinearAlgebra
 @testset  "WAVI tests" begin
     @testset "Iceberg" begin
         include("verification_tests/iceberg_test.jl")
@@ -11,7 +11,7 @@ using Test, WAVI
         #a = 0.3 m/yr, A=2.0e-17 Pa^-3 a^-1
         #ice density 918 kg/m3 ocean density 1028.0 kg/m3, Glen law n=3.
         h0=((36.0*0.3/(2.0e-17))*(1.0/(9.81*918.0*(1-918.0/1028.0)))^3)^(1.0/4.0)
-        u0=sim.model.grid.xxh*0.3/(2.0*h0)
+        u0=sim.model.grid.xxu*0.3/(2.0*h0)
         v0=sim.model.grid.yyv*0.3/(2.0*h0)
         relerr_h=norm(sim.model.fields.gh.h[sim.model.fields.gh.mask].-h0)/
                     norm(h0*ones(length(sim.model.fields.gh.h[sim.model.fields.gh.mask])))
@@ -20,8 +20,8 @@ using Test, WAVI
         relerr_v=norm(sim.model.fields.gv.v[sim.model.fields.gv.mask]-v0[sim.model.fields.gv.mask])/
                          norm(v0[sim.model.fields.gv.mask])
         @test relerr_h < 1.0e-4
-        @test  relerr_u < 3.0e-4
-        @test  relerr_v < 3.0e-4
+        @test relerr_u < 3.0e-4
+        @test relerr_v < 3.0e-4
     end
 
 end
