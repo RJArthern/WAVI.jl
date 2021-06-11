@@ -108,14 +108,14 @@ end
 xxh=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxh)==(nx,ny)
 yyh=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyh)==(nx,ny)
 
-xxu=[x0+(i-1.0)*dx for i=1:nx, j=1:ny]; @assert size(xxu)==(nx,ny)
-yyu=[y0+(j-0.5)*dy for i=1:nx, j=1:ny]; @assert size(yyu)==(nx,ny)
+xxu=[x0+(i-1.0)*dx for i=1:(nx+1), j=1:ny]; @assert size(xxu)==(nx+1,ny)
+yyu=[y0+(j-0.5)*dy for i=1:(nx+1), j=1:ny]; @assert size(yyu)==(nx+1,ny)
 
-xxv=[x0+(i-0.5)*dx for i=1:nx, j=1:ny]; @assert size(xxv)==(nx,ny)
-yyv=[y0+(j-1.0)*dy for i=1:nx, j=1:ny]; @assert size(yyv)==(nx,ny)
+xxv=[x0+(i-0.5)*dx for i=1:nx, j=1:(ny+1)]; @assert size(xxv)==(nx,ny+1)
+yyv=[y0+(j-1.0)*dy for i=1:nx, j=1:(ny+1)]; @assert size(yyv)==(nx,ny+1)
 
-xxc=[x0+i*dx for i=1:nx, j=1:ny]; @assert size(xxc)==(nx,ny)
-yyc=[y0+j*dy for i=1:nx, j=1:ny]; @assert size(yyc)==(nx,ny)
+xxc=[x0+i*dx for i=1:(nx-1), j=1:(ny-1)]; @assert size(xxc)==(nx-1,ny-1)
+yyc=[y0+j*dy for i=1:(nx-1), j=1:(ny-1)]; @assert size(yyc)==(nx-1,ny-1)
 
 #sigma grid info
 σ = collect(range(0.0,length=nσ,stop=1.0)); @assert length(σ) == nσ
