@@ -76,13 +76,13 @@ return_extension(file) =  file[(findlast(isequal('.'),file)+1):end];
 """
 make_ncfile(folder,format)
 
-Wrapper script to zip the output files in "folder" with type "format" to an nc file with name nc_name
+Wrapper script to zip the output files in "folder" with type "format" to an nc file with name nc_name_full (including path)
 """
-function make_ncfile(format, folder, nc_name_full)
+function make_ncfile(format, folder, nc_name)
     #check that the input format is 
     filenames = get_format_filenames(format, folder)
     if ~isempty(filenames)
-        make_ncfile_from_filenames(filenames, format, nc_name_full)
+        make_ncfile_from_filenames(filenames, format, nc_name)
     else
         println("attempted to zip the outputs to nc format, but did not find any files...")
     end
