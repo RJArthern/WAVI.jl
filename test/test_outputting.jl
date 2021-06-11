@@ -1,3 +1,4 @@
+using Core: Argument
 using Test, WAVI, MAT, JLD2
 
 function output_test(; dt  = 0.5, 
@@ -93,7 +94,7 @@ end
         end
         end #end loop over output format
     
-    end
+    
     @testset "Zipping output" begin 
         @info "Testing zipping output..."
     
@@ -116,7 +117,7 @@ end
         u = ncread(fname, "u");
         v = ncread(fname, "v")
         b = ncread(fname, "b")
-        t = ncread(fname, "t")
+        t = ncread(fname, "TIME")
         @test ncread(fname, "TIME") == 5.:5.:100.
         @test size(x) == (80,)
         @test size(y) == (10,)
@@ -148,7 +149,7 @@ end
                     output_format = output_format, 
                     output_path = folder,
                     zip_format = "nc", 
-                    dump_vel = false, 
+                    dump_vel = true, 
                     pchkpt_freq = 1.)
 
         #run again with different niter0
@@ -159,7 +160,7 @@ end
                     output_format = output_format, 
                     output_path = folder,
                     zip_format = "nc", 
-                    dump_vel = false, 
+                    dump_vel = true, 
                     pchkpt_freq = 1.)
 
         
@@ -196,7 +197,7 @@ end
                         output_format = output_format, 
                         output_path = folder,
                         zip_format = "nc", 
-                        dump_vel = false, 
+                        dump_vel = true, 
                         pchkpt_freq = 1.)
          
         #test variables read from nc file
@@ -224,12 +225,30 @@ end
         println(files)
         @test length(files) == 41    #check there are the correct number of output files
 
+        #check we have dumped the velocity
+        @test isfile(string(foldersim, "outfile.nc")) #check the zipped file exists
+
+
         # delete everything you just made
         rm(folder, force = true, recursive = true)
         foreach(rm, filter(endswith(".mat"), readdir()))
         foreach(rm, filter(endswith(".jld2"), readdir()))
         end
 
+
+    end
+    end #end of the if false flag
+
+    @testset "Outputting errors" begin 
+        @info "Testing outputting errors"
+        #check error for weird output format 
+        @test_throws ArgumentError output_test(output_format = "incorrect_format")
+
+        #check that non-standard zip_format reverts to none
+        sim = output_test(end_time = 0., zip_format = "incorrect_zip_format")
+        @test sim.output_params.zip_format == "none"
+
+        @test_throws ArgumentError output_test(output_freq =  -2.)
 
     end
 end
