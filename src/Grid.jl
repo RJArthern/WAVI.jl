@@ -72,7 +72,11 @@ function Grid(;
 ((typeof(ny) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in y direction (ny)  must a positive integer larger than one")) 
 ((typeof(nσ) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in vertical (nσ)  must a positive integer larger than one")) 
 
-#if nx, ny, nσ  of correct type, assemble h_mask, u_iszero, v_iszero (if not passed)
+#if boundary conditions passed as string array, assemble these matric
+~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
+~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(v_iszero,nx,ny+1))
+
+#assemble h_mask, u_iszero, v_iszero (if not passed as string)
 (~(h_mask === nothing)) || (h_mask = trues(nx,ny))
 (~(u_iszero === nothing))|| (u_iszero = falses(nx+1,ny))
 (~(v_iszero === nothing)) || (v_iszero = falses(nx, ny+1))
@@ -142,4 +146,24 @@ return Grid(nx,
             σ,
             ζ,
             quadrature_weights)
+end
+
+
+
+"""
+    orientations2bc(directions, M, N)
+
+Make an M x N matrix with trues in the locations specified by directions
+"""
+function orientations2bc(orientations, M, N)
+    A = falses(M,N)
+    for ornt in orientations
+        ornt_low = lowercase(ornt)
+        ~(ornt_low == "north") || (A[1,:] .= true)
+        ~(ornt_low == "south") || (A[end,:] .= true)
+        ~(ornt_low == "east") || (A[:,end] .= true)
+        ~(ornt_low == "west") || (A[:,1] .= true)
+
+    end
+    return A 
 end

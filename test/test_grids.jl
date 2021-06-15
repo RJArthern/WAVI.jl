@@ -18,6 +18,23 @@ using Test, WAVI
     @test grid.v_iszero == falses(nx,ny+1)
     @test grid.quadrature_weights ==  [0.5;ones(grid.nσ-2);0.5]/(grid.nσ-1)
 
+    #test the string boundary conditions method
+    grid = Grid(nx = nx, ny = ny, u_iszero = ["north"])
+    @test all(grid.u_iszero[1,:] .== 1)
+    grid = Grid(nx = nx, ny = ny, u_iszero = ["south"])
+    @test all(grid.u_iszero[end,:] .== 1)
+    grid = Grid(nx = nx, ny = ny, u_iszero = ["west"])
+    @test all(grid.u_iszero[:,1] .== 1)
+    grid = Grid(nx = nx, ny = ny, u_iszero = ["east"])
+    @test all(grid.u_iszero[:,end] .== 1)
+    grid = Grid(nx = nx, ny = ny, v_iszero = ["North"]) #with upper case
+    @test all(grid.v_iszero[1,:] .== 1)
+    grid = Grid(nx = nx, ny = ny, v_iszero = ["SouTh"])
+    @test all(grid.v_iszero[end,:] .== 1)
+    grid = Grid(nx = nx, ny = ny, v_iszero = ["WeSt"])
+    @test all(grid.v_iszero[:,1] .== 1)
+    grid = Grid(nx = nx, ny = ny, v_iszero = ["East"])
+    @test all(grid.v_iszero[:,end] .== 1)
     end
 
     @testset "Testing Grid construction" begin 

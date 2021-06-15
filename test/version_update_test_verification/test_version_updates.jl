@@ -15,6 +15,10 @@ using WAVI, Test
         h_mask=trues(nx,ny)
         u_iszero = falses(nx+1,ny); u_iszero[1,:].=true
         v_iszero=falses(nx,ny+1); v_iszero[:,1].=true; v_iszero[:,end].=true
+
+        #alternative bc notations
+        u_iszero = ["north"]
+        v_iszero = ["west", "east"]
         grid = Grid(nx = nx, 
                     ny = ny,   
                     nσ = nσ, 
