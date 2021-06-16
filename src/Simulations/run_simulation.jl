@@ -110,7 +110,7 @@ function write_vel(simulation::Simulation)
     if model.grid.Cxl > 1
     
      #u_out_b = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-     h_out_lin = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+     h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      #h_out_line = h_out_b[:]
      
      h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
