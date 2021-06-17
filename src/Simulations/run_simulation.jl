@@ -94,8 +94,11 @@ function write_vel(simulation::Simulation)
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out=model.fields.gu.u[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
-    v_out=model.fields.gv.v[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+    u_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
+    v_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
+    
+    u_out[2:end,:]=model.fields.gu.u[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+    v_out[2:end,:]=model.fields.gv.v[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)
@@ -113,8 +116,8 @@ function write_vel(simulation::Simulation)
      h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      #h_out_line = h_out_b[:]
      
-     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
-     h_out_b[1,:] .= h_out_line[:]
+     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
+     h_out_b[2,:] .= h_out_line[:]
         
      h_out_b .= hton.(h_out_b)
     
