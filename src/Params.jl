@@ -42,7 +42,7 @@ Keyword arguments
 - 'glen_temperature_ref': reference temperature using in glen b calculation
 - 'glen_n': exponent in glen b calculation
 - 'glen_reg_strain_rate': strain rate regularization value
-- 'weertman_c': uniform basal sliding coefficient
+- 'weertman_c': basal sliding field of coefficients
 - 'weertman_m': sliding law exponent
 - 'weertman_reg_speed': regularization speed, used to prevent bed speed going to zero
 - 'sea_level_wrt_geoid': reference sea level
