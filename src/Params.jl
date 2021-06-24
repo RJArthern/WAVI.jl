@@ -1,4 +1,4 @@
-@with_kw struct Params{T <: Real}
+struct Params{T <: Real}
                       dt :: T
                        g :: T
              density_ice :: T
