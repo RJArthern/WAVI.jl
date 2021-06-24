@@ -1,4 +1,4 @@
-struct Params{T <: Real}
+struct Params{T <: Real, A, W}
                       dt :: T
                        g :: T
              density_ice :: T
@@ -9,13 +9,13 @@ struct Params{T <: Real}
        default_viscosity :: T 
      default_temperature :: T
           default_damage :: T 
-       accumulation_rate :: Array{T,2}
+       accumulation_rate :: A
 glen_a_activation_energy :: T 
               glen_a_ref :: T
     glen_temperature_ref :: T 
                   glen_n :: T 
     glen_reg_strain_rate :: T 
-              weertman_c :: Array{T,2} 
+              weertman_c :: W
               weertman_m :: T 
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
@@ -92,24 +92,11 @@ function Params(; g = 9.81,
                   weertman_m  = 3.0,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
-                  minimum_thickness = 50.0,
-                  nx = nothing,
-                  ny = nothing)
+                  minimum_thickness = 50.0)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
 
-  #check scalar weertman c
-  if ((typeof(weertman_c) <: Real) && ((nx === nothing) || (ny === nothing))) #if a scalar weertman_c passed but not a grid size, throw argument error
-    throw(ArgumentError("If you pass a scalar weertman c (as is the default), you must also pass the grid size"))
-  end
-
-  #build weertman_c matrix if grid passed
-  ~(typeof(weertman_c) <: Real) || (weertman_c = weertman_c .*ones(nx,ny))
-
-  #build accumulation_rate matrix if grid passed
-  ~(typeof(accumulation_rate) <: Real) || (accumulation_rate = accumulation_rate .*ones(nx,ny))
-  
   return Params(
                   dt, 
                   g, 
@@ -133,5 +120,4 @@ function Params(; g = 9.81,
                   sea_level_wrt_geoid,
                   minimum_thickness
                   )
-    
 end
