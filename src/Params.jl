@@ -107,8 +107,8 @@ function Params(; g = 9.81,
   #build weertman_c matrix if grid passed
   ~(typeof(weertman_c) <: Real) || (weertman_c = weertman_c .*ones(nx,ny))
 
-  #build weertman_c matrix if grid passed
-  ~(typeof(accumulation_rate) <: Real) || (accumulation_rate = accumulation_rate .*ones(size(weertman_c)))
+  #build accumulation_rate matrix if grid passed
+  ~(typeof(accumulation_rate) <: Real) || (accumulation_rate = accumulation_rate .*ones(nx,ny))
   
   return Params(
                   dt, 
