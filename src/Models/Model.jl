@@ -1,13 +1,11 @@
-struct Model{T <: Real, N <: Integer} <: AbstractModel{T,N}
+struct Model{T <: Real, N <: Integer,A,W} <: AbstractModel{T,N}
     grid::Grid{T,N}
-    params::Params{T}
+    params::Params{T,A,W}
     solver_params::SolverParams{T,N}
     initial_conditions::InitialConditions{T}
     fields::Fields{T,N}
     extra_physics::Dict{String, Any}
 end
-
-
 
 """
  Model constructor
@@ -35,14 +33,28 @@ function Model(;
             #check the size of the bed
     #(Base.size(bed_array) = (grid.nx, grid.ny)) || throw(ArgumentError("Bed and grid sizes must be identical"))
     
-
     #Check initial conditions, and revert to default values if not
     initial_conditions = check_initial_conditions(initial_conditions, params, grid)
+
+    ## Parameter fields checks 
+    #if weertman c passed as a scalar, replace weertman_c parameters with matrix of this value
+    if isa(params.weertman_c, Number) 
+        params = @set params.weertman_c = params.weertman_c*ones(grid.nx,grid.ny)
+    end
+    #check size compatibility of resulting weertman C
+    (size(params.weertman_c)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input weertman c must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
+    
+    #if accumulation is passed as a scalar, replace accumulation parameters with matrix of this value
+    if isa(params.accumulation_rate, Number) 
+        params = @set params.accumulation_rate = params.accumulation_rate*ones(grid.nx,grid.ny)
+    end
+    #check size compatibility of resulting weertman C
+    (size(params.accumulation_rate)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input weertman c must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
 
     #Setup the fields 
     fields = setup_fields(grid, initial_conditions, solver_params, params, bed_array)
     
-    #Use type constructor to build initial state.
+    #Use type constructor to build initial state with no extra physics
     model=Model(grid,params,solver_params,initial_conditions,fields,extra_physics)
 
     return model

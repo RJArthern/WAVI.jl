@@ -1,4 +1,4 @@
-@with_kw struct Params{T <: Real, A, W}
+struct Params{T <: Real, A, W}
                       dt :: T
                        g :: T
              density_ice :: T
@@ -120,5 +120,4 @@ function Params(; g = 9.81,
                   sea_level_wrt_geoid,
                   minimum_thickness
                   )
-    
 end
