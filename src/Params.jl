@@ -1,3 +1,28 @@
+struct Params{T <: Real, A, W}
+                      dt :: T
+                       g :: T
+             density_ice :: T
+           density_ocean :: T
+               gas_const :: T 
+           sec_per_year  :: T
+       default_thickness :: T 
+       default_viscosity :: T 
+     default_temperature :: T
+          default_damage :: T 
+       accumulation_rate :: A
+glen_a_activation_energy :: T 
+              glen_a_ref :: T
+    glen_temperature_ref :: T 
+                  glen_n :: T 
+    glen_reg_strain_rate :: T 
+              weertman_c :: W
+              weertman_m :: T 
+      weertman_reg_speed :: T 
+     sea_level_wrt_geoid :: T
+       minimum_thickness :: T 
+end
+
+
 """
 Params(; 
         dt = 1.0,
@@ -48,26 +73,51 @@ Keyword arguments
 - 'sea_level_wrt_geoid': reference sea level
 - 'minimum_thickness': minimum ice thickness on model domain
 """
-@with_kw struct Params{T <: Real}
-                      dt :: T = 1.0
-                       g :: T = 9.81
-             density_ice :: T = 918.0
-           density_ocean :: T = 1028.0
-               gas_const :: T = 8.314;
-           sec_per_year  :: T = 3600*24*365.25
-       default_thickness :: T = 100.
-       default_viscosity :: T = 1.0e7
-     default_temperature :: T = 265.700709
-          default_damage :: T = 0.0
-       accumulation_rate :: T = 0.0
-glen_a_activation_energy :: T = 5.8631e+04
-              glen_a_ref :: T = 4.9e-16 *sec_per_year * 1.0e-9
-    glen_temperature_ref :: T = 263.15
-                  glen_n :: T = 3.0
-    glen_reg_strain_rate :: T = 1.0e-5
-              weertman_c :: T = 1e4
-              weertman_m :: T = 3.0
-      weertman_reg_speed :: T = 1.0e-5
-     sea_level_wrt_geoid :: T = 0.0
-       minimum_thickness :: T = 50.0
+function Params(; g = 9.81, 
+                  density_ice = 918.0,
+                  density_ocean = 1028.0,
+                  gas_const = 8.314, 
+                  sec_per_year =3600*24*365.25,
+                  default_thickness= 100.,
+                  default_viscosity= 1.0e7,
+                  default_temperature=265.700709,
+                  default_damage= 0.0,
+                  accumulation_rate= 0.0,
+                  glen_a_activation_energy = 5.8631e+04,
+                  glen_a_ref= 4.9e-16 *sec_per_year * 1.0e-9,
+                  glen_temperature_ref= 263.15,
+                  glen_n = 3.0,
+                  glen_reg_strain_rate = 1.0e-5,
+                  weertman_c = 1.0e4,
+                  weertman_m  = 3.0,
+                  weertman_reg_speed = 1.0e-5,
+                  sea_level_wrt_geoid  = 0.0,
+                  minimum_thickness = 50.0)
+                      
+  #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
+  dt = 1.0
+
+  return Params(
+                  dt, 
+                  g, 
+                  density_ice, 
+                  density_ocean, 
+                  gas_const,
+                  sec_per_year, 
+                  default_thickness, 
+                  default_viscosity,
+                  default_temperature,
+                  default_damage,
+                  accumulation_rate,
+                  glen_a_activation_energy,
+                  glen_a_ref,
+                  glen_temperature_ref,
+                  glen_n,
+                  glen_reg_strain_rate,
+                  weertman_c,
+                  weertman_m,
+                  weertman_reg_speed,
+                  sea_level_wrt_geoid,
+                  minimum_thickness
+                  )
 end
