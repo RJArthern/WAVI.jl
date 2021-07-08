@@ -80,6 +80,7 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     Nx=grid.nx,
     Ny=grid.ny,
     Nσ=grid.nσ,
+    σ =grid.σ,
     η = η,
     θ = θ,
     Φ = Φ,

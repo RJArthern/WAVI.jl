@@ -22,7 +22,7 @@ Keyword arguments
         Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
 - 'Ny': (required) Number of grid cells in y-direction in SigmaGrid (should be same as grid.ny )
 - 'Nσ': (required) Number of grid cells in the vertical
-- 'σ' : Vertical levels
+- 'σ' : (required) Vertical levels, read in from grid
 - 'ζ' : Reverse vertical levels
 - 'quadrature_weights' : (required) weights associated with sigma levels, used in computation of integrals over thickness
 - 'η' : (required) three dimensional viscosity field
@@ -35,7 +35,7 @@ Keyword arguments
 Nx :: N
 Ny :: N
 Nσ :: N
-σ :: Vector{T} = collect(range(0.0,length=Nσ,stop=1.0)); @assert length(σ) == Nσ
+σ :: Vector{T} 
 ζ :: Vector{T} = one(eltype(σ)) .- σ ; @assert length(ζ) == Nσ
 quadrature_weights :: Vector{T} = [0.5;ones(Nσ-2);0.5]/(Nσ-1); @assert length(quadrature_weights) == Nσ
 η :: Array{T,3}; @assert size(η)==(Nx,Ny,Nσ)
