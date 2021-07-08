@@ -78,6 +78,18 @@ using Test, WAVI
 
     end
 
+    @testset "Passing sigma levels" begin
+    @info "Testing σ level passing"
+    σ = [0.0, 0.12, 0.13, 0.5, 0.7]
+    nσ = length(σ)
+    grid = Grid(nσ = nσ, σ = σ)
+    bed_elevation = zeros(grid.nx, grid.ny)
+    model = Model(grid = grid, bed_elevation = bed_elevation)
+    @test model.grid.σ == σ
+    @test model.fields.g3d.σ == σ
+    @test_throws DimensionMismatch Model(grid = Grid(nσ = 6, σ = σ), bed_elevation = bed_elevation) #size incompatiblity in the sigma levels
+    end
+
     @testset "testing model construction errors"  begin
     @info "Testing model construction errors"
     #test dimnesion mismatch if size of input weertman_c incompatible
