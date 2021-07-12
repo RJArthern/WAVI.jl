@@ -94,11 +94,11 @@ function write_vel(simulation::Simulation)
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
-    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
+    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
+    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
     
-    u_out[2:end,:]=model.fields.gu.u[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
-    v_out[2:end,:]=model.fields.gv.v[model.grid.Cxl-1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+    u_out[2:end,:]=model.fields.gu.u[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+    v_out[2:end,:]=model.fields.gv.v[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)
@@ -112,20 +112,29 @@ function write_vel(simulation::Simulation)
     
     if model.grid.Cxl > 1
     
-     #u_out_b = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+     u_out_line = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      #h_out_line = h_out_b[:]
      
-     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2,model.grid.Cyu - model.grid.Cyl +1)
+     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
+     u_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)  
+     
      h_out_b[2,:] .= h_out_line[:]
+     u_out_b[2,:] .= u_out_line[:]  
         
      h_out_b .= hton.(h_out_b)
+     u_out_b .= hton.(u_out_b)
     
      hb_file_string = string(simulation.output_params.prefix,  "_Hb.bin")
+     ub_file_string = string(simulation.output_params.prefix,  "_Ub.bin")
     
      hbfileID =  open(hb_file_string,"w")
      write(hbfileID, h_out_b[:,:])
      close(hbfileID) 
+        
+     ubfileID =  open(ub_file_string,"w")
+     write(ubfileID, u_out_b[:,:])
+     close(ubfileID)
     
     end
  end 
