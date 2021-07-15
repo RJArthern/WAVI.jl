@@ -17,7 +17,7 @@ update_thickness!(model::AbstractModel)
 
 Update thickness using rate of change of thickness and apply minimum thickness constraint.
 """
-function update_thickness!(simulation::AbstractSimulation)
+function update_thickness!(simulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
 model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
@@ -29,7 +29,7 @@ end
 
 Update the simulation clock
 """
-function update_clock!(simulation::AbstractSimulation)
+function update_clock!(simulation)
     @unpack clock,timestepping_params=simulation
     clock.n_iter += 1
     clock.time += timestepping_params.dt
@@ -41,7 +41,7 @@ end
     run_simulation(simulation)
 Perform the simulation specified by the simulation
 """
-function run_simulation!(simulation::Simulation)
+function run_simulation!(simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total

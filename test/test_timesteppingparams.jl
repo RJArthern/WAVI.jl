@@ -15,17 +15,6 @@ using Test, WAVI
     #passing both end time and total iterations
     timestepping_params = TimesteppingParams(dt = 0.5, n_iter_total = 100, end_time = 50.) 
     @test timestepping_params isa TimesteppingParams
-    #pass neither of end time or total iterations
-    timestepping_params = TimesteppingParams(dt = 0.5);
-    @test timestepping_params isa TimesteppingParams 
-    @test timestepping_params.end_time == Inf
-    @test timestepping_params.n_iter_total == Inf
-    #pass infinite end time
-    timestepping_params = TimesteppingParams(dt = 0.5, end_time = Inf);
-    @test timestepping_params.n_iter_total == Inf
-    #pass infinite number of iters
-    timestepping_params = TimesteppingParams(dt = 0.5, n_iter_total = Inf);
-    @test timestepping_params.end_time == Inf
     end
 
     @testset "TimesteppingParams errors" begin 
@@ -34,5 +23,7 @@ using Test, WAVI
         @test_throws ArgumentError TimesteppingParams(end_time = -1.) #negative end time
         @test_throws ArgumentError TimesteppingParams(n_iter_total = -1) #negative total iterations 
         @test_throws ArgumentError TimesteppingParams(end_time = 1., dt = 1., n_iter_total = 10) #incompatible endtime and total iters
+        @test_throws ArgumentError TimesteppingParams(dt = 0.5) #pass neither of end time or total iterations --> throw error
+        @test_throws ArgumentError TimesteppingParams(dt = 0.5, end_time = Inf) 
     end
 end

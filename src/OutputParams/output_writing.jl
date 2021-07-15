@@ -1,10 +1,10 @@
 #file containing outputting functions
 """
-    write_output(simulation::AbstractSimulation)
+    write_output(simulation)
 
 Output the data from the simulation at the current timestep
 """
-function write_output(simulation::AbstractSimulation)
+function write_output(simulation)
     @unpack output_params, model, clock = simulation
     output_dict = fetch_output(output_params.outputs)
 

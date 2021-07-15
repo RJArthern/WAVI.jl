@@ -1,5 +1,5 @@
 using Core: Argument
-using Test, WAVI, MAT, JLD2
+using Test, WAVI, MAT, JLD2, NetCDF
 
 function output_test(; dt  = 0.5, 
                     end_time = 100., 
@@ -43,7 +43,7 @@ function output_test(; dt  = 0.5,
 end
 
 @testset "Outputting" begin
-    if false
+    if true
     @testset "Output files" begin 
         @info "Testing outputting..."
         
@@ -245,7 +245,7 @@ end
         @test_throws ArgumentError output_test(output_format = "incorrect_format")
 
         #check that non-standard zip_format reverts to none
-        sim = output_test(end_time = 0., zip_format = "incorrect_zip_format")
+        sim = output_test(end_time = 1., zip_format = "incorrect_zip_format")
         @test sim.output_params.zip_format == "none"
 
         @test_throws ArgumentError output_test(output_freq =  -2.)
