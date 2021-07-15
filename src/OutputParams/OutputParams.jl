@@ -14,15 +14,15 @@ end
 #output constructor
 function OutputParams(; 
     outputs = (),
-    output_freq = Inf, 
+    output_freq = 1, 
     output_format = "jld2",
     prefix = "outfile", 
     output_path = "./",
     dump_vel = false,
     zip_format = "none")
 
-    #default the n_iter_out to Inf (this is updated in simulation once we know timestep from timestepping_params)
-    n_iter_out = Inf
+    #default the n_iter_out to -1 (this is updated in simulation once we know timestep from timestepping_params)
+    n_iter_out = -1
 
     #check output_freq
     ((output_freq == Inf) || (output_freq > 0)) || throw(ArgumentError("output frequency must be positive or Inf"))
