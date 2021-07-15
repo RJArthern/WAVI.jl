@@ -14,7 +14,7 @@ end
 #output constructor
 function OutputParams(; 
     outputs = (),
-    output_freq = 1, 
+    output_freq = Inf, 
     output_format = "jld2",
     prefix = "outfile", 
     output_path = "./",

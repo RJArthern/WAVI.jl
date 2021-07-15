@@ -21,7 +21,7 @@ function Simulation(;
     clock = Clock(n_iter = 0, time = 0.0)
 
     #set the timestep in model parameters (fudge to allow model to see the timestep in velocity solve)
-    set_dt_in_model!(model, timestepping_params.dt)
+    model = set_dt_in_model!(model, timestepping_params.dt)
 
     #build the simulation
     simulation = Simulation(model, timestepping_params, output_params, clock)

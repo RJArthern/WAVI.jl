@@ -66,7 +66,7 @@ function Grid(;
     u_iszero = nothing,
     v_iszero = nothing,
     quadrature_weights = nothing,
-    σ = collect(range(0.0,length=nσ,stop=1.0)))
+    σ = nothing)
 
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
@@ -123,6 +123,7 @@ xxc=[x0+i*dx for i=1:(nx-1), j=1:(ny-1)]; @assert size(xxc)==(nx-1,ny-1)
 yyc=[y0+j*dy for i=1:(nx-1), j=1:(ny-1)]; @assert size(yyc)==(nx-1,ny-1)
 
 #sigma grid info and checks
+~(σ === nothing) ||  (σ = collect(range(0.0,length=nσ,stop=1.0))) #default sigma
 length(σ) == nσ || throw(DimensionMismatch("number of sigma levels (= $(length(σ))) must match number of σ grid points (=$(nσ))"))
 ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
 

@@ -61,7 +61,8 @@ using Test, WAVI
     @testset "Testing SigmaGrid" begin 
         @info "Testing SigmaGrid constuction..."
         params = Params()
-        sigmagrid = WAVI.SigmaGrid(Nx = 10, Ny = 10, Nσ = 10,η = ones(10,10,10), θ = ones(10,10,10), Φ = ones(10,10,10), glen_b = fill(WAVI.glen_b(params.default_temperature,params.default_damage,params),10,10,10))
+        grid = Grid()
+        sigmagrid = WAVI.SigmaGrid(Nx = 10, Ny = 10, Nσ = 10, σ = collect(range(0., 1., length = 10)), η = ones(10,10,10), θ = ones(10,10,10), Φ = ones(10,10,10), glen_b = fill(WAVI.glen_b(params.default_temperature,params.default_damage,params.glen_a_ref,params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const),10,10,10))
         @test sigmagrid isa WAVI.SigmaGrid
         end
 

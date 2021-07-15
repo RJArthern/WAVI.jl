@@ -233,6 +233,7 @@ end
         rm(folder, force = true, recursive = true)
         foreach(rm, filter(endswith(".mat"), readdir()))
         foreach(rm, filter(endswith(".jld2"), readdir()))
+        foreach(rm, filter(endswith(".bin"), readdir()))
         end
 
 
