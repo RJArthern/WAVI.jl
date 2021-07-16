@@ -4,7 +4,16 @@ mutable struct Simulation{M,TS,O,C}
     output_params::O
     clock::C
 end
+"""
+    Simulation(;
+                model = nothing,
+                timestepping_params = nothing,
+                output_params = OutputParams(),
+                pickup_model_update_flag = false,
+                pickup_output_update_flag = false)
 
+Construct a WAVI.jl Simulation object.
+"""
 function Simulation(;
                     model = nothing,
                     timestepping_params = nothing,

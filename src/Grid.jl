@@ -35,25 +35,22 @@ end
     u_iszero = nothing,
     v_iszero = nothing)
 
-Construct a WAVI.jl grid.
+Construct a WAVI.jl grid structure.
 
 Keyword arguments
 =================
-
-    - 'nx': number of x grid points
-    - 'ny': number of y grid points
-    - 'dx': grid spacing in x 
-    - 'dy': grid spacing in y 
-    - 'nσ': number of levels in the vertical
-    - 'x0': grid origin x co-ordinate 
-    - 'y0': grid origin y co-ordinate
-    - 'h_mask': Mask defining domain points within grid
-    - 'u_iszero': Locations of zero u velocity points
-    - 'v_iszero': Locations of zero v velocity points
-    - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
+- `nx`: number of x grid points
+- `ny`: number of y grid points
+- `dx`: grid spacing in x 
+- `dy`: grid spacing in y 
+- `nσ`: number of levels in the vertical
+- `x0`: grid origin x co-ordinate 
+- `y0`: grid origin y co-ordinate
+- `h_mask`: Mask defining domain points within grid
+- `u_iszero`: Locations of zero u velocity points
+- `v_iszero`: Locations of zero v velocity points
+- `quadrature_weights`: weights associated with sigma levels used in quadrature scheme
 """
-
-#grid constructor Hello Alex
 function Grid(; 
     nx = 80,
     ny = 10,
@@ -155,7 +152,7 @@ end
 """
     orientations2bc(directions, M, N)
 
-Make an M x N matrix with trues in the locations specified by directions
+Make an M x N matrix with trues in the locations specified by directions.
 """
 function orientations2bc(orientations, M, N)
     A = falses(M,N)
