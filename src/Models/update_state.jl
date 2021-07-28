@@ -99,7 +99,7 @@ function update_basal_melt!(model::AbstractModel)
         update_melt_rate_model!(model.extra_physics["melt_rate_model"], model)
         gh.basal_melt .= model.extra_physics["melt_rate_model"].melt_rate
     else
-        gh.basal_melt .= 0
+        gh.basal_melt .= 0.
     end
     return model
 end

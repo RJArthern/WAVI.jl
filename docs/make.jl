@@ -37,26 +37,43 @@ data_structure_pages = [
     "Overview" => "data_structure/overview.md"
     "Simulations" => "data_structure/simulations.md"
     "Models" => "data_structure/model.md"
+    "Timestepping Parameters" => "data_structure/timestepping_params.md"
+    "Output Writing" => "data_structure/output_writing.md"
+    "Grid" => "data_structure/grid.md"
+    "Solver Parameters" => "data_structure/solver_parameters.md"
+    "Physical Paramters" => "data_structure/params.md"
+    "Initial Conditions" => "data_structure/initial_conditions.md"
+    "Fields" => "data_structure/fields.md"
+    "Melt Rate Models" => "data_structure/melt_rate_models.md"
+]
+
+numerics_pages = [
+    "Numerical Grid" => "numerics/numerical_grid.md"
+    "Discretization" => "numerics/discretization.md"
+    "Velocity Solve" => "numerics/velocity_solve.md"
+    "Timestepping" => "numerics/timestepping.md"
 ]
 
 physics_pages = [
-    "Governing equations" => "physics/governing_equations.md"
+    "Overview and Background" => "physics/overview.md"
+    "Governing Equations" => "physics/governing_equations.md"
+    "Basal Stress" => "physics/basal_stress.md"
+    "Melt Rates" => "physics/melting.md"
+    #"Calving" => "physics/calving.md"
+    "Damage" => "physics/damage.md"
 ]
 
-parametrization_pages = [
-    "Overview" => "parametrizations/overview.md"
-]
 
 pages = [
     "Home" => "index.md",
     "Installation instructions" => "installation_instructions.md",
-    "Data structure" => data_structure_pages,
     "Examples" => example_pages,
     "Physics" => physics_pages,
-    "Parametrizations" => parametrization_pages,
+    "Numerical Implementation" => numerics_pages,
+    "WAVI Setup" => data_structure_pages,
     "Simulation tips" => "simulation_tips.md",
+    "MITgcm coupling" => "mitgcm_coupling.md",
     "Contributor's guide" => "contributing.md",
-    "Gallery" => "gallery.md",
     "References" => "references.md",
 ]
 
