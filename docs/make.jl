@@ -36,6 +36,7 @@ example_pages = [
 data_structure_pages = [
     "Overview" => "data_structure/overview.md"
     "Simulations" => "data_structure/simulations.md"
+    "Models" => "data_structure/model.md"
 ]
 
 physics_pages = [
