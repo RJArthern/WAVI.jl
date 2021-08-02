@@ -6,7 +6,7 @@ Manifest.toml
 *.tif
 #*.jld2
 *.nc
-*.md
+#*.md
 *.bin
 
 #testing driver scripts
