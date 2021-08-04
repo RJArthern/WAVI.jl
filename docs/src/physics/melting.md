@@ -16,6 +16,15 @@ WAVI.jl also supports coupling to the ocean model MITgcm. Please [get in touch](
 ## Input File Melt Rates
 
 ## Quadratic Temperature Melt Rate Parametrization
+The quadratic temperature melt rate parametrization [[Holland2008](@cite)] parametrizes the melt rate as a quadratic function of the thermal driving:
+```math
+\begin{equation}\label{E:quadratic_parametrization}
+M = \gamma_T \left( \frac{\rho_w c_p}{\rho_i L} \right) \left(T_0 - T_f\right)^2.
+\end{equation}
+```
+Here $\gamma_T$ is a heat exchange velocity, $\rho_w$ is the density of water, $\rho_i$ is the density of ice, $c_p$ is the heat capacity of the ocean, $L$ is the latent heat of fusion of ice. In addition, $T_f = \lambda_1 S_0 + \lambda_2 + \lambda_3 z_b$ is the local freezing point, with $\lambda_1$, $\lambda_2$, and $\lambda_3$ the liquidus slope, intercept, and pressure coefficient, respectively, and $z_b$ the height of the ice shelf draft above sea level (i.e. $z_b$ is negative).  $T_0$ and $S_0$ are the depth-dependent potential temperatre and practical salinity taken from the far field.
+
+The quadratic formulation \eqref{E:quadratic_parametrization} attempts to account for heat providing both more heat for melting and the feedback between sub-shelf melting and circulation in the cavity (higher temperatures result in a more vigorous circulation, promoting enhanced melt rates).
 
 ## Plume Emulator Melt Rate Parametrization
 
