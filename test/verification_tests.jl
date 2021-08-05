@@ -6,7 +6,7 @@ using Test, WAVI, LinearAlgebra
 @testset  "WAVI tests" begin
     @testset "Iceberg" begin
         include("verification_tests/iceberg_test.jl")
-        sim=iceberg_test(end_time = 10000.)
+        sim=iceberg_test(end_time = 1000.)
         #Steady state iceberg thickness and velocity
         #a = 0.3 m/yr, A=2.0e-17 Pa^-3 a^-1
         #ice density 918 kg/m3 ocean density 1028.0 kg/m3, Glen law n=3.
