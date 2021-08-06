@@ -4,7 +4,7 @@ using Test, WAVI
     @info "Testing models...."
 
     @testset "testing model construction" begin 
-    @info "Testing generic model constuction..."
+    @info "Testing generic model construction..."
     grid = Grid()
     bed_elevation = zeros(grid.nx, grid.ny)
     model = Model(grid = grid, bed_elevation = bed_elevation)

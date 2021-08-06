@@ -4,7 +4,7 @@ using Test, WAVI
     @info "Testing Grids...."
 
     @testset "Testing Grid construction" begin 
-    @info "Testing Grid constuction..."
+    @info "Testing Grid construction..."
 
     #no arguments
     nx = 80
@@ -38,7 +38,7 @@ using Test, WAVI
     end
 
     @testset "Testing Grid construction" begin 
-        @info "Testing Grid constuction errors..."
+        @info "Testing Grid construction errors..."
     
         #h_mask size incorrect
         @test_throws DimensionMismatch Grid(nx = 10, ny = 10, h_mask = trues(5,5))

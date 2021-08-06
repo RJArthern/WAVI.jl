@@ -69,11 +69,14 @@ using WAVI, Test
 
     simulation = version_update_test();
 
-    example_output = Dict();
-    if VERSION == v"1.6.1"
-    example_output = load("./test/version_update_test_verification/v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    if  VERSION == v"1.6.2"
+    example_output = load("./version_update_test_verification/v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    elseif VERSION == v"1.6.1"
+    example_output = load("./version_update_test_verification/v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
     elseif  VERSION == v"1.5.1"
-    example_output = load("./test/version_update_test_verification/v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    example_output = load("./version_update_test_verification/v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    else
+    example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
     @test simulation.model.fields.gh.h == example_output["h"]
     @test simulation.model.fields.gu.u == example_output["u"]

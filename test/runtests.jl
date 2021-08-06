@@ -38,6 +38,6 @@ if group == "verification" || group == "all"
 end
 
 if group == "version_update" || group == "all"
-    include("version_update_test_verification/test_version_updates.jl")
+    include(joinpath("version_update_test_verification","test_version_updates.jl"))
 end
 
