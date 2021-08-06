@@ -1,5 +1,5 @@
-mutable struct Simulation{M,TS,O,C} 
-    model::M
+mutable struct Simulation{T<:Real, N<:Int,TS,O,C} 
+    model::Model{T,N}
     timestepping_params::TS
     output_params::O
     clock::C

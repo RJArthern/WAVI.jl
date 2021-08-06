@@ -1,6 +1,6 @@
-struct Model{T <: Real, N <: Integer,A,W} <: AbstractModel{T,N}
+struct Model{T <: Real, N <: Integer} <: AbstractModel{T,N}
     grid::Grid{T,N}
-    params::Params{T,A,W}
+    params::Params{T}
     solver_params::SolverParams{T,N}
     initial_conditions::InitialConditions{T}
     fields::Fields{T,N}

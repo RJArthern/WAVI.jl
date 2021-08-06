@@ -1,4 +1,4 @@
-struct Params{T <: Real, A, W}
+struct Params{T <: Real}
                       dt :: T
                        g :: T
              density_ice :: T
@@ -9,13 +9,13 @@ struct Params{T <: Real, A, W}
        default_viscosity :: T 
      default_temperature :: T
           default_damage :: T 
-       accumulation_rate :: A
+       accumulation_rate :: Union{T, Array{T,2}}
 glen_a_activation_energy :: T 
               glen_a_ref :: T
     glen_temperature_ref :: T 
                   glen_n :: T 
     glen_reg_strain_rate :: T 
-              weertman_c :: W
+              weertman_c :: Union{T, Array{T,2}}
               weertman_m :: T 
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
