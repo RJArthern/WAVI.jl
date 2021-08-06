@@ -28,21 +28,22 @@ grid = Grid(nx = nx,
             x0 = x0, 
             y0 = y0, 
             dx = dx, 
-            dy = dy)
+            dy = dy,
+            u_iszero = u_iszero,
+            v_iszero = v_iszero)
 
 h_mask=sqrt.(grid.xxh.^2+grid.yyh.^2) .< 45000
 h_mask = convert(Array{Bool,2}, h_mask)
 grid = @set grid.h_mask = h_mask
+
 
 #Model domain mask on h-grid
 starting_thickness=zeros(nx,ny)
 starting_thickness[h_mask] .= 200.0
 initial_conditions = InitialConditions(initial_thickness = starting_thickness)
 
-
 accumulation_rate=0.3
 params = Params(accumulation_rate = accumulation_rate)
-
 
 bed_elevation=-500.0.*ones(nx,ny)
 
