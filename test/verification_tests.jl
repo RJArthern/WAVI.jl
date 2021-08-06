@@ -1,7 +1,3 @@
-using Base: _InitialValue
-
-
-
 using Test, WAVI, LinearAlgebra
 @testset  "WAVI tests" begin
     @testset "Iceberg" begin
