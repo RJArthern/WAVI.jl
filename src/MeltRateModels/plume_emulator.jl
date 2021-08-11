@@ -1,6 +1,5 @@
 struct PlumeEmulator{PC,M,T <: Real} <: AbstractMeltRateModel{PC,M}
     α :: T   #calibration coefficient 
-    M0 :: T  #melt rate scaling
     λ1 :: T  #liquidus slope 
     λ2 :: T  #liquidus intercept 
     λ3 :: T  #liquidus pressure coefficient
@@ -19,8 +18,6 @@ struct PlumeEmulator{PC,M,T <: Real} <: AbstractMeltRateModel{PC,M}
 #    melt_rate::Array{T,2} #holder for the current melt rate
 #   add flags for time dependence in Ta and Sa
 end
-
-
 
 """
     PlumeEmulator(; <kwargs>)
@@ -73,7 +70,7 @@ function PlumeEmulator(;
     melt_rate = zeros(2,2) #placeholder -- want to remove melt rate field from all melt rate emulators
     #melt rate emulators shouldn't _own_ the melt rate, they should simply _return_ the melt
 
-    return PlumeEmulator(α, M0, λ1, λ2, λ3,E0, Cd, Γ_TS, L, c, βs, βt,g, Ta, Sa, melt_partial_cell,melt_rate)
+    return PlumeEmulator(α, λ1, λ2, λ3,E0, Cd, Γ_TS, L, c, βs, βt,g, Ta, Sa, melt_partial_cell,melt_rate)
 end
 
 
@@ -101,7 +98,7 @@ Set the melt rate in according to Lazeroms 2018. All plume parameters passed in 
 """
 function set_plume_emulator_melt_rate!(melt, h, grounded_fraction,bathy, ρi, ρw, dx, dy,pme)
     nx, ny = size(h)
-    zbf = -(ρi/ρw)*h.*(1-grounded_fraction) + grounded_fraction*bathy #ice draft if floating everywhere
+    zbf = @. -(ρi/ρw)*h.*(1-grounded_fraction) .+ grounded_fraction*bathy #ice draft if floating everywhere
     ∂zb∂x, ∂zb∂y = get_slope(zbf,dx, dy) #returns the partial derivates of base in both directions
 
     #loop over each grid point
@@ -110,7 +107,7 @@ function set_plume_emulator_melt_rate!(melt, h, grounded_fraction,bathy, ρi, ρ
             melt[i,j] =  pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, j)
         end 
     end 
-
+    return melt
 end
 
 """
@@ -127,7 +124,7 @@ Arguments:
 - i,j: specific grid pt
 """
 function pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, j)
-    if grounded_fraction[i,j] == 1 #i.e. if its floating
+    if grounded_fraction[i,j] == 0. #i.e. if its floating
         #initialize directions 
         dirs = get_plume_directions() #array of directions
         nd = size(dirs)[1] #number of search directions
@@ -137,6 +134,8 @@ function pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, 
         zgl = zeros(1, nd) #grounding line depth
         s = zeros(1, nd) #basal slopes
         iscount = trues(1, nd) #do these points count or not?
+        iscount_s = trues(1,nd)
+        iscount_zgl = trues(1,nd)
 
         #loop over directions
         for k = 1:size(dirs)[1]
@@ -144,18 +143,17 @@ function pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, 
             s[k] = -dot(norm_dirs[k,:], [∂zb∂x[i,j] ∂zb∂y[i,j]]) #note negative sign
             if s[k] <= 0
                 iscount[k] = false
+                iscount_s[k] = false
             end #[this syntax count be tightened]
 
             #compute gl depth in this direction
-
-            zgl[k] = get_pme_gl_depth(dirs[k], grounded_fraction, zbf, i, j)
-
-
-            @warn "Not yet implemented grounding line depth algorithm"
+            zgl[k] = get_pme_gl_depth(dirs[k,:], grounded_fraction, zbf, i, j)
             if isnan(zgl[k]) #no gl point found in this direction
                 iscount[k] = false
+                iscount_zgl[k] = false
             elseif zgl[k] >= zbf[i,j] #if gronding line higher than shelf point
                 iscount[k] = false 
+                iscount_zgl[k] = false
             end
         end
 
@@ -165,18 +163,21 @@ function pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, 
         α = atan(sum(s[iscount])/N);
 
         #update the melt rate
-        Sa_gl = pme.Sa(zgl_eff)
-        Sa_local = pme.Sa(zbf[i,j])
-        Ta_local = pme.Ta(zbf[i,j])
-        Tf0 = pme.λ1*Sa_gl + pme.λ2 + pme.λ3 * zgl_eff
-        M0 = lazeroms_melt_rate_prefactor(pme.βs, pme.βt, pme.g, pme.Cd, pme.Γ_TS, pme.L, pme.c, pme.λ1, pme.λ3, pme.E0, α, Sa_local, Ta_local)
-        x = lazeroms_dimensionless_distance(pme.λ3, zb[i,j], zgl_eff, Ta_local, Tf0)
-        melt = M0 * pme.α * (Ta_local - Tf0)^2 * lazeroms_dimensionless_melt(x)
-
+        if N > 0
+            Sa_gl = pme.Sa(zgl_eff)
+            Sa_local = pme.Sa(zbf[i,j])
+            Ta_local = pme.Ta(zbf[i,j])
+            Tf0 = pme.λ1*Sa_gl + pme.λ2 + pme.λ3 * zgl_eff
+            M0 = lazeroms_melt_rate_prefactor(pme.βs, pme.βt, pme.g, pme.Cd, pme.Γ_TS, pme.L, pme.c, pme.λ1, pme.λ3, pme.E0, α, Sa_local, Ta_local)
+            x = lazeroms_dimensionless_distance(pme.λ3, zbf[i,j], zgl_eff, Ta_local, Tf0)
+            melt = M0 * pme.α * (Ta_local - Tf0)^2 * lazeroms_dimensionless_melt(x) * 365.25* 24 * 60^2
+        else
+            melt = 0.
+        end
     else
         melt = 0.
     end
-    return melt
+    return melt #, zgl, s, iscount, iscount_s, iscount_zgl
 end
 
 
@@ -188,14 +189,14 @@ Returns the partial derivatives of h with respect to x and y as matrices. Uses c
 """
 function get_slope(h, dx, dy)
     ∂h∂x = zeros(size(h))
-    ∂h∂x[2:end-1,:] = (-∂h∂x[1:end-2,:] + ∂h∂x[3:end,:])/ 2/dx 
-    ∂h∂x[1,:] = (-3/2 *∂h∂x[1,:] + 2*∂h∂x[2,:] - 1/2 * ∂h∂x[3,:] )/dx
-    ∂h∂x[end,:] = (1/2 * ∂h∂x[end-2, :] - 2 *∂h∂x[end-1,:] + 3/2 * ∂h∂x[end,:])/dx
+    ∂h∂x[2:end-1,:] = (-h[1:end-2,:] + h[3:end,:])/ 2/dx 
+    ∂h∂x[1,:] = (-3/2 *h[1,:] + 2*h[2,:] - 1/2 * h[3,:] )/dx
+    ∂h∂x[end,:] = (1/2 * h[end-2, :] - 2 *h[end-1,:] + 3/2 * h[end,:])/dx
 
     ∂h∂y = zeros(size(h))
-    ∂h∂y[:,2:end-1]= (∂h∂y[:,1:end-2] + ∂h∂y[3:end])/2 /dy
-    ∂h∂y[:,1] = (-3/2 * ∂h∂y[:,1] + 2 * ∂h∂y[:,2] - 1/2 * ∂h∂y[:,3])/dy
-    ∂h∂y[:,end] = (1/2 * ∂h∂y[:,end-2] - 2*∂h∂y[:,end-1] + 3/2 * ∂h∂y[:,end] )/dy;
+    ∂h∂y[:,2:end-1]= (-h[:,1:end-2] + h[:,3:end])/2 /dy
+    ∂h∂y[:,1] = (-3/2 * h[:,1] + 2 * h[:,2] - 1/2 * h[:,3])/dy
+    ∂h∂y[:,end] = (1/2 * h[:,end-2] - 2*h[:,end-1] + 3/2 * h[:,end] )/dy;
 
     return ∂h∂x, ∂h∂y
 end
@@ -225,7 +226,7 @@ function lazeroms_melt_rate_prefactor(βs,βt, g, Cd, Γ_TS, L, c,λ1, λ3,  E0,
     cp2 = -λ1 * βt/βs
     ct = cp2/cp1
     M0 = sqrt(βs * Sa * g) / sqrt(λ3 * (L/c)^3) *
-         ((1 -  cp1 * sqrt(Cd)*Γ_TS)/(C_d + E0 * sin(α)))^(1/2) *
+         ((1 -  cp1 * sqrt(Cd)*Γ_TS)/(Cd + E0 * sin(α)))^(1/2) *
          (sqrt(Cd) * Γ_TS * E0 * sin(α)/ (sqrt(Cd) * Γ_TS + ct + E0 * sin(α)))^(3/2)
     return M0
 end
@@ -238,13 +239,12 @@ Note that we include only the first term in the expansion (i.e. no contribution 
 """
 lazeroms_dimensionless_distance(λ3, zb, zgl, Ta, Tf0) = λ3 * (zb - zgl) / (Ta - Tf0)
 
-
 """
     lazeroms_dimensionless_melt(x)
 
 Dimensionless melt function, equation 26 in Lazeroms et al. 2019 
 """
-lazeroms_dimensionless_melt(x) = (3*(1-x)^4/3 - 1)*(1- (1-x)^(4/3))^(1/2) / 2 / sqrt(2)
+lazeroms_dimensionless_melt(x) = (3*(1-x)^(4/3) - 1)*(1- (1-x)^(4/3))^(1/2) / 2 / sqrt(2)
 
 
 """
@@ -255,22 +255,31 @@ Note that this function does not yet apply the interpolation described in Lazero
 """
 function get_pme_gl_depth(direction, grounded_fraction, zbf, i,j)
     nx, ny = size(grounded_fraction)
-    is_found = false #trigger for finding gl point
+
+    #initialize
     zgl = NaN
-
-    #first step
-    p = i + direction[1]
-    q = j + direction[2]
-    isin_domain(p,q,nx,ny) ? is_terminated = false : is_terminated = true #if the first step is out of the domain, terminate
-
-    while ~(is_terminated)
+    isterm_gl = false #have we found a grounded point?
+    isterm_domain = false #have we gone outsdie of the domain?
+    p = i 
+    q = j
+    
+    #workflow: (1) check we aren't grounded (before step as may be grounded to begin with)
+    #          (2) make a step
+    #          (3) check we haven't gone out of the domain
+    #          (4) loop if still in domain and not grounded
+    while ~(isterm_domain) && ~(isterm_gl)
         #check whether search point is grounded, trigger terminated if so 
-        ~(grounded_fraction[p,q] == 1) || (is_terminated = true; zgl = zbf[i,j]) 
+        grounded_fraction[p,q] > 1 - 1e-3 ?  isterm_gl = true : isterm_gl = false
+        if isterm_gl #we've found a grounded point
+            zgl = zbf[p,q]
+        end
 
         #update search point
-        p = i + direction[1]
-        q = j + direction[2]
-        isin_domain(p,q,nx,ny) ? is_terminated = false : is_terminated = true #if the first step is out of the domain, terminate
+        p = p + direction[1]
+        q = q + direction[2]
+
+        #have we gone out of the domain
+        isin_domain(p,q,nx,ny) ? isterm_domain = false : isterm_domain = true #if the first step is out of the domain, terminate
     end #end while loop
     return zgl 
 end

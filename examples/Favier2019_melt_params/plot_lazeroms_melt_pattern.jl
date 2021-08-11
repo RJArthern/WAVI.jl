@@ -27,40 +27,46 @@ function plot_lazeroms_melt_pattern()
     #Bed 
     bed = WAVI.mismip_plus_bed #function definition
 
-    #solver parameters
-    maxiter_picard = 1
-    solver_params = SolverParams(maxiter_picard = maxiter_picard)
-
-    #Physical parameters
-    default_thickness = 100.0 #set the initial condition this way
-    accumulation_rate = 0.3
-    params = Params(default_thickness = default_thickness, 
-                    accumulation_rate = accumulation_rate)
-    
-
     #Inputing thickness profile, reading from binary file 
-    fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
+    fname = "examples\\Favier2019_melt_params\\data\\MISMIP_ice0_2km_SteadyThickness.bin";
+    #fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
     h = Array{Float64, 2}(undef, nx, ny)
     read!(fname,h)
     h = ntoh.(h)        
 
-
     #make the model
-    initial_conditions = InitialConditions(initial_thickness = h) #Defining initial condition of ice sheet
+    initial_conditions = InitialConditions(initial_thickness = h) #set thickness 
     model = Model(grid = grid,
-                     bed_elevation = bed, 
-                     params = params, 
-                     solver_params = solver_params,
-                     initial_conditions = initial_conditions)
-
+                bed_elevation = bed, 
+                initial_conditions = initial_conditions) #don't care about params or solver params
 
     #embed the ice model with melt rate model
-    #melt_rate_model = QuadraticMeltModel(model.fields.gh.h,
-    #melt_partial_cell = true)
-    #add_melt_rate_model!(model,melt_rate_model) #this updates the melt rate in model
+    pme = PlumeEmulator()
+    add_melt_rate_model!(model,pme) #this updates the melt rate in model
 
-    return h
+    return model
 end
+
+
+
+model = plot_lazeroms_melt_pattern()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function quad_melt_plot()
 #@time simulation = MISMIP_PLUS();
