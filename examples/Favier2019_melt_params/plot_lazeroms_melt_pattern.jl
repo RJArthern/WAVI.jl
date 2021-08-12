@@ -1,6 +1,4 @@
-using WAVI 
-#using PyPlot
-#using LinearAlgebra
+using WAVI, Plots
 function plot_lazeroms_melt_pattern()
     #Grid and boundary conditions
     nx = 320
@@ -41,13 +39,32 @@ function plot_lazeroms_melt_pattern()
                 initial_conditions = initial_conditions) #don't care about params or solver params
 
     #embed the ice model with melt rate model
-    pme = PlumeEmulator()
-    add_melt_rate_model!(model,pme) #this updates the melt rate in model
+    pme = PlumeEmulator(α = 1.5)
+    @time add_melt_rate_model!(model,pme) #this updates the melt rate in model
 
+    #make the plot
+    x = model.grid.xxh[:,1]; y = model.grid.yyh[1,:];
+    m = deepcopy(model.fields.gh.basal_melt);
+    m[model.fields.gh.grounded_fraction .== 1.] .= NaN;
+    msat = deepcopy(m)
+    msat[msat .> 50] .= 50
+    plt = contour(x./1e3,y/1e3, msat', 
+                    fill = true, 
+                    linewidth = 0, 
+                    colorbar = true,
+                    colorbar_title = "melt rate (m/yr)",
+                    framestyle = :box);
+    xlims!((420, 600))
+    xlabel!("x (km)")
+    ylabel!("y (km)")
+    @show plt
+
+    savefig(plt,  joinpath(dirname(@__FILE__), "lazeroms_melt_rate_pattern.png"))
+
+    mean_melt_rate = sum(m[model.fields.gh.grounded_fraction .< 1])/ sum(model.fields.gh.grounded_fraction .< 1)
+    println("Mean melt rate in the shelf is ", mean_melt_rate, " m/yr")
     return model
 end
-
-
 
 model = plot_lazeroms_melt_pattern()
 
@@ -59,36 +76,3 @@ model = plot_lazeroms_melt_pattern()
 
 
 
-
-
-
-
-
-
-
-
-
-function quad_melt_plot()
-#@time simulation = MISMIP_PLUS();
-sim = MISMIP_PLUS()
-x = range(0, stop= 40*2., length = 40) #In km
-y = range(-40., stop = 320*2., length = 320)
-
-xgrid = repeat(x', 320 ,1)
-ygrid = repeat(y, 1, 40)
-
-basal_melt = sim.model.fields.gh.basal_melt
-
-
-fig = figure()
-cp = contourf(xgrid, ygrid, basal_melt, linewidth=2.0)
-contour(xgrid,ygrid,sim.model.fields.gh.grounded_fraction)
-PyPlot.ylim(400., 320*2.)
-colorbar(cp)
-PyPlot.title("Contour Plot of ice base melt rate m/yr")
-savefig("plot.png")
-display(fig)
-return nothing
-end
-
-plot_lazeroms_melt_pattern()

@@ -81,7 +81,7 @@ function update_melt_rate_model!(melt_model::PlumeEmulator, model)
     set_plume_emulator_melt_rate!(basal_melt, 
                                 h, 
                                 grounded_fraction, 
-                                grid.bed_elevation,
+                                model.fields.gh.b,
                                 params.density_ice, 
                                 params.density_ocean, 
                                 grid.dx, 
@@ -107,6 +107,7 @@ function set_plume_emulator_melt_rate!(melt, h, grounded_fraction,bathy, ρi, ρ
             melt[i,j] =  pme_pointwise_melt(grounded_fraction,zbf, ∂zb∂x,∂zb∂y, pme, i, j)
         end 
     end 
+
     return melt
 end
 

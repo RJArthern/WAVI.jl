@@ -12,7 +12,7 @@ include("plume_emulator.jl")
 Interface to endow the model with a melt rate model
 """
 function add_melt_rate_model!(model, melt_rate_model)
-    ~("melt_rate_model" in keys(model.extra_physics)) || @info "Model already contained a melt rate model. Overwritten to that just specified..."
+    ("melt_rate_model" in keys(model.extra_physics)) ? (@info "Model already contained a melt rate model. Overwritten to that just specified...") : model.extra_physics["melt_rate_model"] = melt_rate_model
 
     #initialize the size of the melt rate grid 
     melt_rate_model = @set melt_rate_model.melt_rate = zeros(size(model.grid.xxh))
