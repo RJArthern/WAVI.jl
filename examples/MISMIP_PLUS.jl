@@ -42,11 +42,11 @@ function MISMIP_PLUS()
                      solver_params = solver_params)
 
     #timestepping parameters
-    niter0 = 20
+    niter0 = 40
     dt = 0.5
-    end_time = 20.
+    end_time = 40.
     chkpt_freq = 1000.
-    pchkpt_freq = 10.
+    pchkpt_freq = 5.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -55,8 +55,8 @@ function MISMIP_PLUS()
 
     #output parameters
     folder = "outputs"
-    isdir(folder) && rm(folder, force = true, recursive = true)
-    mkdir(folder) #make a clean folder for outputs
+    #isdir(folder) && rm(folder, force = true, recursive = true)
+    #mkdir(folder) #make a clean folder for outputs
     outputs = (h = model.fields.gh.h,
                u = model.fields.gh.u,
                v = model.fields.gh.v,
@@ -71,6 +71,7 @@ function MISMIP_PLUS()
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params,
                         output_params = output_params)
+    println(simulation.clock.n_iter)
             
     #perform the simulation
     run_simulation!(simulation)

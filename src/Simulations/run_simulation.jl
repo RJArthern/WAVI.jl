@@ -44,6 +44,7 @@ Perform the simulation specified by the simulation
 function run_simulation!(simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
+    println(simulation.clock.n_iter)
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
 
@@ -68,6 +69,7 @@ function run_simulation!(simulation)
         #check if we have hit an output timestep
         if mod(i,simulation.output_params.n_iter_out) == 0
             write_output(simulation)
+            println(simulation.clock.n_iter)
             println("outputting at timestep number $(simulation.clock.n_iter)")
 
         end

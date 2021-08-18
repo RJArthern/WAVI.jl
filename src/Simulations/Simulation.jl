@@ -9,7 +9,6 @@ function Simulation(;
                     model = nothing,
                     timestepping_params = nothing,
                     output_params = OutputParams(),
-                    pickup_model_update_flag = false,
                     pickup_output_update_flag = false)
 
     (timestepping_params !== nothing) || throw(ArgumentError("You must specify a timestepping parameters"))
@@ -27,14 +26,15 @@ function Simulation(;
     simulation = Simulation(model, timestepping_params, output_params, clock)
 
     #pickup?
-    pickup!(simulation, pickup_model_update_flag, pickup_output_update_flag)
+    pickup!(simulation, pickup_output_update_flag)
 
     return simulation 
 
   
     
 end
-f() =1 
+
+
 include("run_simulation.jl")
 
 function set_dt_in_model!(model, dt)
@@ -49,28 +49,21 @@ function set_n_iter_out!(output_params, dt,n_iter_total)
     return output_params
 end
 
-function pickup!(simulation, pickup_model_update_flag, pickup_output_update_flag)
+function pickup!(simulation, pickup_output_update_flag)
     @unpack timestepping_params = simulation
+
     if timestepping_params.niter0 > 0
         n_iter_string =  lpad(timestepping_params.niter0, 10, "0"); #filename as a string with 10 digits
         println("detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup...")
         try 
-            @load string("PChkpt_",n_iter_string, ".jld2") simulation
+            sim_loaded  = load(string("PChkpt_",n_iter_string, ".jld2"), "simulation")
             println("Pickup successful")
-            #simulation = @set simulation.timestepping_params = timestepping_params
-            simulation.timestepping_params = timestepping_params
-            println("Updated the timestepping parameters in the simulation...")
+            simulation.model = sim_loaded.model
+            simulation.clock = sim_loaded.clock
         
-            #update model and output if the flags are specified
-            if pickup_model_update_flag
-                simulation = @set simulation.model = model
-                simulation.model = model
-                println("WARNING: model updated in simulation after pickup")
-            end
+            #do we want the old output parameters?
             if pickup_output_update_flag
-                simulation = @set simulation.output_params = output_params
-                simulation.output_params = output_params
-                println("WARNING: output parameters updated in simulation after pickup")
+                simulation.output_params = sim_loaded.output_params
             end
         catch 
             Throw(error("Pickup error, terminating run"))

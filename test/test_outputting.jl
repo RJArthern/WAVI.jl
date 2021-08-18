@@ -1,4 +1,4 @@
-using Test, WAVI, MAT, JLD2, NetCDF
+using Test, WAVI, MAT, JLD2, NetCDF, Dates
 
 function output_test(; dt  = 0.5, 
                     end_time = 100., 
