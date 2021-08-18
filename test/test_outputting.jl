@@ -151,6 +151,11 @@ end
                     dump_vel = true, 
                     pchkpt_freq = 1.)
 
+        #get the time that the first file was outputted (test for https://github.com/RJArthern/WAVI.jl/issues/35)
+        first_file_name = joinpath("outputs",string("outfile0000000001.", output_format));
+        @test isfile(first_file_name) #check the first output point exists
+        dt1 = Dates.unix2datetime(mtime(first_file_name)) #time of last modification
+
         #run again with different niter0
         sim = output_test(; dt  = 0.5, 
                     end_time = 20., 
@@ -162,6 +167,9 @@ end
                     dump_vel = true, 
                     pchkpt_freq = 1.)
 
+        #check that the time that first file modified has not changed -- i.e. simulation has not touched outputs at earlier times than it should have            
+        dt2 = Dates.unix2datetime(mtime(first_file_name)) 
+        @test dt1 == dt2
         
         #test variables read from nc file
         fname = string(folder, sim.output_params.prefix, ".nc")
