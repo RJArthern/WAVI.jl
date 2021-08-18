@@ -1,4 +1,3 @@
-using Core: Argument
 using Test, WAVI, MAT, JLD2, NetCDF
 
 function output_test(; dt  = 0.5, 
