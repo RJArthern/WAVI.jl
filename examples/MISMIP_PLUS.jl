@@ -42,11 +42,11 @@ function MISMIP_PLUS()
                      solver_params = solver_params)
 
     #timestepping parameters
-    niter0 = 40
+    niter0 = 600
     dt = 0.5
-    end_time = 40.
+    end_time = 400.
     chkpt_freq = 1000.
-    pchkpt_freq = 5.
+    pchkpt_freq = 20.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -60,8 +60,9 @@ function MISMIP_PLUS()
     outputs = (h = model.fields.gh.h,
                u = model.fields.gh.u,
                v = model.fields.gh.v,
-               b = model.fields.gh.b) #output velocities and thickness
-    output_freq = 2.
+               b = model.fields.gh.b,
+               grfrac = model.fields.gh.grounded_fraction) #output velocities and thickness
+    output_freq = 20.
     output_params = OutputParams(outputs = outputs, 
                             output_path = folder,
                             output_freq = output_freq,
@@ -71,7 +72,6 @@ function MISMIP_PLUS()
     simulation = Simulation(model = model, 
                         timestepping_params = timestepping_params,
                         output_params = output_params)
-    println(simulation.clock.n_iter)
             
     #perform the simulation
     run_simulation!(simulation)

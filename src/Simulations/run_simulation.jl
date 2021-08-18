@@ -44,7 +44,6 @@ Perform the simulation specified by the simulation
 function run_simulation!(simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
-    println(simulation.clock.n_iter)
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
 

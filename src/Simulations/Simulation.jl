@@ -50,21 +50,18 @@ function set_n_iter_out!(output_params, dt,n_iter_total)
 end
 
 function pickup!(simulation, pickup_output_update_flag)
-    @unpack timestepping_params = simulation
+    #@unpack model, timestepping_params, clock = simulation
 
-    if timestepping_params.niter0 > 0
-        n_iter_string =  lpad(timestepping_params.niter0, 10, "0"); #filename as a string with 10 digits
-        println("detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup...")
+    if simulation.timestepping_params.niter0 > 0
+        n_iter_string =  lpad(simulation.timestepping_params.niter0, 10, "0"); #filename as a string with 10 digits
+        println("detected niter0 > 0 (niter0 = $(simulation.timestepping_params.niter0)). Looking for pickup...")
         try 
-            sim_loaded  = load(string("PChkpt_",n_iter_string, ".jld2"), "simulation")
+            sim_load = load(string("PChkpt_",n_iter_string, ".jld2"), "simulation")
             println("Pickup successful")
-            simulation.model = sim_loaded.model
-            simulation.clock = sim_loaded.clock
-        
-            #do we want the old output parameters?
-            if pickup_output_update_flag
-                simulation.output_params = sim_loaded.output_params
-            end
+
+            simulation.model = sim_load.model
+            simulation.clock = sim_load.clock
+            simulation.output_params = sim_load.output_params #pointer based outputting system means we have to use same output parameters after pickup
         catch 
             Throw(error("Pickup error, terminating run"))
         end
