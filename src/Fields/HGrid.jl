@@ -1,6 +1,6 @@
 struct HGrid{T <: Real, N  <: Integer}
-                   Nx :: N                                     # Number of grid cells in x-direction in HGrid
-                   Ny :: N                                     # Number of grid cells in y-direction in HGrid
+                   nxh :: N                                     # Number of grid cells in x-direction in HGrid
+                   nyh :: N                                     # Number of grid cells in y-direction in HGrid
                  mask :: Array{Bool,2}                         # Mask specifying the model domain
                     n :: N                                     # Total number of cells in the model domain
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
@@ -38,22 +38,22 @@ end
 
 """
     HGrid(;
-            Nx, 
-            Ny,
-            mask = trues(Nx,Ny),
+            nxh, 
+            nyh,
+            mask = trues(nxh,nyh),
             b,
             h,
-            ηav = zeros(Nx,Ny))
+            ηav = zeros(nxh,nyh))
 
-Construct a WAVI.jl HGrid with size (Nx,Ny)
+Construct a WAVI.jl HGrid with size (nxh,nyh)
 HGrid stores fields that are defined on the problem's H grid. 
 (Co-ordinates of HGrid stored in a Grid under xxh, yyh fields)
 
 Keyword arguments
 =================
-    - 'Nx': (required) Number of grid cells in x-direction in HGrid (should be same as grid.nx)
+    - 'nxh': (required) Number of grid cells in x-direction in HGrid (should be same as grid.nx)
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
-    - 'Ny': (required) Number of grid cells in y-direction in HGrid (should be same as grid.ny)
+    - 'nyh': (required) Number of grid cells in y-direction in HGrid (should be same as grid.ny)
     - 'mask': Mask specifying the model domain
     - 'b': (requried) Bed elevation (bottom bathymetry)
     - 'h': (required) initial thickness of the ice
@@ -62,87 +62,87 @@ Keyword arguments
 
 
 function HGrid(;
-                Nx, 
-                Ny,
-                mask = trues(Nx,Ny),
+                nxh, 
+                nyh,
+                mask = trues(nxh,nyh),
                 b,
-                h = zeros(Nx,Ny),
-                ηav = zeros(Nx,Ny))
+                h = zeros(nxh,nyh),
+                ηav = zeros(nxh,nyh))
 
     #check the sizes of inputs
-    (size(mask) == size(b) == size(h) == size(ηav) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+    (size(mask) == size(b) == size(h) == size(ηav) == (nxh,nyh)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxh x nyh (i.e. $nxh x $nyh)"))
 
     #construct operators
     n = count(mask);
     crop = Diagonal(float(mask[:]));
     samp = crop[mask[:],:]; 
     spread = sparse(samp');
-    dneghηav = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
-    dimplicit = Ref(crop*Diagonal(zeros(Nx*Ny))*crop)
+    dneghηav = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
+    dimplicit = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
      
     #construct quantities not passed
-    s = zeros(Nx,Ny)
-    dhdt = zeros(Nx,Ny) 
-    accumulation = zeros(Nx,Ny)
-    basal_melt = zeros(Nx,Ny)
-    haf = zeros(Nx,Ny)
-    grounded_fraction = ones(Nx,Ny)
-    dsdh = ones(Nx,Ny)
-    shelf_strain_rate = zeros(Nx,Ny)
-    av_speed = zeros(Nx,Ny) 
-    u = zeros(Nx,Ny) 
-    v = zeros(Nx,Ny)
-    us = zeros(Nx,Ny) 
-    vs = zeros(Nx,Ny)
-    ub = zeros(Nx,Ny) 
-    vb= zeros(Nx,Ny)
-    bed_speed = zeros(Nx,Ny)
-    weertman_c = zeros(Nx,Ny)
-    β = zeros(Nx,Ny)
-    βeff = zeros(Nx,Ny)
-    τbed = zeros(Nx,Ny)
-    quad_f1 = zeros(Nx,Ny)
+    s = zeros(nxh,nyh)
+    dhdt = zeros(nxh,nyh) 
+    accumulation = zeros(nxh,nyh)
+    basal_melt = zeros(nxh,nyh)
+    haf = zeros(nxh,nyh)
+    grounded_fraction = ones(nxh,nyh)
+    dsdh = ones(nxh,nyh)
+    shelf_strain_rate = zeros(nxh,nyh)
+    av_speed = zeros(nxh,nyh) 
+    u = zeros(nxh,nyh) 
+    v = zeros(nxh,nyh)
+    us = zeros(nxh,nyh) 
+    vs = zeros(nxh,nyh)
+    ub = zeros(nxh,nyh) 
+    vb= zeros(nxh,nyh)
+    bed_speed = zeros(nxh,nyh)
+    weertman_c = zeros(nxh,nyh)
+    β = zeros(nxh,nyh)
+    βeff = zeros(nxh,nyh)
+    τbed = zeros(nxh,nyh)
+    quad_f1 = zeros(nxh,nyh)
     quad_f2 = h./(3*ηav)
 
     #check sizes of everything
-    @assert size(mask)==(Nx,Ny); @assert mask == clip(mask)
+    @assert size(mask)==(nxh,nyh); @assert mask == clip(mask)
     @assert n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
     @assert spread == sparse(samp')
-    @assert size(b)==(Nx,Ny)
-    @assert size(h)==(Nx,Ny)
-    @assert size(s)==(Nx,Ny)
-    @assert size(dhdt)==(Nx,Ny)
-    @assert size(accumulation)==(Nx,Ny)
-    @assert size(basal_melt)==(Nx,Ny)
-    @assert size(haf)==(Nx,Ny)
-    @assert size(grounded_fraction)==(Nx,Ny)
-    @assert size(dsdh)==(Nx,Ny)
-    @assert size(shelf_strain_rate)==(Nx,Ny)
-    @assert size(u)==(Nx,Ny)
-    @assert size(v)==(Nx,Ny)
-    @assert size(av_speed)==(Nx,Ny) 
-    @assert size(ub)==(Nx,Ny)
-    @assert size(vb)==(Nx,Ny)
-    @assert size(us)==(Nx,Ny)
-    @assert size(vs)==(Nx,Ny)
-    @assert size(bed_speed)==(Nx,Ny)
-    @assert size(weertman_c)==(Nx,Ny)
-    @assert size(β)==(Nx,Ny)
-    @assert size(βeff)==(Nx,Ny)
-    @assert size(τbed)==(Nx,Ny)
-    @assert size(quad_f1)==(Nx,Ny)
-    @assert size(quad_f2)==(Nx,Ny)
-    @assert size(ηav)==(Nx,Ny)
+    @assert size(b)==(nxh,nyh)
+    @assert size(h)==(nxh,nyh)
+    @assert size(s)==(nxh,nyh)
+    @assert size(dhdt)==(nxh,nyh)
+    @assert size(accumulation)==(nxh,nyh)
+    @assert size(basal_melt)==(nxh,nyh)
+    @assert size(haf)==(nxh,nyh)
+    @assert size(grounded_fraction)==(nxh,nyh)
+    @assert size(dsdh)==(nxh,nyh)
+    @assert size(shelf_strain_rate)==(nxh,nyh)
+    @assert size(u)==(nxh,nyh)
+    @assert size(v)==(nxh,nyh)
+    @assert size(av_speed)==(nxh,nyh) 
+    @assert size(ub)==(nxh,nyh)
+    @assert size(vb)==(nxh,nyh)
+    @assert size(us)==(nxh,nyh)
+    @assert size(vs)==(nxh,nyh)
+    @assert size(bed_speed)==(nxh,nyh)
+    @assert size(weertman_c)==(nxh,nyh)
+    @assert size(β)==(nxh,nyh)
+    @assert size(βeff)==(nxh,nyh)
+    @assert size(τbed)==(nxh,nyh)
+    @assert size(quad_f1)==(nxh,nyh)
+    @assert size(quad_f2)==(nxh,nyh)
+    @assert size(ηav)==(nxh,nyh)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
 
 
 return HGrid(
-            Nx,
-            Ny,
+            nxh,
+            nyh,
             mask,
             n,
             crop,

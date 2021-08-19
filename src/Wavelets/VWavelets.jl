@@ -1,7 +1,7 @@
 #Struct to hold information on wavelet-grid (v-component).
 struct VWavelets{T <: Real, N <: Integer}
-          Nx :: N                                       # Number of grid points in x in UWavelets (equal to UGrid)
-          Ny :: N                                       # Number of grid points in y in UWavelets (equal to UGrid)
+          nxvw :: N                                       # Number of grid points in x in UWavelets (equal to UGrid)
+          nyvw :: N                                       # Number of grid points in y in UWavelets (equal to UGrid)
         mask :: Array{Bool,2}                           # Model domain on the U grid
            n :: Base.RefValue{N}                        # Number of grid points in domain
         crop :: Base.RefValue{Diagonal{T,Array{T,1}}}   # Crop matrix: diagonal matrix with mask entries on diag
@@ -15,43 +15,43 @@ end
 
 """
     VWavelets(;
-            Nx,
-            Ny,
-            mask = trues(Nx,Ny), 
+            nxvw,
+            nyvw,
+            mask = trues(nxvw,nyvw), 
             levels)
 
-Construct a WAVI.jl VWavelets structure with size (Nx,Ny)
+Construct a WAVI.jl VWavelets structure with size (nxvw,nyvw)
 UWavelets stores wavelet matrix and associated fields for velocities in y direction
 
 Keyword arguments
 =================
-    - 'Nx': (required) Number of grid cells in x-direction in VWavelets 
-    - 'Ny': (required) Number of grid cells in y-direction in VWavelets 
+    - 'nxvw': (required) Number of grid cells in x-direction in VWavelets 
+    - 'nyvw': (required) Number of grid cells in y-direction in VWavelets 
     - 'mask': Mask specifying the model domain with respect to UWavelet grid (VGrid)
     - levels: (required) Number of levels in the preconditioner 
 """
 function VWavelets(;   
-                    Nx,
-                    Ny,
-                    mask = trues(Nx,Ny),
+                    nxvw,
+                    nyvw,
+                    mask = trues(nxvw,nyvw),
                     levels)
      
-    (size(mask) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UWavelets must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+    (size(mask) == (nxvw,nyvw)) || throw(DimensionMismatch("Sizes of inputs to UWavelets must all be equal to nxvw x nyvw (i.e. $nxvw x $nyvw)"))
 
     #compute non-inputs 
     n = Ref(count(mask));  @assert n[] == count(mask)
     crop = Ref(Diagonal(float(mask[:]))); @assert crop[] == Diagonal(float(mask[:]));
     samp  = Ref(crop[][mask[:],:]); @assert samp[] == crop[][mask[:],:]
     spread = Ref(sparse(samp[]')); @assert spread[] == sparse(samp[]')
-    idwt =  wavelet_matrix(Ny,levels,"reverse" ) ⊗ wavelet_matrix(Nx,levels,"reverse")
-    wavelets = zeros(Nx,Ny); @assert size(wavelets)==(Nx,Ny)
+    idwt =  wavelet_matrix(nyvw,levels,"reverse" ) ⊗ wavelet_matrix(nxvw,levels,"reverse")
+    wavelets = zeros(nxvw,nyvw); @assert size(wavelets)==(nxvw,nyvw)
     
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
 
     return VWavelets(
-                    Nx,
-                    Ny,
+                    nxvw,
+                    nyvw,
                     mask,
                     n,
                     crop, 

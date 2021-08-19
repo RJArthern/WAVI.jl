@@ -1,6 +1,6 @@
 struct UGrid{T <: Real, N <: Integer}
-                   Nx :: N                                     # Number of frid cells in x-direction in UGrid
-                   Ny :: N                                     # Number of grid cells in y-direction in UGrid 
+                   nxu :: N                                     # Number of frid cells in x-direction in UGrid
+                   nyu :: N                                     # Number of grid cells in y-direction in UGrid 
                  mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
                     n :: N                                     # Total number of cells in model domain 
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
@@ -21,75 +21,75 @@ end
     
 """
     UGrid(;
-            Nx,
-            Ny,
-            mask = trues(Nx,Ny), 
+            nxu,
+            nyu,
+            mask = trues(nxu,nyu), 
             levels,
             dx,
             dy)
 
-Construct a WAVI.jl UGrid with size (Nx,Ny)
+Construct a WAVI.jl UGrid with size (nxu,nyu)
 UGrid stores fields that are defined on the problem's U grid. 
 (Co-ordinates of UGrid stored in a Grid under xxu and yyu fields)
 
 Keyword arguments
 =================
-    - 'Nx': (required) Number of grid cells in x-direction in UGrid (should be same as grid.nx + 1)
+    - 'nxu': (required) Number of grid cells in x-direction in UGrid (should be same as grid.nx + 1)
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
-    - 'Ny': (required) Number of grid cells in y-direction in UGrid (should be same as grid.ny)
+    - 'nyu': (required) Number of grid cells in y-direction in UGrid (should be same as grid.ny)
     - 'mask': Mask specifying the model domain with respect to U grid
     - levels: (required) Number of levels in the preconditioner
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
 """
 function UGrid(;
-                Nx,
-                Ny,
-                mask = trues(Nx,Ny),
+                nxu,
+                nyu,
+                mask = trues(nxu,nyu),
                 levels,
                 dx,
                 dy)
 
     #check the sizes of inputs
-    (size(mask) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+    (size(mask) == (nxu,nyu)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxu x nyu (i.e. $nxu x $nyu)"))
 
     #construct operators
     n = count(mask)
     crop = Diagonal(float(mask[:]))
     samp = crop[mask[:],:]
     spread = sparse(samp')
-    cent =  spI(Ny) ⊗ c(Nx-1)
-    ∂x = spI(Ny) ⊗ ∂1d(Nx-1,dx)
-    ∂y =  ∂1d(Ny-1,dy) ⊗ χ(Nx-2)
-    dωt = wavelet_matrix(Ny,levels,"forward" ) ⊗ wavelet_matrix(Nx,levels,"forward")
+    cent =  spI(nyu) ⊗ c(nxu-1)
+    ∂x = spI(nyu) ⊗ ∂1d(nxu-1,dx)
+    ∂y =  ∂1d(nyu-1,dy) ⊗ χ(nxu-2)
+    dωt = wavelet_matrix(nyu,levels,"forward" ) ⊗ wavelet_matrix(nxu,levels,"forward")
 
     #fields stored on UGrid
-    s = zeros(Nx,Ny)
-    h = zeros(Nx,Ny)
-    grounded_fraction = ones(Nx,Ny)
-    βeff = zeros(Nx,Ny)
+    s = zeros(nxu,nyu)
+    h = zeros(nxu,nyu)
+    grounded_fraction = ones(nxu,nyu)
+    βeff = zeros(nxu,nyu)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    u = zeros(Nx,Ny)
+    u = zeros(nxu,nyu)
 
 
     #size assertions
-    @assert size(mask)==(Nx,Ny)
+    @assert size(mask)==(nxu,nyu)
     n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
     @assert spread == sparse(samp')
-    @assert size(s)==(Nx,Ny)
-    @assert size(h)==(Nx,Ny)
-    @assert size(grounded_fraction)==(Nx,Ny)
-    @assert size(βeff)==(Nx,Ny)
-    @assert size(u)==(Nx,Ny)
+    @assert size(s)==(nxu,nyu)
+    @assert size(h)==(nxu,nyu)
+    @assert size(grounded_fraction)==(nxu,nyu)
+    @assert size(βeff)==(nxu,nyu)
+    @assert size(u)==(nxu,nyu)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
 
     return UGrid(
-                Nx,
-                Ny,
+                nxu,
+                nyu,
                 mask,
                 n,
                 crop,

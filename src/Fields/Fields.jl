@@ -37,8 +37,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     h =  deepcopy(initial_conditions.initial_thickness)
     ηav = deepcopy(initial_conditions.initial_viscosity[:,:,1]) #set to the viscosity on the first level for now
     gh=HGrid(
-    Nx=grid.nx,
-    Ny=grid.ny,
+    nxh=grid.nx,
+    nyh=grid.ny,
     mask=h_mask,
     b = bed_array,
     h = h,
@@ -47,8 +47,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #u-grid
     gu=UGrid(
-    Nx=grid.nx+1,
-    Ny=grid.ny,
+    nxu=grid.nx+1,
+    nyu=grid.ny,
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
@@ -57,8 +57,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #v-grid
     gv=VGrid(
-    Nx=grid.nx,
-    Ny=grid.ny+1,
+    nxv=grid.nx,
+    nyv=grid.ny+1,
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
@@ -67,8 +67,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #c-grid
     gc=CGrid(
-    Nx=grid.nx-1,
-    Ny=grid.ny-1,
+    nxc=grid.nx-1,
+    nyc=grid.ny-1,
     mask=c_mask
     )
 
@@ -77,9 +77,9 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     θ = deepcopy(initial_conditions.initial_temperature)
     Φ = deepcopy(initial_conditions.initial_damage)
     g3d=SigmaGrid(
-    Nx=grid.nx,
-    Ny=grid.ny,
-    Nσ=grid.nσ,
+    nxs=grid.nx,
+    nys=grid.ny,
+    nσs=grid.nσ,
     σ =grid.σ,
     η = η,
     θ = θ,
@@ -89,9 +89,9 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     )
 
     #Wavelet-grid, u-component.
-    wu=UWavelets(Nx=grid.nx+1,Ny=grid.ny,levels=solver_params.levels)
+    wu=UWavelets(nxuw=grid.nx+1,nyuw=grid.ny,levels=solver_params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(Nx=grid.nx,Ny=grid.ny+1,levels=solver_params.levels)
+    wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
     return Fields(gh,gu,gv,gc,g3d,wu,wv)
 end

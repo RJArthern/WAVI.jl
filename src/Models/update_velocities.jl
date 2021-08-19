@@ -71,7 +71,7 @@ end
 function get_rhs(model::AbstractModel)
     @unpack gh,gu,gv,gc=model.fields
     @unpack params=model
-    onesvec=ones(gh.Nx*gh.Ny)
+    onesvec=ones(gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
         (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂x'*surf_elev_adjusted))
@@ -174,9 +174,9 @@ Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
 function inner_update_viscosity!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     @unpack params,solver_params=model
-    for k=1:g3d.Nσ
-        for j=1:g3d.Ny
-            for i=1:g3d.Nx
+    for k=1:g3d.nσs
+        for j=1:g3d.nys
+            for i=1:g3d.nxs
                 if gh.mask[i,j]
                     for iter=1:solver_params.n_iter_viscosity
                         g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * (
@@ -202,9 +202,9 @@ Use quadrature to compute the depth averaged viscosity.
 function update_av_viscosity!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     gh.ηav .= zero(gh.ηav)
-    for k=1:g3d.Nσ
-       for j = 1:g3d.Ny
-          for i = 1:g3d.Nx
+    for k=1:g3d.nσs
+       for j = 1:g3d.nys
+          for i = 1:g3d.nxs
                 gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k]
           end
        end
@@ -222,9 +222,9 @@ function update_quadrature_falpha!(model::AbstractModel)
     @unpack gh,g3d=model.fields
     gh.quad_f1 .= zero(gh.quad_f1)
     gh.quad_f2 .= zero(gh.quad_f2)
-    for k=1:g3d.Nσ
-       for j = 1:g3d.Ny
-          for i = 1:g3d.Nx
+    for k=1:g3d.nσs
+       for j = 1:g3d.nys
+          for i = 1:g3d.nxs
                 gh.quad_f1[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*g3d.ζ[k]/g3d.η[i,j,k]
                 gh.quad_f2[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*(g3d.ζ[k])^2/g3d.η[i,j,k]
           end
@@ -257,15 +257,15 @@ function update_βeff_on_uv_grids!(model::AbstractModel)
 
     T=eltype(gh.grounded_fraction)
 
-    onesvec=ones(T,gh.Nx*gh.Ny)
+    onesvec=ones(T,gh.nxh*gh.nyh)
     gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
-    ipolgfu=zeros(T,gu.Nx,gu.Ny);
+    ipolgfu=zeros(T,gu.nxu,gu.nyu);
     ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
 
     gv.βeff[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
-    ipolgfv=zeros(T,gv.Nx,gv.Ny);
+    ipolgfv=zeros(T,gv.nxv,gv.nyv);
     ipolgfv[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
     gv.βeff[ipolgfv .> zero(T)] .= gv.βeff[ipolgfv .> zero(T)].*gv.grounded_fraction[ipolgfv .> zero(T)]./
                                                  ipolgfv[ipolgfv .> zero(T)];

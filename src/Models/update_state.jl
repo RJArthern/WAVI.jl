@@ -41,7 +41,7 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 """
 function update_geometry_on_uv_grids!(model::AbstractModel)
     @unpack gh,gu,gv,gc=model.fields
-    onesvec=ones(gh.Nx*gh.Ny)
+    onesvec=ones(gh.nxh*gh.nyh)
     gu.h[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.h[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.s[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.s[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gv.h[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.h[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))

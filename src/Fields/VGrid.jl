@@ -1,6 +1,6 @@
 struct VGrid{T <: Real, N <: Int}
-                   Nx :: N                                     # Number of frid cells in x-direction in UGrid
-                   Ny :: N                                     # Number of grid cells in y-direction in UGrid 
+                   nxv :: N                                     # Number of frid cells in x-direction in UGrid
+                   nyv :: N                                     # Number of grid cells in y-direction in UGrid 
                  mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
                     n :: N                                     # Total number of cells in model domain 
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
@@ -22,74 +22,74 @@ end
     
 """
     VGrid(;
-            Nx,
-            Ny,
-            mask = trues(Nx,Ny), 
+            nxv,
+            nyv,
+            mask = trues(nxv,nyv), 
             levels,
             dx,
             dy)
 
-Construct a WAVI.jl VGrid with size (Nx,Ny)
+Construct a WAVI.jl VGrid with size (nxv,nyv)
 VGrid stores fields that are defined on the problem's V grid. 
 (Co-ordinates of HGrid stored in a Grid under xxv and yyv fields)
 
 Keyword arguments
 =================
-    - 'Nx': (required) Number of grid cells in x-direction in VGrid (should be same as grid.nx)
+    - 'nxv': (required) Number of grid cells in x-direction in VGrid (should be same as grid.nx)
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
-    - 'Ny': (required) Number of grid cells in y-direction in VGrid (should be same as grid.ny + 1)
+    - 'nyv': (required) Number of grid cells in y-direction in VGrid (should be same as grid.ny + 1)
     - 'mask': Mask specifying the model domain with respect to V grid
     - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
 """
 function VGrid(;
-        Nx,
-        Ny,
-        mask = trues(Nx,Ny),
+        nxv,
+        nyv,
+        mask = trues(nxv,nyv),
         levels,
         dx,
         dy)
 
     #check the sizes of inputs
-    (size(mask) == (Nx,Ny)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to Nx x Ny (i.e. $Nx x $Ny)"))
+    (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
 
     #construct operators
     n = count(mask)
     crop = Diagonal(float(mask[:]))
     samp = crop[mask[:],:]
     spread = sparse(samp')
-    cent = c(Ny-1) ⊗ spI(Nx)
-    ∂x = χ(Ny-2) ⊗ ∂1d(Nx-1,dx)
-    ∂y = ∂1d(Ny-1,dy) ⊗ spI(Nx)
-    dωt = wavelet_matrix(Ny,levels,"forward" ) ⊗ wavelet_matrix(Nx,levels,"forward")
+    cent = c(nyv-1) ⊗ spI(nxv)
+    ∂x = χ(nyv-2) ⊗ ∂1d(nxv-1,dx)
+    ∂y = ∂1d(nyv-1,dy) ⊗ spI(nxv)
+    dωt = wavelet_matrix(nyv,levels,"forward" ) ⊗ wavelet_matrix(nxv,levels,"forward")
 
     #fields stored on UGrid
-    s = zeros(Nx,Ny)
-    h = zeros(Nx,Ny)
-    grounded_fraction = ones(Nx,Ny)
-    βeff = zeros(Nx,Ny)
+    s = zeros(nxv,nyv)
+    h = zeros(nxv,nyv)
+    grounded_fraction = ones(nxv,nyv)
+    βeff = zeros(nxv,nyv)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    v = zeros(Nx,Ny)
+    v = zeros(nxv,nyv)
 
     #size assertions
-    @assert size(mask)==(Nx,Ny)
+    @assert size(mask)==(nxv,nyv)
     n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
     @assert spread == sparse(samp')
-    @assert size(s)==(Nx,Ny)
-    @assert size(h)==(Nx,Ny)
-    @assert size(grounded_fraction)==(Nx,Ny)
-    @assert size(βeff)==(Nx,Ny)
-    @assert size(v)==(Nx,Ny)
+    @assert size(s)==(nxv,nyv)
+    @assert size(h)==(nxv,nyv)
+    @assert size(grounded_fraction)==(nxv,nyv)
+    @assert size(βeff)==(nxv,nyv)
+    @assert size(v)==(nxv,nyv)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
 
     return VGrid(
-                Nx,
-                Ny,
+                nxv,
+                nyv,
                 mask,
                 n,
                 crop,
