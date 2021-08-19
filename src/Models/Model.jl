@@ -1,10 +1,10 @@
-struct Model{T <: Real, N <: Integer,A,W} <: AbstractModel{T,N}
+struct Model{T <: Real, N <: Integer,A,W, M <:AbstractMeltRate} <: AbstractModel{T,N,M}
     grid::Grid{T,N}
     params::Params{T,A,W}
     solver_params::SolverParams{T,N}
     initial_conditions::InitialConditions{T}
     fields::Fields{T,N}
-    extra_physics::Dict{String, Any}
+    melt_rate::M
 end
 
 """
@@ -16,7 +16,7 @@ function Model(;
     params = Params(),
     solver_params = SolverParams(),
     initial_conditions = InitialConditions(),
-    extra_physics = Dict{String, Any}())
+    melt_rate = UniformMeltRate())
 
     #check that a grid and bed has been inputted
     ~(grid === nothing) || throw(ArgumentError("You must specify an input grid"))
@@ -55,7 +55,7 @@ function Model(;
     fields = setup_fields(grid, initial_conditions, solver_params, params, bed_array)
     
     #Use type constructor to build initial state with no extra physics
-    model=Model(grid,params,solver_params,initial_conditions,fields,extra_physics)
+    model=Model(grid,params,solver_params,initial_conditions,fields,melt_rate)
 
     return model
 end

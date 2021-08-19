@@ -11,8 +11,15 @@ import SparseArrays: spdiagm, spdiagm_internal, dimlub
 import Setfield: @set
 
 #This module will export these functions and types, allowing basic use of the model.
-export update_state!, timestep!, Model, Params, TimesteppingParams, 
-Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation!
+export
+    #Structures
+    Model, Params, TimesteppingParams, Grid, SolverParams, InitialConditions, OutputParams, Simulation,
+
+    #Simulation controls
+    update_state!, timestep!, run_simulation!,
+
+    #Melt rates
+    PlumeEmulator 
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
@@ -20,10 +27,11 @@ Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation!
 
 #Abstract types
 abstract type AbstractGrid{T <: Real, N <: Integer} end
-abstract type AbstractModel{T <: Real, N <: Integer} end
+abstract type AbstractMeltRate end
+abstract type AbstractModel{T <: Real, N <: Integer, M <: AbstractMeltRate} end
 abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
 #abstract type AbstractSimulation{T,N,R,A,W} end
-abstract type AbstractMeltRateModel{PC <: Bool, M} end
+
 
 
 #Type alias, just for abreviation
@@ -44,7 +52,7 @@ include("InitialConditions.jl")
 include("Wavelets/Wavelets.jl")
 include("Fields/Fields.jl")
 include("Models/Model.jl")
-include("MeltRateModels/MeltRateModel.jl")
+include("MeltRate/MeltRate.jl")
 include("Simulations/Simulation.jl")
 include("utilities.jl")
 

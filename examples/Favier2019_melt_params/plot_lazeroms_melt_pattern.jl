@@ -1,6 +1,6 @@
 using WAVI, Plots
 function plot_lazeroms_melt_pattern()
-    #Grid and boundary conditions
+    # Grid and boundary conditions
     nx = 320
     ny = 40
     nσ = 4
@@ -8,52 +8,58 @@ function plot_lazeroms_melt_pattern()
     y0 = -40000.0
     dx = 2000.0
     dy = 2000.0
-    h_mask=trues(nx,ny)
-    u_iszero = falses(nx+1,ny); u_iszero[1,:].=true
-    v_iszero=falses(nx,ny+1); v_iszero[:,1].=true; v_iszero[:,end].=true
-    grid = Grid(nx = nx, 
-                ny = ny,   
-                nσ = nσ, 
-                x0 = x0, 
-                y0 = y0, 
-                dx = dx, 
-                dy = dy,
-                h_mask = h_mask, 
-                u_iszero = u_iszero, 
-                v_iszero = v_iszero)
+    h_mask = trues(nx, ny)
+    u_iszero = falses(nx + 1, ny); u_iszero[1,:] .= true
+    v_iszero = falses(nx, ny + 1); v_iszero[:,1] .= true; v_iszero[:,end] .= true
+    grid = Grid(nx=nx, 
+                ny=ny,   
+                nσ=nσ, 
+                x0=x0, 
+                y0=y0, 
+                dx=dx, 
+                dy=dy,
+                h_mask=h_mask, 
+                u_iszero=u_iszero, 
+                v_iszero=v_iszero)
 
-    #Bed 
-    bed = WAVI.mismip_plus_bed #function definition
+    # Bed 
+    bed = WAVI.mismip_plus_bed # function definition
 
-    #Inputing thickness profile, reading from binary file 
+    # Inputing thickness profile, reading from binary file 
     fname = "examples\\Favier2019_melt_params\\data\\MISMIP_ice0_2km_SteadyThickness.bin";
-    #fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
-    h = Array{Float64, 2}(undef, nx, ny)
-    read!(fname,h)
-    h = ntoh.(h)        
+    # fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
+    h = Array{Float64,2}(undef, nx, ny)
+    read!(fname, h)
+    h = ntoh.(h)
 
-    #make the model
-    initial_conditions = InitialConditions(initial_thickness = h) #set thickness 
-    model = Model(grid = grid,
-                bed_elevation = bed, 
-                initial_conditions = initial_conditions) #don't care about params or solver params
+    # melt rate Model    
+    pme = PlumeEmulator(α=1.5)
 
-    #embed the ice model with melt rate model
-    pme = PlumeEmulator(α = 1.5)
-    @time add_melt_rate_model!(model,pme) #this updates the melt rate in model
 
-    #make the plot
+    # make the model
+    initial_conditions = InitialConditions(initial_thickness=h) # set thickness 
+    model = Model(grid=grid,
+                bed_elevation=bed, 
+                initial_conditions=initial_conditions,
+                melt_rate=pme,
+                solver_params=SolverParams(maxiter_picard=1) # we'll update state to get basal melt, but don't need other info accurate
+                ) 
+
+    # update the configuration
+    update_state!(model)
+    
+    # make the plot
     x = model.grid.xxh[:,1]; y = model.grid.yyh[1,:];
     m = deepcopy(model.fields.gh.basal_melt);
     m[model.fields.gh.grounded_fraction .== 1.] .= NaN;
     msat = deepcopy(m)
     msat[msat .> 50] .= 50
-    plt = contour(x./1e3,y/1e3, msat', 
-                    fill = true, 
-                    linewidth = 0, 
-                    colorbar = true,
-                    colorbar_title = "melt rate (m/yr)",
-                    framestyle = :box);
+    plt = contour(x ./ 1e3,y / 1e3, msat', 
+                  fill=true, 
+                  linewidth=0, 
+                  colorbar=true,
+                  colorbar_title="melt rate (m/yr)",
+                  framestyle=:box);
     xlims!((420, 600))
     xlabel!("x (km)")
     ylabel!("y (km)")
@@ -61,8 +67,9 @@ function plot_lazeroms_melt_pattern()
 
     savefig(plt,  joinpath(dirname(@__FILE__), "lazeroms_melt_rate_pattern.png"))
 
-    mean_melt_rate = sum(m[model.fields.gh.grounded_fraction .< 1])/ sum(model.fields.gh.grounded_fraction .< 1)
+    mean_melt_rate = sum(m[model.fields.gh.grounded_fraction .< 1]) / sum(model.fields.gh.grounded_fraction .< 1)
     println("Mean melt rate in the shelf is ", mean_melt_rate, " m/yr")
+  
     return model
 end
 

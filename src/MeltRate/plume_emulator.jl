@@ -1,4 +1,4 @@
-struct PlumeEmulator{PC,M,T <: Real} <: AbstractMeltRateModel{PC,M}
+struct PlumeEmulator{T <: Real} <: AbstractMeltRate
     α :: T   #calibration coefficient 
     λ1 :: T  #liquidus slope 
     λ2 :: T  #liquidus intercept 
@@ -11,12 +11,10 @@ struct PlumeEmulator{PC,M,T <: Real} <: AbstractMeltRateModel{PC,M}
     βs :: T #haline contraction coefficient 
     βt :: T #thermal expansion coefficient 
     g :: T #gravity
+    ρi :: T #ice density 
+    ρw :: T #water density
     Ta :: Function #Function specifying ambient temperature  
     Sa :: Function #Function specifying ambient salinity 
-    melt_partial_cell::PC     #specify whether melt applies to partial cells or not
-    melt_rate::M              #stores the melt rate
-#    melt_rate::Array{T,2} #holder for the current melt rate
-#   add flags for time dependence in Ta and Sa
 end
 
 """
@@ -38,6 +36,8 @@ Keyword arguments
 - βs: haline contraction coefficient (units psu^(-1))
 - βt: thermal expansion coefficient (units C^{-1})
 - g: gravitational acceleration (units m / s^2)
+- ρi: ice density (units kg/m^3)
+- ρw: water density (units kg/m^3)
 - Ta: ambient temperature function, defaults to the ISOMIP warm0 scenario. Ta must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
 - Sa: ambient salnity function, defaults to the ISOMIP warm0 scenario.  Sa must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
 """
@@ -54,9 +54,11 @@ function PlumeEmulator(;
                         βs = 7.86e-4,
                         βt = 3.87e-5,
                         g = 9.81,
+                        ρi = 918.0,
+                        ρw = 1028.0,
                         Ta = isomip_warm0_temp,
-                        Sa = isomip_warm0_salinity,
-                        melt_partial_cell = true)
+                        Sa = isomip_warm0_salinity)
+
     #check that Ta and Sa accept a single argument
     try Ta(0.0)
     catch
@@ -66,27 +68,22 @@ function PlumeEmulator(;
     catch
         ArgumentError("Ambient salinity function Sa must accept a single argument")
     end
-    
-    melt_rate = zeros(2,2) #placeholder -- want to remove melt rate field from all melt rate emulators
-    #melt rate emulators shouldn't _own_ the melt rate, they should simply _return_ the melt
 
-    return PlumeEmulator(α, λ1, λ2, λ3,E0, Cd, Γ_TS, L, c, βs, βt,g, Ta, Sa, melt_partial_cell,melt_rate)
+    return PlumeEmulator(α, λ1, λ2, λ3,E0, Cd, Γ_TS, L, c, βs, βt,g, ρi, ρw, Ta, Sa)
+    
 end
 
 
-function update_melt_rate_model!(melt_model::PlumeEmulator, model)
-    @unpack basal_melt, h, grounded_fraction = model.fields.gh #get the ice thickness and grounded fraction
-    @unpack params = model
-    @unpack grid = model
-    set_plume_emulator_melt_rate!(basal_melt, 
+
+function update_melt_rate!(plume_emulator::PlumeEmulator, fields, grid)
+    @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
+    @time set_plume_emulator_melt_rate!(basal_melt, 
                                 h, 
                                 grounded_fraction, 
-                                model.fields.gh.b,
-                                params.density_ice, 
-                                params.density_ocean, 
-                                grid.dx, 
+                                b,
+                                grid.dx,
                                 grid.dy,
-                                melt_model)
+                                plume_emulator)
     return nothing
 end
 
@@ -96,9 +93,9 @@ end
 
 Set the melt rate in according to Lazeroms 2018. All plume parameters passed in the plume model emulator (pme)
 """
-function set_plume_emulator_melt_rate!(melt, h, grounded_fraction,bathy, ρi, ρw, dx, dy,pme)
+function set_plume_emulator_melt_rate!(melt, h, grounded_fraction,bathy, dx, dy,pme)
     nx, ny = size(h)
-    zbf = @. -(ρi/ρw)*h.*(1-grounded_fraction) .+ grounded_fraction*bathy #ice draft if floating everywhere
+    zbf = @. -(pme.ρi/pme.ρw)*h.*(1-grounded_fraction) .+ grounded_fraction*bathy #ice draft if floating everywhere
     ∂zb∂x, ∂zb∂y = get_slope(zbf,dx, dy) #returns the partial derivates of base in both directions
 
     #loop over each grid point
