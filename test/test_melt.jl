@@ -1,6 +1,7 @@
 using Test, WAVI
 
 @testset "Melting" begin
+  if false
     @info "Testing melt rate phsyics...."
 
     @testset "test analytic melt rate construction" begin 
@@ -69,14 +70,13 @@ using Test, WAVI
 
 
     end
-
+  end
     @testset "test binary input file melt rate construction and update" begin 
 
         @info "Testing binary input file construction and update"
         grid = Grid()
         bed_elevation = -900 .* ones(grid.nx, grid.ny) #low bed so we can make it float everywhere
         initial_conditions = InitialConditions(initial_thickness = 100.0*ones(grid.nx, grid.ny)) #initialize to 100m thickn
-        model = Model(grid = grid, bed_elevation = bed_elevation, initial_conditions = initial_conditions)
 
         #write a binary file 
         m = ones(grid.nx, grid.ny)
@@ -87,14 +87,20 @@ using Test, WAVI
         close(mfileID) 
 
         #create a melt rate model from this input
-        binfile_melt_rate = BinfileMeltRate(input_filename =filename,nx = grid.nx, ny = grid.ny)
-        @test binfile_melt_rate isa WAVI.BinfileMeltRate
+        binfile_melt_rate = BinfileMeltRate(input_filename =filename)
+        @test binfile_melt_rate isa BinfileMeltRate
 
-        #add to the model
-        add_melt_rate_model!(model, binfile_melt_rate) 
-        @test model.extra_physics["melt_rate_model"] isa WAVI.BinfileMeltRate
-        @test all(model.extra_physics["melt_rate_model"].melt_rate .== 1)
-        @test all(binfile_melt_rate.melt_rate .== 1)
+        #create model 
+        model = Model(grid = grid, 
+                      bed_elevation = bed_elevation, 
+                      initial_conditions = initial_conditions,
+                      melt_rate = binfile_melt_rate,
+                      solver_params = SolverParams(maxiter_picard = 1))
+        @test model.melt_rate isa BinfileMeltRate
+
+        #check that melt rate read OK
+        update_state!(model)
+        @test all(model.fields.gh.basal_melt .== 1)
 
         #change the binary file and check we can update
         m = 2 .* ones(grid.nx, grid.ny)
@@ -103,8 +109,7 @@ using Test, WAVI
           write(mfileID, m[:,:])
         close(mfileID)
         update_state!(model)
-        @test all(model.extra_physics["melt_rate_model"].melt_rate .== 2)
-        @test all(binfile_melt_rate.melt_rate .== 2)
+        @test all(model.fields.gh.basal_melt .== 2)
 
         #change the binary file to one of the wrong size, and check we return an error when updating
         m = 2 .* ones(grid.nx+1, grid.ny+1)
@@ -117,34 +122,6 @@ using Test, WAVI
         #remove the file we just made
         rm(filename)
 
-        
-    end
-
-    @testset "test binary input file melt rate construction errors" begin 
-
-        @info "Testing input file melt rate construction errors"
-        @test_throws ArgumentError BinfileMeltRate()
-        @test_throws ArgumentError BinfileMeltRate(input_filename = "a_file_that_does_not_exist.bin")
-
-        #size incompatibilities
-        grid = Grid()
-        bed_elevation = ones(grid.nx, grid.ny) #low bed so we can make it float everywhere
-        model = Model(grid = grid, bed_elevation = bed_elevation)
-        m = ones(grid.nx+1, grid.ny+1)
-        m .= hton.(m)
-        filename =  "melt_test_file.bin"
-        mfileID =  open(filename,"w")
-          write(mfileID, m[:,:])
-        close(mfileID) 
-        #check that we can't add file of the wrong size to a BinfileMeltRate
-        @test_throws DimensionMismatch BinfileMeltRate(input_filename = filename, nx = grid.nx, ny = grid.ny)
-        
-        #check that we can't add a melt rate model of the wrong size to model
-        binfile_melt_rate = BinfileMeltRate(input_filename = filename, nx = grid.nx+1, ny = grid.ny+1)
-        add_melt_rate_model!(model, binfile_melt_rate)
-        @test_throws KeyError model.extra_physics["melt_rate_model"]
-
-        rm(filename)
         
     end
 

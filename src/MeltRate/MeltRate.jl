@@ -1,6 +1,6 @@
 #add each of the individual melt rate models
 #include("./analytic_melt_rate_model.jl")
-#include("./binfile_melt_rate.jl")
+include("./binfile_melt_rate.jl")
 include("./plume_emulator.jl")
 
              
