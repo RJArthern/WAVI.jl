@@ -19,7 +19,7 @@ export
     update_state!, timestep!, run_simulation!,
 
     #Melt rates
-    PlumeEmulator, BinfileMeltRate 
+    PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
