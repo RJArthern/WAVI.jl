@@ -55,8 +55,8 @@ function run_simulation!(simulation::Simulation)
          u_out_line = u_out_line + model.fields.gu.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
          h_out_line = h_out_line + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
           if (i == timestepping_params.n_iter_total)
-          u_out_line= u_out_line ./ (timestepping_params.n_iter_total- simulation.clock.n_iter)
-          h_out_line= h_out_line ./ (timestepping_params.n_iter_total- simulation.clock.n_iter)
+          u_out_line= u_out_line ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+          h_out_line= h_out_line ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
           end
         end
         
