@@ -45,8 +45,8 @@ function run_simulation!(simulation::Simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
     if model.grid.Cxl > 1
-       u_out_line = zeros(1,model.grid.Cyu - model.grid.Cyl +1) 
-       h_out_line = zeros(1,model.grid.Cyu - model.grid.Cyl +1) 
+       u_out_line = zeros(model.grid.Cyu - model.grid.Cyl +1) 
+       h_out_line = zeros(model.grid.Cyu - model.grid.Cyl +1) 
     end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
