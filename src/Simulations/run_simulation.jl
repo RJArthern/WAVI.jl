@@ -44,9 +44,22 @@ Perform the simulation specified by the simulation
 function run_simulation!(simulation::Simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
+    if model.grid.Cxl > 1
+       u_out_line = zeros[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu] 
+       h_out_line = zeros[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu] 
+    end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
 
+        if model.grid.Cxl > 1
+         u_out_line = u_out_line + model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+         h_out_line = h_out_line + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+          if (i == timestepping_params.n_iter_total)
+          u_out_line= u_out_line ./ (timestepping_params.n_iter_total- simulation.clock.n_iter)
+          h_out_line= h_out_line ./ (timestepping_params.n_iter_total- simulation.clock.n_iter)
+          end
+        end
+        
         #check if we have hit a temporary checkpoint
         if mod(i,timestepping_params.n_iter_chkpt) == 0
             #output a temporary checkpoint
@@ -112,8 +125,8 @@ function write_vel(simulation::Simulation)
     
     if model.grid.Cxl > 1
     
-     u_out_line = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-     h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+     #u_out_line = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+     #h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
      #h_out_line = h_out_b[:]
      
      h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
