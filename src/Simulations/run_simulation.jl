@@ -52,7 +52,7 @@ function run_simulation!(simulation::Simulation)
         timestep!(simulation)
 
         if model.grid.Cxl > 1
-         u_out_line = u_out_line + model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+         u_out_line = u_out_line + model.fields.gu.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
          h_out_line = h_out_line + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
           if (i == timestepping_params.n_iter_total)
           u_out_line= u_out_line ./ (timestepping_params.n_iter_total- simulation.clock.n_iter)
@@ -87,7 +87,7 @@ function run_simulation!(simulation::Simulation)
 
         #check the dump velocity flag at the final timestep
         if (i == timestepping_params.n_iter_total) && output_params.dump_vel
-            write_vel(simulation)
+            write_vel(simulation,u_out_line,h_out_line)
         end
     end
 
@@ -102,7 +102,7 @@ end
 
 Write the velocity at the the final timestep of the simulation (used in the coupled wavi-mitgcm model to communicate with streamice)
 """
-function write_vel(simulation::Simulation)
+function write_vel(simulation::Simulation,u_out_line,h_out_line)
     @unpack model = simulation  
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
