@@ -168,10 +168,10 @@ function write_vel(simulation::Simulation,u_out_line,h_out_line)
      h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w ,model.grid.Cyu - model.grid.Cyl +1 + y_s + y_n)
             
      if model.grid.Cxl > 1
-            h_out_b[2, y_s+1:end-y_n] .= h_out_line_w[:]
+            h_out_b[2,y_s+1:end-y_n] .= h_out_line_w[:]
      end
      if model.grid.Cxu < model.grid.nx
-            h_out_b[end -1,y_s+1:end-y_n] .= h_out_line_e[:]
+            h_out_b[end-1,y_s+1:end-y_n] .= h_out_line_e[:]
      end   
      if model.grid.Cyl > 1
             h_out_b[x_w+1:end-x_e,2] .= h_out_line_s[:]
