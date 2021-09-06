@@ -45,18 +45,42 @@ function run_simulation!(simulation::Simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
     if model.grid.Cxl > 1
-       u_out_line = zeros(model.grid.Cyu - model.grid.Cyl +1) 
-       h_out_line = zeros(model.grid.Cyu - model.grid.Cyl +1) 
+       h_out_line_w = zeros(model.grid.Cyu - model.grid.Cyl +1) 
+    end
+     if model.grid.Cxu < model.grid.nx
+       h_out_line_e = zeros(model.grid.Cyu - model.grid.Cyl +1) 
+    end
+    if model.grid.Cyl > 1
+       h_out_line_s = zeros(model.grid.Cxu - model.grid.Cxl +1) 
+    end
+    if model.grid.Cyu < model.grid.ny
+       h_out_line_n = zeros(model.grid.Cxu - model.grid.Cxl +1) 
     end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
 
         if model.grid.Cxl > 1
-         u_out_line = u_out_line + model.fields.gu.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-         h_out_line = h_out_line + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+         h_out_line_w = h_out_line_w + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
           if (i == timestepping_params.n_iter_total)
-          u_out_line= u_out_line ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-          h_out_line= h_out_line ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+          h_out_line_w= h_out_line_w ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+          end
+        end
+         if model.grid.Cxu < model.grid.nx
+         h_out_line_e = h_out_line_e + model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
+          if (i == timestepping_params.n_iter_total)
+          h_out_line_e= h_out_line_e ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+          end
+        end
+         if model.grid.Cyl > 1
+         h_out_line_s = h_out_line_s + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
+          if (i == timestepping_params.n_iter_total)
+          h_out_line_s= h_out_line_s ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+          end
+        end
+         if model.grid.Cyu < model.grid.ny
+         h_out_line_n = h_out_line_n + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
+          if (i == timestepping_params.n_iter_total)
+          h_out_line_n= h_out_line_n ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
           end
         end
         
@@ -123,31 +147,45 @@ function write_vel(simulation::Simulation,u_out_line,h_out_line)
     write(vfileID, v_out[:,:])
     close(vfileID)   
     
-    if model.grid.Cxl > 1
-    
-     #u_out_line = model.fields.gh.u[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-     #h_out_line = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-     #h_out_line = h_out_b[:]
-     
-     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1 +1,model.grid.Cyu - model.grid.Cyl +1)
-     u_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1 +1,model.grid.Cyu - model.grid.Cyl +1)  
-     
-     h_out_b[2,:] .= h_out_line[:]
-     u_out_b[2,:] .= u_out_line[:]  
-        
+    if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
+    x_w=0  
+    x_e=0     
+    y_s=0        
+    if model.grid.Cxl > 1 
+     x_w=x_w+2
+    end  
+    if model.grid.Cxu <  model.grid.nx
+     x_e=x_e+2
+    end     
+    if model.grid.Cyl > 1 
+     y_s=y_s+2
+    end   
+     if model.grid.Cyu <  model.grid.ny
+     y_n=y_n+2
+    end   
+            
+            
+     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w ,model.grid.Cyu - model.grid.Cyl +1 + y_s + y_n)
+            
+     if model.grid.Cxl > 1
+            h_out_b[2, y_s+1:end-y_n] .= h_out_line_w[:]
+     end
+     if model.grid.Cxu < model.grid.nx
+            h_out_b[end -1,y_s+1:end-y_n] .= h_out_line_e[:]
+     end   
+     if model.grid.Cyl > 1
+            h_out_b[x_w+1:end-x_e,2] .= h_out_line_s[:]
+     end
+     if model.grid.Cyu < model.grid.ny
+            h_out_b[2,x_w+1:end-x_e] .= h_out_line_n[:]
+     end 
      h_out_b .= hton.(h_out_b)
-     u_out_b .= hton.(u_out_b)
-    
+  
      hb_file_string = string(simulation.output_params.prefix,  "_Hb.bin")
-     ub_file_string = string(simulation.output_params.prefix,  "_Ub.bin")
     
      hbfileID =  open(hb_file_string,"w")
      write(hbfileID, h_out_b[:,:])
      close(hbfileID) 
         
-     ubfileID =  open(ub_file_string,"w")
-     write(ubfileID, u_out_b[:,:])
-     close(ubfileID)
-    
     end
  end 
