@@ -144,7 +144,8 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
     x_w=0  
     x_e=0     
-    y_s=0        
+    y_s=0
+    y_n=0
     if model.grid.Cxl > 1 
      x_w=x_w+2
     end  
