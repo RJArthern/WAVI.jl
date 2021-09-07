@@ -172,7 +172,7 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
             h_out_b[x_w+1:end-x_e,2] .= h_out_line_s[:]
      end
      if model.grid.Cyu < model.grid.ny
-            h_out_b[2,x_w+1:end-x_e] .= h_out_line_n[:]
+            h_out_b[x_w+1:end-x_e,end-1] .= h_out_line_n[:]
      end 
      h_out_b .= hton.(h_out_b)
   
