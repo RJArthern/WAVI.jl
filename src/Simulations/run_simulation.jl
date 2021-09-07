@@ -147,8 +147,8 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
     v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
     
-    u_out[1+ x_w*0.5:end-x_e*0.5,1+ y_s*0.5:end-y_n*0.5]=model.fields.gu.u[model.grid.Cxl - x_w*0.5:model.grid.Cxu + x_e*0.5,model.grid.Cyl -y_s*0.5:model.grid.Cyu +y_n*0.5]
-    v_out[1+ x_w*0.5:end-x_e*0.5,1+ y_s*0.5:end-y_n*0.5]=model.fields.gv.v[model.grid.Cxl - x_w*0.5:model.grid.Cxu + x_e*0.5,model.grid.Cyl -y_s*0.5:model.grid.Cyu +y_n*0.5]
+    u_out[1+x_w*0.5:end-x_e*0.5,1+y_s*0.5:end-y_n*0.5]=model.fields.gu.u[model.grid.Cxl-x_w*0.5:model.grid.Cxu+x_e*0.5,model.grid.Cyl-y_s*0.5:model.grid.Cyu+y_n*0.5]
+    v_out[1+x_w*0.5:end-x_e*0.5,1+y_s*0.5:end-y_n*0.5]=model.fields.gv.v[model.grid.Cxl-x_w*0.5:model.grid.Cxu+x_e*0.5,model.grid.Cyl-y_s*0.5:model.grid.Cyu+y_n*0.5]
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)
