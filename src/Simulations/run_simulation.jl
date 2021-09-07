@@ -128,27 +128,27 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     y_n=0
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny  
      if model.grid.Cxl > 1 
-      x_w=x_w+2
+      x_w=x_w+1
      end  
      if model.grid.Cxu <  model.grid.nx
-      x_e=x_e+2
+      x_e=x_e+1
      end     
      if model.grid.Cyl > 1 
-      y_s=y_s+2
+      y_s=y_s+1
      end   
      if model.grid.Cyu <  model.grid.ny
-      y_n=y_n+2
+      y_n=y_n+1
      end
     end
     
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
-    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
+    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2*x_e +2*x_w,model.grid.Cyu - model.grid.Cyl +1 +2*y_s +2*y_n)
+    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2*x_e +2*x_w,model.grid.Cyu - model.grid.Cyl +1 +2*y_s +2*y_n)
     
-    u_out[1+x_w*0.5:end-x_e*0.5,1+y_s*0.5:end-y_n*0.5]=model.fields.gu.u[model.grid.Cxl-x_w*0.5:model.grid.Cxu+x_e*0.5,model.grid.Cyl-y_s*0.5:model.grid.Cyu+y_n*0.5]
-    v_out[1+x_w*0.5:end-x_e*0.5,1+y_s*0.5:end-y_n*0.5]=model.fields.gv.v[model.grid.Cxl-x_w*0.5:model.grid.Cxu+x_e*0.5,model.grid.Cyl-y_s*0.5:model.grid.Cyu+y_n*0.5]
+    u_out[1+x_w:end-x_e,1+y_s:end-y_n]=model.fields.gu.u[model.grid.Cxl-x_w:model.grid.Cxu+x_e,model.grid.Cyl-y_s:model.grid.Cyu+y_n]
+    v_out[1+x_w:end-x_e,1+y_s:end-y_n]=model.fields.gv.v[model.grid.Cxl-x_w:model.grid.Cxu+x_e,model.grid.Cyl-y_s:model.grid.Cyu+y_n]
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)
@@ -163,19 +163,19 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
             
             
-     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w ,model.grid.Cyu - model.grid.Cyl +1 + y_s + y_n)
+     h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e*2 +x_w*2 ,model.grid.Cyu - model.grid.Cyl +1 + y_s*2 + y_n*2)
             
      if model.grid.Cxl > 1
-            h_out_b[2,y_s+1:end-y_n] .= h_out_line_w[:]
+            h_out_b[2,y_s*2+1:end-y_n*2] .= h_out_line_w[:]
      end
      if model.grid.Cxu < model.grid.nx
-            h_out_b[end-1,y_s+1:end-y_n] .= h_out_line_e[:]
+            h_out_b[end-1,y_s*2+1:end-y_n*2] .= h_out_line_e[:]
      end   
      if model.grid.Cyl > 1
-            h_out_b[x_w+1:end-x_e,2] .= h_out_line_s[:]
+            h_out_b[x_w*2+1:end-x_e*2,2] .= h_out_line_s[:]
      end
      if model.grid.Cyu < model.grid.ny
-            h_out_b[x_w+1:end-x_e,end-1] .= h_out_line_n[:]
+            h_out_b[x_w*2+1:end-x_e*2,end-1] .= h_out_line_n[:]
      end 
      h_out_b .= hton.(h_out_b)
   
