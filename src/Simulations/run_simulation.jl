@@ -122,14 +122,33 @@ Write the velocity at the the final timestep of the simulation (used in the coup
 """
 function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s)
     @unpack model = simulation  
+    x_w=0  
+    x_e=0     
+    y_s=0
+    y_n=0
+    if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny  
+     if model.grid.Cxl > 1 
+      x_w=x_w+2
+     end  
+     if model.grid.Cxu <  model.grid.nx
+      x_e=x_e+2
+     end     
+     if model.grid.Cyl > 1 
+      y_s=y_s+2
+     end   
+     if model.grid.Cyu <  model.grid.ny
+      y_n=y_n+2
+     end
+    end
+    
     uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
     vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
     
-    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
-    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 1 + 1,model.grid.Cyu - model.grid.Cyl +1)
+    u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
+    v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +y_s +y_n)
     
-    u_out[2:end,:]=model.fields.gu.u[model.grid.Cxl - 1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
-    v_out[2:end,:]=model.fields.gv.v[model.grid.Cxl - 1:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+    u_out[1+ x_w*0.5:end-x_e*0.5,1+ y_s*0.5:end-y_n*0.5]=model.fields.gu.u[model.grid.Cxl - x_w*0.5:model.grid.Cxu + x_e*0.5,model.grid.Cyl -y_s*0.5:model.grid.Cyu +y_n*0.5]
+    v_out[1+ x_w*0.5:end-x_e*0.5,1+ y_s*0.5:end-y_n*0.5]=model.fields.gv.v[model.grid.Cxl - x_w*0.5:model.grid.Cxu + x_e*0.5,model.grid.Cyl -y_s*0.5:model.grid.Cyu +y_n*0.5]
 
     u_out .= hton.(u_out)
     v_out .= hton.(v_out)
@@ -142,22 +161,6 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     close(vfileID)   
     
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
-    x_w=0  
-    x_e=0     
-    y_s=0
-    y_n=0
-    if model.grid.Cxl > 1 
-     x_w=x_w+2
-    end  
-    if model.grid.Cxu <  model.grid.nx
-     x_e=x_e+2
-    end     
-    if model.grid.Cyl > 1 
-     y_s=y_s+2
-    end   
-     if model.grid.Cyu <  model.grid.ny
-     y_n=y_n+2
-    end   
             
             
      h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + x_e +x_w ,model.grid.Cyu - model.grid.Cyl +1 + y_s + y_n)
