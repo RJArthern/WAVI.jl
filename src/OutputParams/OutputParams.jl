@@ -8,6 +8,10 @@ struct OutputParams{T <: Real, R <: Real, O}
     prefix::String     #file prefix
     output_path::String #folder in which to save
     dump_vel::Bool     #toggle on dumping the velocity after the final timestep
+    PC_east::Bool      #toggle Parent child for eastern boundary
+    PC_north::Bool     #toggle Parent child for northern boundary
+    PC_west::Bool      #toggle Parent child for western boundary
+    PC_south::Bool     #toggle Parent child for southern boundary
     zip_format::String     #specify whether or not to zip the output, and the format
 end
 
@@ -19,6 +23,10 @@ function OutputParams(;
     prefix = "outfile", 
     output_path = "./",
     dump_vel = false,
+    PC_east = false,
+    PC_north = false,
+    PC_west = false,
+    PC_south = false,
     zip_format = "none")
 
     #default the n_iter_out to Inf (this is updated in simulation once we know timestep from timestepping_params)
