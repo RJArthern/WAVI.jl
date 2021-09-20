@@ -20,7 +20,18 @@ Update thickness using rate of change of thickness and apply minimum thickness c
 function update_thickness!(simulation::AbstractSimulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
+    
+if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+ mask_nochild=model.fields.gh.mask
+ mask_nochild[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]=falses(model.grid.Cxu - model.grid.Cxl +1,model.grid.Cyu - model.grid.Cyl +1)
+end 
+if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+model.fields.gh.h[mask_nochild] = model.fields.gh.h[mask_nochild] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[mask_nochild],timestepping_params.dt*model.fields.gh.dhdt[mask_nochild])       
+else        
 model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
+end
+
+        
 return simulation
 end
 
