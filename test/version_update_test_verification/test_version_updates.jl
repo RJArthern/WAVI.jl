@@ -15,6 +15,10 @@ using WAVI, Test
         h_mask=trues(nx,ny)
         u_iszero = falses(nx+1,ny); u_iszero[1,:].=true
         v_iszero=falses(nx,ny+1); v_iszero[:,1].=true; v_iszero[:,end].=true
+
+        #alternative bc notations
+        u_iszero = ["north"]
+        v_iszero = ["west", "east"]
         grid = Grid(nx = nx, 
                     ny = ny,   
                     nσ = nσ, 
@@ -65,11 +69,17 @@ using WAVI, Test
 
     simulation = version_update_test();
 
-    example_output = Dict();
-    if VERSION == v"1.6.1"
-    example_output = load("./test/version_update_test_verification/v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+    if  VERSION == v"1.6.2"
+        filename = joinpath(dirname(@__FILE__), "v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
+    elseif VERSION == v"1.6.1"
+        filename = joinpath(dirname(@__FILE__), "v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
     elseif  VERSION == v"1.5.1"
-    example_output = load("./test/version_update_test_verification/v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        filename = joinpath(dirname(@__FILE__), "v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
+    else
+    example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
     @test simulation.model.fields.gh.h == example_output["h"]
     @test simulation.model.fields.gu.u == example_output["u"]

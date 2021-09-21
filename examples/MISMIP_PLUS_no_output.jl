@@ -44,7 +44,7 @@ function MISMIP_PLUS()
     #timestepping parameters
     niter0 = 0
     dt = 0.5
-    end_time = 10.
+    end_time = 10000.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time)

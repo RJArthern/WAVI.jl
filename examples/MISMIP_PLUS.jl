@@ -42,11 +42,11 @@ function MISMIP_PLUS()
                      solver_params = solver_params)
 
     #timestepping parameters
-    niter0 = 20
+    niter0 = 600
     dt = 0.5
-    end_time = 1.
-    chkpt_freq = 10.
-    pchkpt_freq = 10.
+    end_time = 400.
+    chkpt_freq = 1000.
+    pchkpt_freq = 20.
     timestepping_params = TimesteppingParams(niter0 = niter0, 
                                             dt = dt, 
                                             end_time = end_time, 
@@ -54,17 +54,19 @@ function MISMIP_PLUS()
                                             pchkpt_freq = pchkpt_freq)
 
     #output parameters
-    #folder = "outputs"
+    folder = "outputs"
     #isdir(folder) && rm(folder, force = true, recursive = true)
     #mkdir(folder) #make a clean folder for outputs
     outputs = (h = model.fields.gh.h,
                u = model.fields.gh.u,
                v = model.fields.gh.v,
-               b = model.fields.gh.b) #output velocities and thickness
-    output_freq = 5.
+               b = model.fields.gh.b,
+               grfrac = model.fields.gh.grounded_fraction) #output velocities and thickness
+    output_freq = 20.
     output_params = OutputParams(outputs = outputs, 
+                            output_path = folder,
                             output_freq = output_freq,
-                            output_format = "mat",
+                            output_format = "jld2",
                             zip_format = "nc")
     
     simulation = Simulation(model = model, 

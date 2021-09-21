@@ -6,8 +6,8 @@ function MISMIP_PLUS_Ice1r_2km()
     nσ = 4
     x0 = 0.0
     y0 = -40000.0
-    dx = 8000.0
-    dy = 8000.0
+    dx = 2000.0
+    dy = 2000.0
     h_mask=trues(nx,ny)
     u_iszero = falses(nx+1,ny); u_iszero[1,:].=true
     v_iszero=falses(nx,ny+1); v_iszero[:,1].=true; v_iszero[:,end].=true

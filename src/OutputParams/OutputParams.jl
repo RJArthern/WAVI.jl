@@ -29,8 +29,11 @@ function OutputParams(;
     PC_south = false,
     zip_format = "none")
 
-    #default the n_iter_out to Inf (this is updated in simulation once we know timestep from timestepping_params)
-    n_iter_out = Inf
+    #default the n_iter_out to -1 (this is updated in simulation once we know timestep from timestepping_params)
+    n_iter_out = -1
+
+    #check output_freq
+    ((output_freq == Inf) || (output_freq > 0)) || throw(ArgumentError("output frequency must be positive or Inf"))
 
     #if you don't find folder, set it to the working directory
     if ~isdir(output_path)
@@ -41,16 +44,10 @@ function OutputParams(;
     #append a "/" to folder if it doesn't have one
     endswith(output_path, "/") || (output_path = string(output_path, "/"))
 
-    #check the zip format
-    if ~(output_format in ["none", "mat", "jld2"])
-        println("detected a output format other than none, mat, or jld2...\nWAVI currently only supports outputting to mat or jld2.\nSimulation will not output!")
-        zip_format = "none"
-    end
-    
+    #throw an error if we don't get an output format we know
+    ((output_format == "jld2") || (output_format == "mat")) || throw(ArgumentError("Output format must be `jld2` or `mat`"))
 
-    (output_format == "jld2" || output_format == "mat") || ArgumentError("Output format must be jld2 or mat")
-
-    #check the zip format
+    #revert the zip format to none if we don't recognise format
     if ~(zip_format in ["none", "nc"])
         println("detected a zip format other than none or nc...
         WAVI currently only supports zipping to nc.

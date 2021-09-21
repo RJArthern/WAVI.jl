@@ -41,7 +41,7 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 """
 function update_geometry_on_uv_grids!(model::AbstractModel)
     @unpack gh,gu,gv,gc=model.fields
-    onesvec=ones(gh.nx*gh.ny)
+    onesvec=ones(gh.nxh*gh.nyh)
     gu.h[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.h[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gu.s[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.s[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
     gv.h[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.h[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
@@ -97,7 +97,7 @@ function update_basal_melt!(model::AbstractModel)
     @unpack gh = model.fields
     if "melt_rate_model" in keys(model.extra_physics)
         update_melt_rate_model!(model.extra_physics["melt_rate_model"], model)
-        gh.basal_melt .= model.extra_physics["melt_rate_model"].melt_rate
+        #gh.basal_melt .= model.extra_physics["melt_rate_model"].melt_rate
     else
         gh.basal_melt .= 0
     end

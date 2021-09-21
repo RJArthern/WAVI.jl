@@ -279,8 +279,7 @@ Compute stiffness parameter B in Glen flow law.
 
 """
 
-function glen_b(temperature,damage,params)
-    @unpack glen_a_ref, glen_n, glen_a_activation_energy, glen_temperature_ref, gas_const = params
+function glen_b(temperature,damage,glen_a_ref, glen_n, glen_a_activation_energy, glen_temperature_ref, gas_const)
     glen_a0 = glen_a_ref*exp(+glen_a_activation_energy/(glen_temperature_ref*gas_const) )
     glen_b = (1-damage)*( glen_a0*exp(-glen_a_activation_energy/(temperature*gas_const)) )^(-1.0/glen_n)
     return glen_b

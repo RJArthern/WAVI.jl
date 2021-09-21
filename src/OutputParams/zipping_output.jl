@@ -3,7 +3,7 @@
 
 Returns an array of filenames in folder (string) with suffix format (string)
 """
-get_format_filenames(format::String, folder::String) =[string(folder,f) for f in  readdir(folder) if endswith(f, format)]
+get_format_filenames(format::String, folder::String, prefix::String) =[string(folder,f) for f in  readdir(folder) if (endswith(f, format) && startswith(f,prefix))]
 
 
 """
@@ -76,13 +76,13 @@ return_extension(file) =  file[(findlast(isequal('.'),file)+1):end];
 """
 make_ncfile(folder,format)
 
-Wrapper script to zip the output files in "folder" with type "format" to an nc file with name nc_name
+Wrapper script to zip the output files in "folder" with type "format" to an nc file with name nc_name_full (including path)
 """
-function make_ncfile(format, folder, nc_name_full)
+function make_ncfile(format, folder, nc_name, prefix)
     #check that the input format is 
-    filenames = get_format_filenames(format, folder)
+    filenames = get_format_filenames(format, folder, prefix)
     if ~isempty(filenames)
-        make_ncfile_from_filenames(filenames, format, nc_name_full)
+        make_ncfile_from_filenames(filenames, format, nc_name)
     else
         println("attempted to zip the outputs to nc format, but did not find any files...")
     end
@@ -111,7 +111,16 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
     #create the nc file variables
     output_dict = Dict() #dictionary for the output values
     output_vars = Dict() #dictionary for the output variables
-    for key in keys(matread(filenames[1]))
+    
+    #get the keys
+    if format == "mat"
+        filekeys = keys(matread(filenames[1]))
+    elseif format == "jld2"
+        filekeys = keys(load(filenames[1]))
+        #println(typeof(filekeys))
+    end
+
+    for key in filekeys
         if ~(key in ["x", "y", "t"]) #if this isn't a spatial dimensions
             var_out = zeros(length(x), length(y), length(t))
     
@@ -156,7 +165,7 @@ function zip_output(simulation)
     @unpack output_params = simulation
     if output_params.zip_format == "nc"
         nc_name_full = string(output_params.output_path, output_params.prefix, ".nc")
-        make_ncfile(output_params.output_format, output_params.output_path, nc_name_full)
+        make_ncfile(output_params.output_format, output_params.output_path, nc_name_full, output_params.prefix)
     end
     return nothing
 end

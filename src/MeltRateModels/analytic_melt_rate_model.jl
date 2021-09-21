@@ -33,10 +33,10 @@ Update the melt rate for an analytic-type melt rate model
 function update_melt_rate_model!(melt_model::AnalyticMeltRate, model)
     @unpack melt_rate, function_arguments, melt_rate_function = melt_model
         if melt_model.melt_partial_cell
-        melt_rate .= melt_rate_function(function_arguments...).* (1 .- model.fields.gh.grounded_fraction)
+        melt_rate .= melt_rate_function(function_arguments...).* (1.0 .- model.fields.gh.grounded_fraction)
     else
         grounded_matrix =  model.fields.gh.grounded_fraction .- mod.(model.fields.gh.grounded_fraction,1) #send any partially floating cells to zero grounded fraction
-        melt_rate .= melt_rate_function(function_arguments...).* (1 .- grounded_matrix)
+        melt_rate .= melt_rate_function(function_arguments...).* (1.0 .- grounded_matrix)
     end
     return nothing
 end

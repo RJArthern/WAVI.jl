@@ -22,7 +22,7 @@ Grid, SolverParams, InitialConditions, OutputParams, Simulation, run_simulation!
 abstract type AbstractGrid{T <: Real, N <: Integer} end
 abstract type AbstractModel{T <: Real, N <: Integer} end
 abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
-abstract type AbstractSimulation{T <: Real, N <: Integer, R <: Real} end
+#abstract type AbstractSimulation{T,N,R,A,W} end
 abstract type AbstractMeltRateModel{PC <: Bool, M} end
 
 
@@ -41,7 +41,7 @@ include("SolverParams.jl")
 include("TimesteppingParams.jl")
 include("Clock.jl")
 include("InitialConditions.jl")
-include("Wavelets/WaveletGrids.jl")
+include("Wavelets/Wavelets.jl")
 include("Fields/Fields.jl")
 include("Models/Model.jl")
 include("MeltRateModels/MeltRateModel.jl")

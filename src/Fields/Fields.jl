@@ -18,7 +18,7 @@ end
 """
     setup_fields(grid, initial_conditions, solver_params, params, bed_array)
 
-Acts as a constructor for the fields (no explicit constructor as only ever called when setting up a model)
+Acts as a constructor for the fields (no explicit constructor as fields `only ever called when setting up a model)
 """
 
 function setup_fields(grid, initial_conditions, solver_params, params, bed_array)
@@ -35,14 +35,10 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     #h-grid
     #gh=HGrid(grid, params) #uncomment if using the explicit constructor method
     h =  deepcopy(initial_conditions.initial_thickness)
-    ηav = deepcopy(initial_conditions.initial_viscosity)
+    ηav = deepcopy(initial_conditions.initial_viscosity[:,:,1]) #set to the viscosity on the first level for now
     gh=HGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny,
-    dx=grid.dx,
-    dy=grid.dy,
+    nxh=grid.nx,
+    nyh=grid.ny,
     mask=h_mask,
     b = bed_array,
     h = h,
@@ -51,10 +47,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #u-grid
     gu=UGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx+1,
-    ny=grid.ny,
+    nxu=grid.nx+1,
+    nyu=grid.ny,
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
@@ -63,10 +57,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #v-grid
     gv=VGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx,
-    ny=grid.ny+1,
+    nxv=grid.nx,
+    nyv=grid.ny+1,
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
@@ -75,30 +67,31 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
 
     #c-grid
     gc=CGrid(
-    x0=grid.x0,
-    y0=grid.y0,
-    nx=grid.nx-1,
-    ny=grid.ny-1,
-    dx=grid.dx,
-    dy=grid.dy,
+    nxc=grid.nx-1,
+    nyc=grid.ny-1,
     mask=c_mask
     )
 
     #3D-grid
+    η = deepcopy(initial_conditions.initial_viscosity)
+    θ = deepcopy(initial_conditions.initial_temperature)
+    Φ = deepcopy(initial_conditions.initial_damage)
     g3d=SigmaGrid(
-    nx=grid.nx,
-    ny=grid.ny,
-    nσ=grid.nσ,
-    η = fill(params.default_viscosity,grid.nx,grid.ny,grid.nσ),
-    θ = fill(params.default_temperature,grid.nx,grid.ny,grid.nσ),
-    Φ = fill(params.default_damage,grid.nx,grid.ny,grid.nσ),
-    glen_b = fill(glen_b(params.default_temperature,params.default_damage,params),grid.nx,grid.ny,grid.nσ)
+    nxs=grid.nx,
+    nys=grid.ny,
+    nσs=grid.nσ,
+    σ =grid.σ,
+    η = η,
+    θ = θ,
+    Φ = Φ,
+    glen_b = glen_b.(θ,Φ,params.glen_a_ref, params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const),
+    quadrature_weights = grid.quadrature_weights
     )
 
     #Wavelet-grid, u-component.
-    wu=UWavelets(nx=grid.nx+1,ny=grid.ny,levels=solver_params.levels)
+    wu=UWavelets(nxuw=grid.nx+1,nyuw=grid.ny,levels=solver_params.levels)
 
     #Wavelet-grid, v-component.
-    wv=VWavelets(nx=grid.nx,ny=grid.ny+1,levels=solver_params.levels)
+    wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
     return Fields(gh,gu,gv,gc,g3d,wu,wv)
 end
