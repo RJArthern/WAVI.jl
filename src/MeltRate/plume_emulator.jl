@@ -1,18 +1,18 @@
 struct PlumeEmulator{T <: Real} <: AbstractMeltRate
-    α :: T   #calibration coefficient 
-    λ1 :: T  #liquidus slope 
-    λ2 :: T  #liquidus intercept 
-    λ3 :: T  #liquidus pressure coefficient
-    E0 :: T  #entrainment coefficient
-    Cd :: T  #drag coeffecient
-    Γ_TS :: T #combined stanton number
-    L :: T #latent heat of fusion for ice 
-    c :: T #specific heat capacity of ocean water 
-    βs :: T #haline contraction coefficient 
-    βt :: T #thermal expansion coefficient 
-    g :: T #gravity
-    ρi :: T #ice density 
-    ρw :: T #water density
+    α :: T         #calibration coefficient 
+    λ1 :: T        #liquidus slope 
+    λ2 :: T        #liquidus intercept 
+    λ3 :: T        #liquidus pressure coefficient
+    E0 :: T        #entrainment coefficient
+    Cd :: T        #drag coeffecient
+    Γ_TS :: T      #combined Stanton number
+    L :: T         #latent heat of fusion for ice 
+    c :: T         #specific heat capacity of ocean water 
+    βs :: T        #haline contraction coefficient 
+    βt :: T        #thermal expansion coefficient 
+    g :: T         #gravity
+    ρi :: T        #ice density 
+    ρw :: T        #water density
     Ta :: Function #Function specifying ambient temperature  
     Sa :: Function #Function specifying ambient salinity 
 end
@@ -20,7 +20,7 @@ end
 """
     PlumeEmulator(; <kwargs>)
 
-Construct a plume emulator 
+Construct a plume emulator to prescribe the melt rate in WAVI
 
 Keyword arguments
 =================
@@ -74,10 +74,9 @@ function PlumeEmulator(;
 end
 
 
-
 function update_melt_rate!(plume_emulator::PlumeEmulator, fields, grid)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
-    @time set_plume_emulator_melt_rate!(basal_melt, 
+    set_plume_emulator_melt_rate!(basal_melt, 
                                 h, 
                                 grounded_fraction, 
                                 b,
