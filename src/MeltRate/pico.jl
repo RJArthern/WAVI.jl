@@ -194,16 +194,15 @@ function set_box_one_melt_rate!(melt,boxes,pico, dx, dy, zb)
     ν = pico.ρi / pico.ρw
     λ = pico.L / pico.c
     s  = pico.S0 / ν / λ
-    
     if ~(pico.use_box_mean_depth) #don't use mean depth, below are vector quantities
-        Tstar = pico.λ1 .* pico.S0 .+ pico.λ2 .- pico.λ3 .* zb .- pico.T0
+        Tstar = pico.λ1 .* pico.S0 .+ pico.λ2 .+ pico.λ3 .* zb .- pico.T0
         c =  g1 .* Tstar / pico.C / pico.ρw / (pico.βs * s - pico.βt) #ρw = ρ* in Reese et al 2018
         b =  g1  ./2 ./ pico.C / pico.ρw ./ (pico.βs * s - pico.βt) 
         x = -b .+ sqrt.(b.^2 .- c) 
         T1 = pico.T0 .- x 
         y = pico.S0 .* x ./ ν ./ λ
         S1 = pico.S0 .- y
-        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* S1 .+ pico.λ2 .- pico.λ3 .* zb .- T1)*365.25*24*60^2 #melt rate if all domain in box one
+        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* S1 .+ pico.λ2 .+ pico.λ3 .* zb .- T1)*365.25*24*60^2 #melt rate if all domain in box one
 
         #set melt rate at box one points
         melt[boxes .== 1] .= m[boxes .== 1]
@@ -215,16 +214,17 @@ function set_box_one_melt_rate!(melt,boxes,pico, dx, dy, zb)
     else #use the mean depth, then below are scalar quantities
         zbf = zb
         zb = sum(zbf[boxes .== 1])/length(zbf[boxes .== 1]) #use mean depth in the box
-        Tstar = pico.λ1 .* pico.S0 .+ pico.λ2 .- pico.λ3 .* zb .- pico.T0
+        Tstar = pico.λ1 .* pico.S0 .+ pico.λ2 .+ pico.λ3 .* zb .- pico.T0
         c =  g1 .* Tstar / pico.C / pico.ρw / (pico.βs * s - pico.βt) #ρw = ρ* in Reese et al 2018
         b =  g1  ./2 ./ pico.C / pico.ρw ./ (pico.βs * s - pico.βt) 
         x = -b .+ sqrt.(b.^2 .- c) 
         T1 = pico.T0 .- x 
         y = pico.S0 .* x ./ ν ./ λ
+        println(y)
         S1 = pico.S0 .- y
 
         #set melt rate at box one points
-        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* S1 .+ pico.λ2 .- pico.λ3 .* zb .- T1)*365.25*24*60^2 #melt rate if all domain in box one
+        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* S1 .+ pico.λ2 .+ pico.λ3 .* zb .- T1)*365.25*24*60^2 #melt rate if all domain in box one
         melt[boxes .== 1] .= m
 
         #compute the mean
@@ -256,14 +256,14 @@ function set_box_k_melt_rate!(melt,k, T_prev, S_prev,q,boxes,pico, dx, dy, zb)
   
     #compute salinity and temp in this box
     if ~(pico.use_box_mean_depth) #don't use mean depth, below are vector quantities
-        Tstar = pico.λ1 .* S_prev .+ pico.λ2 .- pico.λ3 .* zb .- T_prev
+        Tstar = pico.λ1 .* S_prev .+ pico.λ2 .+ pico.λ3 .* zb .- T_prev
         x = -g1 .* Tstar ./ (q + g1 - g1*pico.λ1 * S_prev / ν / λ)
         y = S_prev .* x ./ ν / λ
         Tk = T_prev .- x
         Sk = S_prev .- y
     
         # compute and set melt rate in this box
-        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* Sk .+ pico.λ2 .- pico.λ3 .* zb .- Tk)*365.25*24*60^2 #melt rate if all domain in box one
+        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* Sk .+ pico.λ2 .+ pico.λ3 .* zb .- Tk)*365.25*24*60^2 #melt rate if all domain in box one
         melt[boxes .== k] .= m[boxes .== k]
 
         #update the mean temperature and salinity for the next box
@@ -273,14 +273,14 @@ function set_box_k_melt_rate!(melt,k, T_prev, S_prev,q,boxes,pico, dx, dy, zb)
     else #use the mean depth, then below are scalar quantities
         zbf = zb
         zb = sum(zbf[boxes .== k])/length(zbf[boxes .== k]) #use mean depth in the box
-        Tstar = pico.λ1 .* S_prev .+ pico.λ2 .- pico.λ3 .* zb .- T_prev
+        Tstar = pico.λ1 .* S_prev .+ pico.λ2 .+ pico.λ3 .* zb .- T_prev
         x = -g1 .* Tstar ./ (q + g1 - g1*pico.λ1 * S_prev / ν / λ)
         y = S_prev .* x ./ ν / λ
         Tk = T_prev .- x
         Sk = S_prev .- y
     
         # compute and set melt rate in this box
-        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* Sk .+ pico.λ2 .- pico.λ3 .* zb .- Tk)*365.25*24*60^2 #melt rate if all domain in box one
+        m  = -pico.γT ./ ν ./ λ .* (pico.λ1 .* Sk .+ pico.λ2 .+ pico.λ3 .* zb .- Tk)*365.25*24*60^2 #melt rate if all domain in box one
         melt[boxes .== k] .= m
 
         T_out = Tk

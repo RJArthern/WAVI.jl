@@ -50,7 +50,7 @@ pico = PICO(ice_front_mask = ice_front_mask,
             T0 =1.2, 
             S0 = 34.6, 
             use_box_mean_depth = true, 
-            γT = 3.8e-5);
+            γT = 3.e-5);
 
 #return the gl mask
 ice_front_mask = zeros(nx,ny);
