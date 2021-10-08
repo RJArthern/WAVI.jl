@@ -25,8 +25,8 @@ grid = Grid(nx=nx,
 bed = WAVI.mismip_plus_bed # function definition
 
 # Inputing thickness profile, reading from binary file 
-fname = "examples\\Favier2019_melt_params\\data\\MISMIP_ice0_2km_SteadyThickness.bin";
-# fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
+#fname = "examples\\Favier2019_melt_params\\data\\MISMIP_ice0_2km_SteadyThickness.bin";
+fname = joinpath(dirname(@__FILE__), "data",  "MISMIP_ice0_2km_SteadyThickness.bin")
 h = Array{Float64,2}(undef, nx, ny)
 read!(fname, h)
 h = ntoh.(h)

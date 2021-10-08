@@ -220,7 +220,6 @@ function set_box_one_melt_rate!(melt,boxes,pico, dx, dy, zb)
         x = -b .+ sqrt.(b.^2 .- c) 
         T1 = pico.T0 .- x 
         y = pico.S0 .* x ./ ν ./ λ
-        println(y)
         S1 = pico.S0 .- y
 
         #set melt rate at box one points
@@ -286,6 +285,5 @@ function set_box_k_melt_rate!(melt,k, T_prev, S_prev,q,boxes,pico, dx, dy, zb)
         T_out = Tk
         S_out = Sk
     end    
-    println((T_out, S_out))
     return T_out, S_out
 end
