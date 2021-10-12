@@ -8,7 +8,17 @@ struct Model{T <: Real, N <: Integer,A,W} <: AbstractModel{T,N}
 end
 
 """
- Model constructor
+    Model(; <kwargs>)
+
+Construct a WAVI.jl Model
+=========================
+Keyword Arguments:
+- `grid` [required]: An instance of a WAVI.jl Grid object, which stores information about the numerical grid
+- `bed_elevation` [required]: Bed elevation at grid points. Must have size `grid.nx` x `grid.ny`
+- `params`: An instant of a WAVI.jl Params object, which stores information on physical parameters
+- `solver_params`: An instant of a WAVI.jl Params object, which stores information on solver parameters
+- `initial_conditions`: An instant of a WAVI.jl InitialConditions object, which stores information on the initial thickness, temperature, viscosity, and damage
+- `melt_rate`: An instant of a WAVI.jl MeltRate object, which stores information on the melt rate parametrization
 """
 function Model(;
     grid = nothing, 

@@ -1,6 +1,6 @@
 # Installation instructions
 
-You can install the latest version of Oceananigans using the built-in package manager (accessed by pressing `]` in the
+You can install the latest version of WAVI using the built-in package manager (accessed by pressing `]` in the
 Julia command prompt) to add the package and instantiate/build all dependencies
 
 ```julia
