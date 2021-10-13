@@ -30,7 +30,14 @@ bib = CitationBibliography(bib_filepath)
 #    "One-dimensional diffusion"          => "generated/one_dimensional_diffusion.md",
 #]
 example_pages = [
+    "MISMIP"   => "examples/mismip.md"
+    "MISMIP3D"   => "examples/mismip_3d.md"
     "MISMIP+"   => "examples/mismip_plus.md"
+    "MISI"   => "examples/MISI.md"
+    "Greenland"   => "examples/Greenland.md"
+    "WAIS"   => "examples/WAIS.md"
+    "Antarctica" => "examples/Antarctica.md"
+
 ]
 
 data_structure_pages = [
