@@ -20,8 +20,6 @@ glen_a_activation_energy :: T
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
        minimum_thickness :: T 
-           evolveShelves :: Bool
-                smallHAF :: T
 end
 
 
@@ -47,9 +45,7 @@ Params(;
         weertman_m = 3.0,
         weertman_reg_speed = 1.0e-5, 
         sea_level_wrt_geoid = 0.0,
-        minimum_thickness = 50.0,
-        evolveShelves = true,
-        smallHAF = 1)
+        minimum_thickness = 50.0)
 
 Construct a WAVI.jl parameters object for holding physical parameters.
 
@@ -76,8 +72,6 @@ Keyword arguments
 - 'weertman_reg_speed': regularization speed, used to prevent bed speed going to zero
 - 'sea_level_wrt_geoid': reference sea level
 - 'minimum_thickness': minimum ice thickness on model domain
-- 'evolveShelves': flag for turning on and off the evolution of the shelves in the forward run_simulation
-- 'smallHAF': small value of HAF used within update_thickness when not evolving shelves
 """
 function Params(; g = 9.81, 
                   density_ice = 918.0,
@@ -98,9 +92,7 @@ function Params(; g = 9.81,
                   weertman_m  = 3.0,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
-                  minimum_thickness = 50.0,
-                  evolveShelves = true,
-                  smallHAF = 1.0)
+                  minimum_thickness = 50.0)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
@@ -126,7 +118,6 @@ function Params(; g = 9.81,
                   weertman_m,
                   weertman_reg_speed,
                   sea_level_wrt_geoid,
-                  minimum_thickness,
-                  evolveShelves,
-                  smallHAF)
+                  minimum_thickness
+                  )
 end
