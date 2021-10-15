@@ -20,32 +20,13 @@ glen_a_activation_energy :: T
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
        minimum_thickness :: T 
+           evolveShelves :: Bool
+                smallHAF :: T
 end
 
 
 """
-Params(; 
-        dt = 1.0,
-        g  = 9.81,
-        density_ice = 918.0,
-        density_ocean = 1028.0,
-        gas_const = 8.314, 
-        sec_per_year = 3.15576e7,
-        default_thickness = 100.0,
-        default_viscosity = 1.0e7,
-        default_temperature = 265.700709,
-        default_damage = 0.0,
-        accumulation_rate = 0.0,
-        glen_a_activation_energy = 5.8631e+04,
-        glen_a_ref = 4.9e-16 *sec_per_year * 1.0e-9,
-        glen_temperature_ref = 263.15,
-        glen_n = 3.0,
-        glen_reg_strain_rate = 1.0e-5,
-        weertman_c = 1.0e4
-        weertman_m = 3.0,
-        weertman_reg_speed = 1.0e-5, 
-        sea_level_wrt_geoid = 0.0,
-        minimum_thickness = 50.0)
+Params(; <kwargs>)
 
 Construct a WAVI.jl parameters object for holding physical parameters.
 
@@ -72,6 +53,8 @@ Keyword arguments
 - 'weertman_reg_speed': regularization speed, used to prevent bed speed going to zero
 - 'sea_level_wrt_geoid': reference sea level
 - 'minimum_thickness': minimum ice thickness on model domain
+- 'evolveShelves': flag for turning on and off the evolution of the shelves in the forward run_simulation
+- 'smallHAF': small value of HAF used within update_thickness when not evolving shelves
 """
 function Params(; g = 9.81, 
                   density_ice = 918.0,
@@ -92,7 +75,9 @@ function Params(; g = 9.81,
                   weertman_m  = 3.0,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
-                  minimum_thickness = 50.0)
+                  minimum_thickness = 50.0,
+                  evolveShelves = true,
+                  smallHAF = 1.0)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
@@ -118,6 +103,8 @@ function Params(; g = 9.81,
                   weertman_m,
                   weertman_reg_speed,
                   sea_level_wrt_geoid,
-                  minimum_thickness
+                  minimum_thickness,
+                  evolveShelves,
+                  smallHAF
                   )
 end

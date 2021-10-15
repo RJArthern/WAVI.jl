@@ -15,12 +15,24 @@ end
 """
 update_thickness!(model::AbstractModel)
 
-Update thickness using rate of change of thickness and apply minimum thickness constraint.
+Update thickness using rate of change of thickness and apply minimum thickness constraint. Includes an option for not evolving shelf thickness.
 """
 function update_thickness!(simulation)
 @unpack model,timestepping_params=simulation
-onesvec=ones(model.grid.nx*model.grid.ny)
-model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
+hUpdate=zeros(model.grid.nx,model.grid.ny)
+aground=zeros(model.grid.nx,model.grid.ny)
+hUpdate[model.fields.gh.mask]=max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
+#Specify whether to evolve the shelves:
+if !model.params.evolveShelves
+    hUpdate[model.fields.gh.mask]=max.(model.params.smallHAF.-(model.params.density_ocean./model.params.density_ice).*model.fields.gh.b[model.fields.gh.mask].-model.fields.gh.h[model.fields.gh.mask],hUpdate[model.fields.gh.mask])
+    aground=(model.fields.gh.haf.>=0)
+    wc=[1 1 1; 1 1 1; 1 1 1]
+    w=centered(wc)
+    nearfloat_mask=imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
+    nearfloat_mask=iszero.(iszero.(nearfloat_mask))
+    hUpdate[nearfloat_mask].=0
+  end
+model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ hUpdate[model.fields.gh.mask]
 return simulation
 end
 
