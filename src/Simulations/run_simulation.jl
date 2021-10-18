@@ -21,17 +21,17 @@ function update_thickness!(simulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
     
-#if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
  
  thick_nochild=model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]  
 
-#end        
+end        
     
 model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
 
-#if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
 model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]=thick_nochild[:,:]
-#end
+end
 
         
 return simulation
