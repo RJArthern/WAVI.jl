@@ -10,7 +10,7 @@ Manifest.toml
 *.bin
 *.png
 
-#testing driver scripts
+#useful things to ignore when testing driver scripts
 driver_updated.jl 
 *.box
 *.data
