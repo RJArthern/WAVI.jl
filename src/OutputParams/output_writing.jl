@@ -22,6 +22,8 @@ function write_output(simulation)
         fname = string(fname, ".mat")
         matwrite(fname, output_dict)
     end
+
+    println("outputting at timestep number $(simulation.clock.n_iter)")
 end
 
 """

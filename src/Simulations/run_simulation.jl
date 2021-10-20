@@ -4,8 +4,12 @@
 Perform one timestep of the simulation
 """
 function timestep!(simulation)
-    @unpack model,timestepping_params = simulation
+    @unpack model,timestepping_params, output_params = simulation
     update_state!(model)
+    #write solution if at the first timestep (hack for https://github.com/RJArthern/WAVI.jl/issues/46 until synchronicity is fixed)
+    if (output_params.output_start) && (simulation.clock.n_iter == 0)
+        write_output(simulation)
+    end
     if timestepping_params.step_thickness
         update_thickness!(simulation)
     end
@@ -58,7 +62,7 @@ function run_simulation!(simulation)
     chkpt_tag = "A"
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
-
+        
         #check if we have hit a temporary checkpoint
         if mod(i,timestepping_params.n_iter_chkpt) == 0
             #output a temporary checkpoint
@@ -80,9 +84,6 @@ function run_simulation!(simulation)
         #check if we have hit an output timestep
         if mod(i,simulation.output_params.n_iter_out) == 0
             write_output(simulation)
-            println(simulation.clock.n_iter)
-            println("outputting at timestep number $(simulation.clock.n_iter)")
-
         end
 
         #check the dump velocity flag at the final timestep

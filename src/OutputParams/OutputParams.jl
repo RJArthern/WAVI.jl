@@ -9,6 +9,7 @@ struct OutputParams{T <: Real, R <: Real, O}
     output_path::String #folder in which to save
     dump_vel::Bool     #toggle on dumping the velocity after the final timestep
     zip_format::String     #specify whether or not to zip the output, and the format
+    output_start::Bool  #flag to specify whether to output the initial state or not 
 end
 
 #output constructor
@@ -19,7 +20,8 @@ function OutputParams(;
     prefix = "outfile", 
     output_path = "./",
     dump_vel = false,
-    zip_format = "none")
+    zip_format = "none",
+    output_start = false)
 
     #default the n_iter_out to -1 (this is updated in simulation once we know timestep from timestepping_params)
     n_iter_out = -1
@@ -47,7 +49,7 @@ function OutputParams(;
         zip_format = "none"
     end
 
-    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, zip_format)
+    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, zip_format, output_start)
 end
 
 include("output_writing.jl")
