@@ -44,10 +44,12 @@ function output_test(; dt  = 0.5,
 end
 
 #########################################################
+############### Test flags ##############################
 test_basic_outputting = true
-test_zipping_output   = false #includes tests for output first timestep
-test_output_after_restart = false
-test_output_errors = false
+test_zipping_output   = true
+test_output_after_restart = true
+test_output_errors = true
+##########################################################
 
 
 @testset "Outputting" begin
@@ -104,30 +106,39 @@ test_output_errors = false
         
         end
         @testset "Test output start" begin 
-            folder = "outputs/"
-            isdir(folder) && rm(folder, force = true, recursive = true) #make a new folder
-            mkdir(folder)
-            #test that if we only get an output at the start (e.g. if the output freq > end time), then outputted solution matches the expected thing
-            sim = output_test(output_path = folder, 
-                            end_time = 1., 
-                            output_freq = 5., 
-                            prefix = "testoutfile", 
-                            output_format = "jld2", 
-                            output_start = true)
-            foldersim = sim.output_params.output_path 
-            fname = string(foldersim,readdir(folder)[1])
-            dict = load(fname)
+            for output_start in [true, false]
+                folder = "outputs/"
+                isdir(folder) && rm(folder, force = true, recursive = true) #make a new folder
+                mkdir(folder)
+                #test that if we only get an output at the start (e.g. if the output freq > end time), then outputted solution matches the expected thing
+                sim = output_test(output_path = folder, 
+                                end_time = 1., 
+                                output_freq = 5., 
+                                prefix = "testoutfile", 
+                                output_format = "jld2", 
+                                output_start = output_start)
 
-            #check that thickness same as IC and time = 0
-            @test dict["h"] == sim.model.initial_conditions.initial_thickness
-            @test dict["t"] == 0.0
+                foldersim = sim.output_params.output_path 
+                if output_start
+                    #check only a single file outputted
+                    @test length(readdir(foldersim)) == 1
 
-            #check only a single file outputted
-            @test length(readdir(foldersim)) == 1
+                    fname = string(foldersim,readdir(folder)[1])
+                    dict = load(fname)
 
-            #delete the folder
-            rm(folder, force = true, recursive = true)
+                    #check that thickness same as IC and time = 0
+                    @test dict["h"] == sim.model.initial_conditions.initial_thickness
+                    @test dict["t"] == 0.0
 
+
+                else
+                    #check that no file output
+                    @test isempty(readdir(foldersim))
+                end
+
+                #delete the folder
+                rm(folder, force = true, recursive = true)
+            end
         end
     end
 
