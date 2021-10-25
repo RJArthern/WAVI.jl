@@ -7,7 +7,7 @@ Manifest.toml
 #*.jld2
 *.nc
 *.md
-*.bin
+#*.bin
 *.png
 
 #useful things to ignore when testing driver scripts

@@ -3,6 +3,7 @@
 include("./binfile_melt_rate.jl")
 include("./plume_emulator.jl")
 include("./pico.jl")
+include("./quadratic_melt_rate.jl")
              
 
 ##### default temperature and salinity profiles #####

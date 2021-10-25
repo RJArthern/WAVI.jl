@@ -6,9 +6,11 @@ Produce a plot of the melt rate in MISMIP for specified melt rate parametrizatio
                         (e.g. "PICO_nbox2_z700")
     - PME              : Plume model emulator (using Lazeroms 2018 algorithm for grounding line and basal slope -- doi:10.5194/tc-12-49-2018)
     - MISMIP_1r        : Melt rate according to the MISMIP+ ice 1r experiment (doi: 10.5194/tc-14-2283-2020) scaled to match the mean melt rate
+    - QuadL            : Quadratic formulation of melting with local dependency on thermal driving
+    - QuadNL           : Quadratic formulation of melting with non-local dependency on thermal driving
 """
 
-melt_rate_model = "MISMIP_1r"
+melt_rate_model = "QuadL"
 
 function Favier2019_4km_init(melt_model)
 # Grid and boundary conditions
@@ -119,6 +121,15 @@ elseif melt_rate_model == "PME"
 
 elseif melt_rate_model == "MISMIP_1r"
     melt_model = MISMIPMeltRateOne(α = 0.184)
+
+elseif melt_rate_model == "QuadL"
+    melt_model = QuadraticMeltRate(γT = 0.745*1e-3)
+    #melt_model = QuadraticMeltRate(γT = 0.745*1e-3, melt_partial_cell = true)
+    
+elseif melt_rate_model == "QuadNL"
+    melt_model = QuadraticMeltRate(γT = 0.85*1e-3, flocal = false)
+    #melt_model = QuadraticMeltRate(γT = 0.85*1e-3, flocal = false, melt_partial_cell = true)
+
 else
     throw(ArgumentError("Specified melt rate model not found"))
 end
