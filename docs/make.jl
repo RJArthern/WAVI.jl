@@ -64,9 +64,8 @@ numerics_pages = [
 physics_pages = [
     "Overview and Background" => "physics/overview.md"
     "Governing Equations" => "physics/governing_equations.md"
-    "Basal Stress" => "physics/basal_stress.md"
     "Melt Rates" => "physics/melting.md"
-    #"Calving" => "physics/calving.md"
+    "Calving" => "physics/calving.md"
     "Damage" => "physics/damage.md"
 ]
 
