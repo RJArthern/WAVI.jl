@@ -1,7 +1,7 @@
 # Timestepping Parameters
 
 ## Overview
-A `TimesteppingParams` structure is used to pass information relating to [timestepping](../numerics/timestepping.md) to the simulation. The following parameters as specified by passing appropriate keyword arguments the `TimesteppingParams` constructor:
+A `TimesteppingParams` structure is used to pass information relating to [timestepping](../numerical_procedure/numerical_procedure.md) to the simulation. The following parameters as specified by passing appropriate keyword arguments the `TimesteppingParams` constructor:
 - `niter0`: the iteration number at which the simulation. Set `niter0` to `0` to initialize a 'clean' simulation, or `niter0` to a positive integer to (attempt to) pickup from the a corresponding checkpoint (see [Checkpoints and Pickups](#Checkpoints-and-Pickups) below)
 - `dt`: the simulation timestep
 - `end_time`: the clock time at which the simulation should terminate

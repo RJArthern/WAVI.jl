@@ -54,28 +54,25 @@ data_structure_pages = [
     "Melt Rate Models" => "data_structure/melt_rate_models.md"
 ]
 
-numerics_pages = [
-    "Numerical Grid" => "numerics/numerical_grid.md"
-    "Discretization" => "numerics/discretization.md"
-    "Velocity Solve" => "numerics/velocity_solve.md"
-    "Timestepping" => "numerics/timestepping.md"
-]
 
 physics_pages = [
-    "Overview and Background" => "physics/overview.md"
+    "Overview" => "physics/overview.md"
     "Governing Equations" => "physics/governing_equations.md"
     "Melt Rates" => "physics/melting.md"
     "Calving" => "physics/calving.md"
     "Damage" => "physics/damage.md"
 ]
 
+#numerics_pages = [
+#    "Numerical Implementation" => "numerical_procedure/numerical_procedure.md"
+#]
 
 pages = [
     "Home" => "index.md",
     "Installation instructions" => "installation_instructions.md",
     "Examples" => example_pages,
     "Physics" => physics_pages,
-    "Numerical Implementation" => numerics_pages,
+    "Numerical Implementation" => "numerical_procedure/numerical_procedure.md",
     "WAVI Setup" => data_structure_pages,
     "Simulation tips" => "simulation_tips.md",
     "MITgcm coupling" => "mitgcm_coupling.md",
