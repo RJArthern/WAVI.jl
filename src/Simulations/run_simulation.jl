@@ -65,40 +65,40 @@ function run_simulation!(simulation)
     end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
-        if output_params.dump_vel
-         if output_params.PC_west
-          if model.grid.Cxl > 1
-           h_out_line_w = h_out_line_w + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-            if (i == timestepping_params.n_iter_total)
-             h_out_line_w= h_out_line_w ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-            end
-          end
-         end
-         if output_params.PC_east
-          if model.grid.Cxu < model.grid.nx
-          h_out_line_e = h_out_line_e + model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
-           if (i == timestepping_params.n_iter_total)
-            h_out_line_e= h_out_line_e ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-           end
-          end
-         end
-         if output_params.PC_south
-          if model.grid.Cyl > 1
-          h_out_line_s = h_out_line_s + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
-           if (i == timestepping_params.n_iter_total)
-           h_out_line_s= h_out_line_s ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-           end
-          end
-         end
-         if output_params.PC_north
-          if model.grid.Cyu < model.grid.ny
-          h_out_line_n = h_out_line_n + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
-           if (i == timestepping_params.n_iter_total)
-           h_out_line_n= h_out_line_n ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-           end
-          end
-         end
-        end
+        #if output_params.dump_vel
+        # if output_params.PC_west
+        #  if model.grid.Cxl > 1
+        #   h_out_line_w = h_out_line_w + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+        #    if (i == timestepping_params.n_iter_total)
+        #     h_out_line_w= h_out_line_w ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+        #    end
+        #  end
+        # end
+        # if output_params.PC_east
+        #  if model.grid.Cxu < model.grid.nx
+        #  h_out_line_e = h_out_line_e + model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
+        #   if (i == timestepping_params.n_iter_total)
+        #    h_out_line_e= h_out_line_e ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+        #   end
+        #  end
+        # end
+        # if output_params.PC_south
+        #  if model.grid.Cyl > 1
+        #  h_out_line_s = h_out_line_s + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
+        #   if (i == timestepping_params.n_iter_total)
+        #   h_out_line_s= h_out_line_s ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+        #   end
+        #  end
+        # end
+        # if output_params.PC_north
+        #  if model.grid.Cyu < model.grid.ny
+        #  h_out_line_n = h_out_line_n + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
+        #   if (i == timestepping_params.n_iter_total)
+        #   h_out_line_n= h_out_line_n ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
+        #   end
+        #  end
+        # end
+        #end
         #check if we have hit a temporary checkpoint
         if mod(i,timestepping_params.n_iter_chkpt) == 0
             #output a temporary checkpoint
@@ -127,6 +127,26 @@ function run_simulation!(simulation)
 
         #check the dump velocity flag at the final timestep
         if (i == timestepping_params.n_iter_total) && output_params.dump_vel
+         if output_params.PC_west
+          if model.grid.Cxl > 1
+           h_out_line_w = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+          end
+         end
+         if output_params.PC_east
+          if model.grid.Cxu < model.grid.nx
+          h_out_line_e = model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
+          end
+         end  
+         if output_params.PC_south
+          if model.grid.Cyl > 1
+          h_out_line_s = model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
+          end
+         end
+         if output_params.PC_north
+          if model.grid.Cyu < model.grid.ny
+          h_out_line_n = model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
+          end
+         end
             write_vel(simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s)
         end
     end
