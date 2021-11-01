@@ -1,44 +1,40 @@
 push!(LOAD_PATH,"../src/")
 using Documenter
 using DocumenterCitations
-
-using  WAVI
+using Literate 
+using Plots
+using WAVI
 
 bib_filepath = joinpath(dirname(@__FILE__), "wavi.bib")
 bib = CitationBibliography(bib_filepath)
 
+ENV["GKSwstype"] = "100"
+
 #####
-##### Generate examples (uncomment for example generation -- see https://github.com/CliMA/Oceananigans.jl/blob/master/docs/make.jl)
+##### Generate examples
 #####
 
-#const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
-#const OUTPUT_DIR   = joinpath(@__DIR__, "src/generated")
-#examples = [
-#    "MISMIP_PLUS.jl"
-#]
+const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
+const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 
-#for example in examples
-#    example_filepath = joinpath(EXAMPLES_DIR, example)
-#    Literate.markdown(example_filepath, OUTPUT_DIR, documenter=true)
-#end
+examples = [
+    "planar_one_dimensional_flow.jl"
+]
+
+for example in examples
+    example_filepath = joinpath(EXAMPLES_DIR, example)
+    Literate.markdown(example_filepath, OUT_DIR; flavor = Literate.DocumenterFlavor())
+end
+
 
 #####
 #### Organize page hierarchies
 #####
 
-#example_pages = [
-#    "One-dimensional diffusion"          => "generated/one_dimensional_diffusion.md",
-#]
 example_pages = [
-    "MISMIP"   => "examples/mismip.md"
-    "MISMIP3D"   => "examples/mismip_3d.md"
-    "MISMIP+"   => "examples/mismip_plus.md"
-    "MISI"   => "examples/MISI.md"
-    "Greenland"   => "examples/Greenland.md"
-    "WAIS"   => "examples/WAIS.md"
-    "Antarctica" => "examples/Antarctica.md"
-
+    "One-dimensional planar flow"    => "generated/planar_one_dimensional_flow.md",
 ]
+
 
 data_structure_pages = [
     "Overview" => "data_structure/overview.md"

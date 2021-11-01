@@ -4,7 +4,7 @@ Manifest.toml
 .ipynb_checkpoints
 *.mat
 *.tif
-#*.jld2
+*.jld2
 *.nc
 #*.md
 *.bin

@@ -40,7 +40,6 @@ Keyword arguments
 - 'chkpt_path' : Path to location checkpoint output
 - 'step_thickness': Toggle whether to update the ice thickness (true) or not (false) at each timestep
 """
-
 function TimesteppingParams(;
                         niter0 = 0,
                         dt = 1.0,
