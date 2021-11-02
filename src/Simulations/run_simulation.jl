@@ -236,7 +236,7 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
      end
      h_out_b .= hton.(h_out_b)
      
-     clock_time_s=simulation.clock.time/(3600*24*365)
+     clock_time_s=simulation.clock.time*(3600*24*365)
         
      hb_file_string = string(simulation.output_params.prefix, "_Hb", lpad(clock_time_s, 10,"0") ,".bin")
     
