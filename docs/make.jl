@@ -19,6 +19,7 @@ const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 
 examples = [
     "planar_one_dimensional_flow.jl"
+    "bumpy_bed.jl"
 ]
 
 for example in examples
@@ -33,6 +34,7 @@ end
 
 example_pages = [
     "One-dimensional planar flow"    => "generated/planar_one_dimensional_flow.md",
+    "Flow over a bumpy bed"          => "generated/bumpy_bed.md"
 ]
 
 

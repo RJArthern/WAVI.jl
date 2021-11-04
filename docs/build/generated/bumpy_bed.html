@@ -1,0 +1,1414 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Flow over a bumpy bed · WAVI.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.039/juliamono-regular.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.11/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../index.html"><img src="../assets/logo.png" alt="WAVI.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">WAVI.jl</a></span></div><form class="docs-search" action="../search.html"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><a class="tocitem" href="../installation_instructions.html">Installation instructions</a></li><li><input class="collapse-toggle" id="menuitem-3" type="checkbox" checked/><label class="tocitem" for="menuitem-3"><span class="docs-label">Examples</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="planar_one_dimensional_flow.html">One-dimensional planar flow</a></li><li class="is-active"><a class="tocitem" href="bumpy_bed.html">Flow over a bumpy bed</a><ul class="internal"><li><a class="tocitem" href="#Install-dependencies"><span>Install dependencies</span></a></li><li><a class="tocitem" href="#The-Bed"><span>The Bed</span></a></li><li><a class="tocitem" href="#Model-Instantiation-and-Initial-Conditions"><span>Model Instantiation and Initial Conditions</span></a></li><li><a class="tocitem" href="#Determining-the-velocity"><span>Determining the velocity</span></a></li><li><a class="tocitem" href="#Different-Lengthscales"><span>Different Lengthscales</span></a></li></ul></li></ul></li><li><input class="collapse-toggle" id="menuitem-4" type="checkbox"/><label class="tocitem" for="menuitem-4"><span class="docs-label">Physics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../physics/overview.html">Overview</a></li><li><a class="tocitem" href="../physics/governing_equations.html">Governing Equations</a></li><li><a class="tocitem" href="../physics/melting.html">Melt Rates</a></li><li><a class="tocitem" href="../physics/calving.html">Calving</a></li><li><a class="tocitem" href="../physics/damage.html">Damage</a></li></ul></li><li><a class="tocitem" href="../numerical_procedure/numerical_procedure.html">Numerical Implementation</a></li><li><input class="collapse-toggle" id="menuitem-6" type="checkbox"/><label class="tocitem" for="menuitem-6"><span class="docs-label">WAVI Setup</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../data_structure/overview.html">Overview</a></li><li><a class="tocitem" href="../data_structure/simulations.html">Simulations</a></li><li><a class="tocitem" href="../data_structure/model.html">Models</a></li><li><a class="tocitem" href="../data_structure/timestepping_params.html">Timestepping Parameters</a></li><li><a class="tocitem" href="../data_structure/output_writing.html">Output Writing</a></li><li><a class="tocitem" href="../data_structure/grid.html">Grid</a></li><li><a class="tocitem" href="../data_structure/solver_parameters.html">Solver Parameters</a></li><li><a class="tocitem" href="../data_structure/params.html">Physical Paramters</a></li><li><a class="tocitem" href="../data_structure/initial_conditions.html">Initial Conditions</a></li><li><a class="tocitem" href="../data_structure/fields.html">Fields</a></li><li><a class="tocitem" href="../data_structure/melt_rate_models.html">Melt Rate Models</a></li></ul></li><li><a class="tocitem" href="../simulation_tips.html">Simulation tips</a></li><li><a class="tocitem" href="../mitgcm_coupling.html">MITgcm coupling</a></li><li><a class="tocitem" href="../contributing.html">Contributor&#39;s guide</a></li><li><a class="tocitem" href="../references.html">References</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="bumpy_bed.html">Flow over a bumpy bed</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="bumpy_bed.html">Flow over a bumpy bed</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Ice-Flow-over-a-Bumpy-Bed"><a class="docs-heading-anchor" href="#Ice-Flow-over-a-Bumpy-Bed">Ice Flow over a Bumpy Bed</a><a id="Ice-Flow-over-a-Bumpy-Bed-1"></a><a class="docs-heading-anchor-permalink" href="#Ice-Flow-over-a-Bumpy-Bed" title="Permalink"></a></h1><p>This is the first two dimensional example: flow down a plane with bumps with different length scales. This example is similar in spirit to Experiment A in the Ice Sheet Model Intercomparison Exercise - Higher Order Model (ISMIP-HOM): doi: 10.5194/tc-2-95-2008 This example demonstrates: How to use WAVI.jl in plan view (two horizontal spatial dimensions) with arbitrary bed shapes, and how to interact with Grid objects.</p><h2 id="Install-dependencies"><a class="docs-heading-anchor" href="#Install-dependencies">Install dependencies</a><a id="Install-dependencies-1"></a><a class="docs-heading-anchor-permalink" href="#Install-dependencies" title="Permalink"></a></h2><p>First let&#39;s make sure we have all required packages installed.</p><pre><code class="language-julia hljs">using Pkg
+pkg&quot;add WAVI, Plots&quot;</code></pre><pre><code class="language-julia hljs">using WAVI, Plots</code></pre><h2 id="The-Bed"><a class="docs-heading-anchor" href="#The-Bed">The Bed</a><a id="The-Bed-1"></a><a class="docs-heading-anchor-permalink" href="#The-Bed" title="Permalink"></a></h2><p>Following ISMIP-HOM, let&#39;s take a bed with a series of sinusoidal oscillations with an amplitude of 500m: $ z_b(x,y) = -x \tan \alpha + 500 \sin (\omega x) \sin(\omega y) $ Here <span>$L$</span> is the lengthscale of the domain, <span>$\alpha$</span> is the net slope of the plane, and <span>$\omega = 2\pi / L$</span> is the frequency of the bumps. Let&#39;s define this bed as a function and take a look at it:</p><pre><code class="language-julia hljs">z_b(x,y; α, ω) = -x * tand(α) + 500sin(ω*x)*sin(ω*y)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">z_b (generic function with 1 method)</code></pre><p>It&#39;s useful to define our model grid here. We can do this for an arbitary domain length L.</p><pre><code class="language-julia hljs">grid(; L, nx = 80,ny = 80) = Grid(nx = nx, ny = ny, dx = L/nx, dy = L/ny, y0 = 0.0, x0 = 0.0)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">grid (generic function with 1 method)</code></pre><p>The final two arguments simply set the origin of the co-ordinate system. This grid has 80 grid points in each direction by default</p><p>Let&#39;s choose a domain of 80km with 80 grid points</p><pre><code class="language-julia hljs">L = 80000.
+grid80 = grid(L = L)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Grid{Float64, Int64}(80, 80, 4, 1000.0, 1000.0, 0.0, 0.0, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], Bool[0 0 … 0 0; 0 0 … 0 0; … ; 0 0 … 0 0; 0 0 … 0 0], Bool[0 0 … 0 0; 0 0 … 0 0; … ; 0 0 … 0 0; 0 0 … 0 0], [500.0 500.0 … 500.0 500.0; 1500.0 1500.0 … 1500.0 1500.0; … ; 78500.0 78500.0 … 78500.0 78500.0; 79500.0 79500.0 … 79500.0 79500.0], [500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0; … ; 500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0], [0.0 0.0 … 0.0 0.0; 1000.0 1000.0 … 1000.0 1000.0; … ; 79000.0 79000.0 … 79000.0 79000.0; 80000.0 80000.0 … 80000.0 80000.0], [500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0; … ; 500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0], [500.0 500.0 … 500.0 500.0; 1500.0 1500.0 … 1500.0 1500.0; … ; 78500.0 78500.0 … 78500.0 78500.0; 79500.0 79500.0 … 79500.0 79500.0], [0.0 1000.0 … 79000.0 80000.0; 0.0 1000.0 … 79000.0 80000.0; … ; 0.0 1000.0 … 79000.0 80000.0; 0.0 1000.0 … 79000.0 80000.0], [1000.0 1000.0 … 1000.0 1000.0; 2000.0 2000.0 … 2000.0 2000.0; … ; 78000.0 78000.0 … 78000.0 78000.0; 79000.0 79000.0 … 79000.0 79000.0], [1000.0 2000.0 … 78000.0 79000.0; 1000.0 2000.0 … 78000.0 79000.0; … ; 1000.0 2000.0 … 78000.0 79000.0; 1000.0 2000.0 … 78000.0 79000.0], [0.0, 0.3333333333333333, 0.6666666666666666, 1.0], [1.0, 0.6666666666666667, 0.33333333333333337, 0.0], [0.16666666666666666, 0.3333333333333333, 0.3333333333333333, 0.16666666666666666])</code></pre><p>This grid object contains information about the location of grid points. We use this to construct and array defining the bed:</p><pre><code class="language-julia hljs">z_b80 = z_b.(grid80.xxh,grid80.yyh; α = 0.5, ω = 2π/L );
+plt = Plots.heatmap(grid80.xxh[:,1]/1e3, grid80.yyh[1,:]/1e3, z_b80,
+                        xlabel = &quot;x (km)&quot;,
+                        ylabel = &quot;y (km)&quot;,
+                        colorbar_title = &quot;bed depth (m)&quot;)
+plot!(size = (1000,550))
+display(plt)</code></pre><h2 id="Model-Instantiation-and-Initial-Conditions"><a class="docs-heading-anchor" href="#Model-Instantiation-and-Initial-Conditions">Model Instantiation and Initial Conditions</a><a id="Model-Instantiation-and-Initial-Conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Model-Instantiation-and-Initial-Conditions" title="Permalink"></a></h2><p>In the ISMIP-HOM comparison, the main test is velocity along the line <span>$y = L/4$</span>, for various different values of <span>$L$</span>. Before we do that, lets look at the velocity for the example we started above with <span>$L = 80$</span>km.</p><p>To begin, we create an <code>InitialConditions</code> object to prescribe the ice thickness of 1000m everywhere</p><pre><code class="language-julia hljs">initial_conditions = InitialConditions(initial_thickness = 1000. .* ones(grid80.nx, grid80.ny))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">InitialConditions{Float64}
+  initial_thickness: Array{Float64}((80, 80)) [1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0; … ; 1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0]
+  initial_viscosity: Array{Float64}((1, 1, 1)) [NaN]
+  initial_temperature: Array{Float64}((1, 1, 1)) [NaN]
+  initial_damage: Array{Float64}((1, 1, 1)) [NaN]
+</code></pre><p>Now we can build our model</p><pre><code class="language-julia hljs">model80 = Model(grid = grid80,
+            bed_elevation = z_b80,
+            initial_conditions = initial_conditions)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Model{Float64, Int64, Matrix{Float64}, Matrix{Float64}}(Grid{Float64, Int64}(80, 80, 4, 1000.0, 1000.0, 0.0, 0.0, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], Bool[0 0 … 0 0; 0 0 … 0 0; … ; 0 0 … 0 0; 0 0 … 0 0], Bool[0 0 … 0 0; 0 0 … 0 0; … ; 0 0 … 0 0; 0 0 … 0 0], [500.0 500.0 … 500.0 500.0; 1500.0 1500.0 … 1500.0 1500.0; … ; 78500.0 78500.0 … 78500.0 78500.0; 79500.0 79500.0 … 79500.0 79500.0], [500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0; … ; 500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0], [0.0 0.0 … 0.0 0.0; 1000.0 1000.0 … 1000.0 1000.0; … ; 79000.0 79000.0 … 79000.0 79000.0; 80000.0 80000.0 … 80000.0 80000.0], [500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0; … ; 500.0 1500.0 … 78500.0 79500.0; 500.0 1500.0 … 78500.0 79500.0], [500.0 500.0 … 500.0 500.0; 1500.0 1500.0 … 1500.0 1500.0; … ; 78500.0 78500.0 … 78500.0 78500.0; 79500.0 79500.0 … 79500.0 79500.0], [0.0 1000.0 … 79000.0 80000.0; 0.0 1000.0 … 79000.0 80000.0; … ; 0.0 1000.0 … 79000.0 80000.0; 0.0 1000.0 … 79000.0 80000.0], [1000.0 1000.0 … 1000.0 1000.0; 2000.0 2000.0 … 2000.0 2000.0; … ; 78000.0 78000.0 … 78000.0 78000.0; 79000.0 79000.0 … 79000.0 79000.0], [1000.0 2000.0 … 78000.0 79000.0; 1000.0 2000.0 … 78000.0 79000.0; … ; 1000.0 2000.0 … 78000.0 79000.0; 1000.0 2000.0 … 78000.0 79000.0], [0.0, 0.3333333333333333, 0.6666666666666666, 1.0], [1.0, 0.6666666666666667, 0.33333333333333337, 0.0], [0.16666666666666666, 0.3333333333333333, 0.3333333333333333, 0.16666666666666666]), Params{Float64, Matrix{Float64}, Matrix{Float64}}(1.0, 9.81, 918.0, 1028.0, 8.314, 3.15576e7, 100.0, 1.0e7, 265.700709, 0.0, [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], 58631.0, 1.5463224e-17, 263.15, 3.0, 1.0e-5, [10000.0 10000.0 … 10000.0 10000.0; 10000.0 10000.0 … 10000.0 10000.0; … ; 10000.0 10000.0 … 10000.0 10000.0; 10000.0 10000.0 … 10000.0 10000.0], 3.0, 1.0e-5, 0.0, 50.0, true, 1.0), SolverParams{Float64, Int64}
+  n_iter_viscosity: Int64 2
+  tol_picard: Float64 1.0e-5
+  maxiter_picard: Int64 30
+  tol_coarse: Float64 1.0e-5
+  maxiter_coarse: Int64 1000
+  levels: Int64 3
+  wavelet_threshold: Float64 10.0
+  nsmooth: Int64 5
+  smoother_omega: Float64 1.0
+  stencil_margin: Int64 3
+, InitialConditions{Float64}
+  initial_thickness: Array{Float64}((80, 80)) [1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0; … ; 1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0]
+  initial_viscosity: Array{Float64}((80, 80, 4)) [1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+  initial_temperature: Array{Float64}((80, 80, 4)) [265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+  initial_damage: Array{Float64}((80, 80, 4)) [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+, WAVI.Fields{Float64, Int64}(WAVI.HGrid{Float64, Int64}(80, 80, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], 6400, [1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0], 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, [-3.592767328661388 -2.056185610881832 … -6.670682179876957 -5.134100462097409; -10.783053401640622 -6.182781785557335 … -19.997821586719034 -15.397549970635774; … ; -687.3663698590625 -691.9666414751458 … -678.1516016739841 -682.7518732900674; -694.5566559320417 -696.0932376498214 … -691.4787410808261 -693.0153227986058], [1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0; … ; 1000.0 1000.0 … 1000.0 1000.0; 1000.0 1000.0 … 1000.0 1000.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0; … ; 1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0], [1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0; … ; 1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [3.3333333333333335e-5 3.3333333333333335e-5 … 3.3333333333333335e-5 3.3333333333333335e-5; 3.3333333333333335e-5 3.3333333333333335e-5 … 3.3333333333333335e-5 3.3333333333333335e-5; … ; 3.3333333333333335e-5 3.3333333333333335e-5 … 3.3333333333333335e-5 3.3333333333333335e-5; 3.3333333333333335e-5 3.3333333333333335e-5 … 3.3333333333333335e-5 3.3333333333333335e-5], Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]), Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0])), WAVI.UGrid{Float64, Int64}(81, 80, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], 6480, [1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0], 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 6400×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×81 LinearMaps.WrappedMap{Float64} of
+    80×81 SparseArrays.SparseMatrixCSC{Float64, Int64}, 6400×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×81 LinearMaps.WrappedMap{Float64} of
+    80×81 SparseArrays.SparseMatrixCSC{Float64, Int64}, 6241×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  79×80 LinearMaps.WrappedMap{Float64} of
+    79×80 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  79×81 LinearMaps.WrappedMap{Float64} of
+    79×81 SparseArrays.SparseMatrixCSC{Float64, Int64}, 3, 6480×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  81×81 LinearMaps.WrappedMap{Float64} of
+    81×81 SparseArrays.SparseMatrixCSC{Float64, Int64}, [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0; … ; 1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([-0.0 0.0 … 0.0 0.0; 0.0 -0.0 … 0.0 0.0; … ; 0.0 0.0 … -0.0 0.0; 0.0 0.0 … 0.0 -0.0]), [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]), WAVI.VGrid{Float64, Int64}(80, 81, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], 6480, [1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0], 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 6400×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×81 LinearMaps.WrappedMap{Float64} of
+    80×81 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}, 6241×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  79×81 LinearMaps.WrappedMap{Float64} of
+    79×81 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  79×80 LinearMaps.WrappedMap{Float64} of
+    79×80 SparseArrays.SparseMatrixCSC{Float64, Int64}, 6400×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×81 LinearMaps.WrappedMap{Float64} of
+    80×81 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}, 3, 6480×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  81×81 LinearMaps.WrappedMap{Float64} of
+    81×81 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}, [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], [1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0; … ; 1.0 1.0 … 1.0 1.0; 1.0 1.0 … 1.0 1.0], [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0], Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([-0.0 0.0 … 0.0 0.0; 0.0 -0.0 … 0.0 0.0; … ; 0.0 0.0 … -0.0 0.0; 0.0 0.0 … 0.0 -0.0]), [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]), WAVI.CGrid{Float64, Int64}(79, 79, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], 6241, [1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0], 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄, 6400×6241 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×79 LinearMaps.WrappedMap{Float64} of
+    80×79 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×79 LinearMaps.WrappedMap{Float64} of
+    80×79 SparseArrays.SparseMatrixCSC{Float64, Int64}), WAVI.SigmaGrid{Float64, Int64}
+  nxs: Int64 80
+  nys: Int64 80
+  nσs: Int64 4
+  σ: Array{Float64}((4,)) [0.0, 0.3333333333333333, 0.6666666666666666, 1.0]
+  ζ: Array{Float64}((4,)) [1.0, 0.6666666666666667, 0.33333333333333337, 0.0]
+  quadrature_weights: Array{Float64}((4,)) [0.16666666666666666, 0.3333333333333333, 0.3333333333333333, 0.16666666666666666]
+  η: Array{Float64}((80, 80, 4)) [1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+
+[1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7; … ; 1.0e7 1.0e7 … 1.0e7 1.0e7; 1.0e7 1.0e7 … 1.0e7 1.0e7]
+  θ: Array{Float64}((80, 80, 4)) [265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+
+[265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709; … ; 265.700709 265.700709 … 265.700709 265.700709; 265.700709 265.700709 … 265.700709 265.700709]
+  Φ: Array{Float64}((80, 80, 4)) [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+
+[0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]
+  glen_b: Array{Float64}((80, 80, 4)) [368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; … ; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335]
+
+[368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; … ; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335]
+
+[368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; … ; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335]
+
+[368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; … ; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335; 368403.3811376335 368403.3811376335 … 368403.3811376335 368403.3811376335]
+, WAVI.UWavelets{Float64, Int64}(81, 80, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], Base.RefValue{Int64}(6480), Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0]), Base.RefValue{SparseArrays.SparseMatrixCSC{Float64, Int64}}(
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄), Base.RefValue{SparseArrays.SparseMatrixCSC{Float64, Int64}}(
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄), 3, 6480×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  81×81 LinearMaps.WrappedMap{Float64} of
+    81×81 SparseArrays.SparseMatrixCSC{Float64, Int64}, [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0]), WAVI.VWavelets{Float64, Int64}(80, 81, Bool[1 1 … 1 1; 1 1 … 1 1; … ; 1 1 … 1 1; 1 1 … 1 1], Base.RefValue{Int64}(6480), Base.RefValue{LinearAlgebra.Diagonal{Float64, Vector{Float64}}}([1.0 0.0 … 0.0 0.0; 0.0 1.0 … 0.0 0.0; … ; 0.0 0.0 … 1.0 0.0; 0.0 0.0 … 0.0 1.0]), Base.RefValue{SparseArrays.SparseMatrixCSC{Float64, Int64}}(
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄), Base.RefValue{SparseArrays.SparseMatrixCSC{Float64, Int64}}(
+⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠑⢄), 3, 6480×6480 LinearMaps.KroneckerMap{Float64} with 2 maps:
+  81×81 LinearMaps.WrappedMap{Float64} of
+    81×81 SparseArrays.SparseMatrixCSC{Float64, Int64}
+  80×80 LinearMaps.WrappedMap{Float64} of
+    80×80 SparseArrays.SparseMatrixCSC{Float64, Int64}, [0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0; … ; 0.0 0.0 … 0.0 0.0; 0.0 0.0 … 0.0 0.0])), Dict{String, Any}())</code></pre><h2 id="Determining-the-velocity"><a class="docs-heading-anchor" href="#Determining-the-velocity">Determining the velocity</a><a id="Determining-the-velocity-1"></a><a class="docs-heading-anchor-permalink" href="#Determining-the-velocity" title="Permalink"></a></h2><p>To bring the velocity in line with the ice thickness, we have to use the <code>update_state!</code> function</p><pre><code class="language-julia hljs">update_state!(model80)</code></pre><p>Let&#39;s have a look at the velocity component in the x-direction</p><pre><code class="language-julia hljs">Plots.heatmap(model80.grid.xxh[:,1]/1e3, model80.grid.yyh[1,:]/1e3, model80.fields.gh.u&#39;,
+                        xlabel = &quot;x (km)&quot;,
+                        ylabel = &quot;y (km)&quot;,
+                        colorbar_title = &quot;ice velocity in x-direction (m/yr)&quot;)
+plot!(size = (1000,550))</code></pre><?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1000" height="550" viewBox="0 0 4000 2200">
+<defs>
+  <clipPath id="clip460">
+    <rect x="0" y="0" width="4000" height="2200"/>
+  </clipPath>
+</defs>
+<path clip-path="url(#clip460)" d="
+M0 2200 L4000 2200 L4000 0 L0 0  Z
+  " fill="#ffffff" fill-rule="evenodd" fill-opacity="1"/>
+<defs>
+  <clipPath id="clip461">
+    <rect x="800" y="0" width="2801" height="2200"/>
+  </clipPath>
+</defs>
+<path clip-path="url(#clip460)" d="
+M212.805 2031.54 L3489.76 2031.54 L3489.76 47.2441 L212.805 47.2441  Z
+  " fill="#ffffff" fill-rule="evenodd" fill-opacity="1"/>
+<defs>
+  <clipPath id="clip462">
+    <rect x="212" y="47" width="3278" height="1985"/>
+  </clipPath>
+</defs>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,2031.54 212.805,47.2441 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  1032.04,2031.54 1032.04,47.2441 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  1851.28,2031.54 1851.28,47.2441 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  2670.52,2031.54 2670.52,47.2441 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  3489.76,2031.54 3489.76,47.2441 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,2031.54 3489.76,2031.54 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,2031.54 212.805,2012.65 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  1032.04,2031.54 1032.04,2012.65 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  1851.28,2031.54 1851.28,2012.65 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  2670.52,2031.54 2670.52,2012.65 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  3489.76,2031.54 3489.76,2012.65 
+  "/>
+<path clip-path="url(#clip460)" d="M212.805 2075.26 Q209.194 2075.26 207.365 2078.83 Q205.56 2082.37 205.56 2089.5 Q205.56 2096.61 207.365 2100.17 Q209.194 2103.71 212.805 2103.71 Q216.439 2103.71 218.245 2100.17 Q220.073 2096.61 220.073 2089.5 Q220.073 2082.37 218.245 2078.83 Q216.439 2075.26 212.805 2075.26 M212.805 2071.56 Q218.615 2071.56 221.671 2076.17 Q224.749 2080.75 224.749 2089.5 Q224.749 2098.23 221.671 2102.83 Q218.615 2107.42 212.805 2107.42 Q206.995 2107.42 203.916 2102.83 Q200.861 2098.23 200.861 2089.5 Q200.861 2080.75 203.916 2076.17 Q206.995 2071.56 212.805 2071.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1010.82 2102.81 L1027.14 2102.81 L1027.14 2106.74 L1005.19 2106.74 L1005.19 2102.81 Q1007.85 2100.05 1012.44 2095.42 Q1017.04 2090.77 1018.23 2089.43 Q1020.47 2086.91 1021.35 2085.17 Q1022.25 2083.41 1022.25 2081.72 Q1022.25 2078.97 1020.31 2077.23 Q1018.39 2075.49 1015.29 2075.49 Q1013.09 2075.49 1010.63 2076.26 Q1008.2 2077.02 1005.42 2078.57 L1005.42 2073.85 Q1008.25 2072.72 1010.7 2072.14 Q1013.16 2071.56 1015.19 2071.56 Q1020.56 2071.56 1023.76 2074.24 Q1026.95 2076.93 1026.95 2081.42 Q1026.95 2083.55 1026.14 2085.47 Q1025.35 2087.37 1023.25 2089.96 Q1022.67 2090.63 1019.57 2093.85 Q1016.47 2097.04 1010.82 2102.81 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1046.95 2075.26 Q1043.34 2075.26 1041.51 2078.83 Q1039.71 2082.37 1039.71 2089.5 Q1039.71 2096.61 1041.51 2100.17 Q1043.34 2103.71 1046.95 2103.71 Q1050.59 2103.71 1052.39 2100.17 Q1054.22 2096.61 1054.22 2089.5 Q1054.22 2082.37 1052.39 2078.83 Q1050.59 2075.26 1046.95 2075.26 M1046.95 2071.56 Q1052.76 2071.56 1055.82 2076.17 Q1058.9 2080.75 1058.9 2089.5 Q1058.9 2098.23 1055.82 2102.83 Q1052.76 2107.42 1046.95 2107.42 Q1041.14 2107.42 1038.06 2102.83 Q1035.01 2098.23 1035.01 2089.5 Q1035.01 2080.75 1038.06 2076.17 Q1041.14 2071.56 1046.95 2071.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1839.46 2076.26 L1827.65 2094.71 L1839.46 2094.71 L1839.46 2076.26 M1838.23 2072.18 L1844.11 2072.18 L1844.11 2094.71 L1849.04 2094.71 L1849.04 2098.6 L1844.11 2098.6 L1844.11 2106.74 L1839.46 2106.74 L1839.46 2098.6 L1823.85 2098.6 L1823.85 2094.08 L1838.23 2072.18 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1866.77 2075.26 Q1863.16 2075.26 1861.33 2078.83 Q1859.53 2082.37 1859.53 2089.5 Q1859.53 2096.61 1861.33 2100.17 Q1863.16 2103.71 1866.77 2103.71 Q1870.4 2103.71 1872.21 2100.17 Q1874.04 2096.61 1874.04 2089.5 Q1874.04 2082.37 1872.21 2078.83 Q1870.4 2075.26 1866.77 2075.26 M1866.77 2071.56 Q1872.58 2071.56 1875.64 2076.17 Q1878.71 2080.75 1878.71 2089.5 Q1878.71 2098.23 1875.64 2102.83 Q1872.58 2107.42 1866.77 2107.42 Q1860.96 2107.42 1857.88 2102.83 Q1854.83 2098.23 1854.83 2089.5 Q1854.83 2080.75 1857.88 2076.17 Q1860.96 2071.56 1866.77 2071.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M2655.93 2087.6 Q2652.78 2087.6 2650.93 2089.75 Q2649.1 2091.91 2649.1 2095.66 Q2649.1 2099.38 2650.93 2101.56 Q2652.78 2103.71 2655.93 2103.71 Q2659.08 2103.71 2660.91 2101.56 Q2662.76 2099.38 2662.76 2095.66 Q2662.76 2091.91 2660.91 2089.75 Q2659.08 2087.6 2655.93 2087.6 M2665.21 2072.95 L2665.21 2077.21 Q2663.45 2076.37 2661.65 2075.93 Q2659.86 2075.49 2658.11 2075.49 Q2653.48 2075.49 2651.02 2078.62 Q2648.59 2081.74 2648.24 2088.06 Q2649.61 2086.05 2651.67 2084.98 Q2653.73 2083.9 2656.21 2083.9 Q2661.42 2083.9 2664.42 2087.07 Q2667.46 2090.22 2667.46 2095.66 Q2667.46 2100.98 2664.31 2104.2 Q2661.16 2107.42 2655.93 2107.42 Q2649.93 2107.42 2646.76 2102.83 Q2643.59 2098.23 2643.59 2089.5 Q2643.59 2081.3 2647.48 2076.44 Q2651.37 2071.56 2657.92 2071.56 Q2659.68 2071.56 2661.46 2071.91 Q2663.27 2072.25 2665.21 2072.95 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M2685.51 2075.26 Q2681.9 2075.26 2680.07 2078.83 Q2678.27 2082.37 2678.27 2089.5 Q2678.27 2096.61 2680.07 2100.17 Q2681.9 2103.71 2685.51 2103.71 Q2689.15 2103.71 2690.95 2100.17 Q2692.78 2096.61 2692.78 2089.5 Q2692.78 2082.37 2690.95 2078.83 Q2689.15 2075.26 2685.51 2075.26 M2685.51 2071.56 Q2691.32 2071.56 2694.38 2076.17 Q2697.46 2080.75 2697.46 2089.5 Q2697.46 2098.23 2694.38 2102.83 Q2691.32 2107.42 2685.51 2107.42 Q2679.7 2107.42 2676.62 2102.83 Q2673.57 2098.23 2673.57 2089.5 Q2673.57 2080.75 2676.62 2076.17 Q2679.7 2071.56 2685.51 2071.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3474.64 2090.33 Q3471.3 2090.33 3469.38 2092.11 Q3467.48 2093.9 3467.48 2097.02 Q3467.48 2100.15 3469.38 2101.93 Q3471.3 2103.71 3474.64 2103.71 Q3477.97 2103.71 3479.89 2101.93 Q3481.81 2100.12 3481.81 2097.02 Q3481.81 2093.9 3479.89 2092.11 Q3477.99 2090.33 3474.64 2090.33 M3469.96 2088.34 Q3466.95 2087.6 3465.26 2085.54 Q3463.59 2083.48 3463.59 2080.52 Q3463.59 2076.37 3466.53 2073.97 Q3469.5 2071.56 3474.64 2071.56 Q3479.8 2071.56 3482.74 2073.97 Q3485.68 2076.37 3485.68 2080.52 Q3485.68 2083.48 3483.99 2085.54 Q3482.32 2087.6 3479.34 2088.34 Q3482.72 2089.13 3484.59 2091.42 Q3486.49 2093.71 3486.49 2097.02 Q3486.49 2102.04 3483.41 2104.73 Q3480.35 2107.42 3474.64 2107.42 Q3468.92 2107.42 3465.84 2104.73 Q3462.78 2102.04 3462.78 2097.02 Q3462.78 2093.71 3464.68 2091.42 Q3466.58 2089.13 3469.96 2088.34 M3468.25 2080.96 Q3468.25 2083.64 3469.91 2085.15 Q3471.6 2086.65 3474.64 2086.65 Q3477.65 2086.65 3479.34 2085.15 Q3481.05 2083.64 3481.05 2080.96 Q3481.05 2078.27 3479.34 2076.77 Q3477.65 2075.26 3474.64 2075.26 Q3471.6 2075.26 3469.91 2076.77 Q3468.25 2078.27 3468.25 2080.96 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3504.8 2075.26 Q3501.19 2075.26 3499.36 2078.83 Q3497.55 2082.37 3497.55 2089.5 Q3497.55 2096.61 3499.36 2100.17 Q3501.19 2103.71 3504.8 2103.71 Q3508.43 2103.71 3510.24 2100.17 Q3512.07 2096.61 3512.07 2089.5 Q3512.07 2082.37 3510.24 2078.83 Q3508.43 2075.26 3504.8 2075.26 M3504.8 2071.56 Q3510.61 2071.56 3513.66 2076.17 Q3516.74 2080.75 3516.74 2089.5 Q3516.74 2098.23 3513.66 2102.83 Q3510.61 2107.42 3504.8 2107.42 Q3498.99 2107.42 3495.91 2102.83 Q3492.85 2098.23 3492.85 2089.5 Q3492.85 2080.75 3495.91 2076.17 Q3498.99 2071.56 3504.8 2071.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1783.22 2164.76 L1770.33 2182.11 L1783.89 2200.41 L1776.98 2200.41 L1766.6 2186.4 L1756.23 2200.41 L1749.32 2200.41 L1763.17 2181.76 L1750.5 2164.76 L1757.41 2164.76 L1766.86 2177.46 L1776.31 2164.76 L1783.22 2164.76 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1826.95 2150.95 Q1822.69 2158.27 1820.62 2165.43 Q1818.55 2172.59 1818.55 2179.94 Q1818.55 2187.29 1820.62 2194.52 Q1822.72 2201.71 1826.95 2209 L1821.86 2209 Q1817.08 2201.52 1814.7 2194.3 Q1812.34 2187.07 1812.34 2179.94 Q1812.34 2172.84 1814.7 2165.65 Q1817.05 2158.46 1821.86 2150.95 L1826.95 2150.95 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1838.09 2150.88 L1843.98 2150.88 L1843.98 2180.13 L1861.45 2164.76 L1868.93 2164.76 L1850.03 2181.44 L1869.73 2200.41 L1862.09 2200.41 L1843.98 2183 L1843.98 2200.41 L1838.09 2200.41 L1838.09 2150.88 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1903.82 2171.6 Q1906.01 2167.66 1909.07 2165.78 Q1912.12 2163.9 1916.26 2163.9 Q1921.83 2163.9 1924.86 2167.82 Q1927.88 2171.7 1927.88 2178.89 L1927.88 2200.41 L1921.99 2200.41 L1921.99 2179.08 Q1921.99 2173.96 1920.18 2171.48 Q1918.36 2168.99 1914.64 2168.99 Q1910.09 2168.99 1907.45 2172.02 Q1904.8 2175.04 1904.8 2180.26 L1904.8 2200.41 L1898.92 2200.41 L1898.92 2179.08 Q1898.92 2173.93 1897.1 2171.48 Q1895.29 2168.99 1891.5 2168.99 Q1887.01 2168.99 1884.37 2172.05 Q1881.73 2175.07 1881.73 2180.26 L1881.73 2200.41 L1875.84 2200.41 L1875.84 2164.76 L1881.73 2164.76 L1881.73 2170.3 Q1883.73 2167.02 1886.53 2165.46 Q1889.34 2163.9 1893.19 2163.9 Q1897.07 2163.9 1899.78 2165.87 Q1902.51 2167.85 1903.82 2171.6 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M1938.64 2150.95 L1943.73 2150.95 Q1948.5 2158.46 1950.86 2165.65 Q1953.25 2172.84 1953.25 2179.94 Q1953.25 2187.07 1950.86 2194.3 Q1948.5 2201.52 1943.73 2209 L1938.64 2209 Q1942.87 2201.71 1944.94 2194.52 Q1947.04 2187.29 1947.04 2179.94 Q1947.04 2172.59 1944.94 2165.43 Q1942.87 2158.27 1938.64 2150.95 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,2031.54 3489.76,2031.54 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,1535.47 3489.76,1535.47 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,1039.39 3489.76,1039.39 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,543.319 3489.76,543.319 
+  "/>
+<polyline clip-path="url(#clip462)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:2; stroke-opacity:0.1; fill:none" points="
+  212.805,47.2441 3489.76,47.2441 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,2031.54 212.805,47.2441 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,2031.54 229.647,2031.54 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,1535.47 229.647,1535.47 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,1039.39 229.647,1039.39 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,543.319 229.647,543.319 
+  "/>
+<polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  212.805,47.2441 229.647,47.2441 
+  "/>
+<path clip-path="url(#clip460)" d="M140.861 2017.34 Q137.25 2017.34 135.421 2020.91 Q133.615 2024.45 133.615 2031.58 Q133.615 2038.69 135.421 2042.25 Q137.25 2045.79 140.861 2045.79 Q144.495 2045.79 146.3 2042.25 Q148.129 2038.69 148.129 2031.58 Q148.129 2024.45 146.3 2020.91 Q144.495 2017.34 140.861 2017.34 M140.861 2013.64 Q146.671 2013.64 149.726 2018.25 Q152.805 2022.83 152.805 2031.58 Q152.805 2040.31 149.726 2044.91 Q146.671 2049.5 140.861 2049.5 Q135.05 2049.5 131.972 2044.91 Q128.916 2040.31 128.916 2031.58 Q128.916 2022.83 131.972 2018.25 Q135.05 2013.64 140.861 2013.64 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M104.727 1548.81 L121.046 1548.81 L121.046 1552.75 L99.1016 1552.75 L99.1016 1548.81 Q101.764 1546.06 106.347 1541.43 Q110.953 1536.78 112.134 1535.43 Q114.379 1532.91 115.259 1531.17 Q116.162 1529.42 116.162 1527.73 Q116.162 1524.97 114.217 1523.24 Q112.296 1521.5 109.194 1521.5 Q106.995 1521.5 104.541 1522.26 Q102.111 1523.03 99.333 1524.58 L99.333 1519.86 Q102.157 1518.72 104.611 1518.14 Q107.064 1517.56 109.102 1517.56 Q114.472 1517.56 117.666 1520.25 Q120.861 1522.93 120.861 1527.42 Q120.861 1529.55 120.051 1531.48 Q119.263 1533.37 117.157 1535.97 Q116.578 1536.64 113.476 1539.86 Q110.375 1543.05 104.727 1548.81 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M140.861 1521.27 Q137.25 1521.27 135.421 1524.83 Q133.615 1528.37 133.615 1535.5 Q133.615 1542.61 135.421 1546.17 Q137.25 1549.72 140.861 1549.72 Q144.495 1549.72 146.3 1546.17 Q148.129 1542.61 148.129 1535.5 Q148.129 1528.37 146.3 1524.83 Q144.495 1521.27 140.861 1521.27 M140.861 1517.56 Q146.671 1517.56 149.726 1522.17 Q152.805 1526.75 152.805 1535.5 Q152.805 1544.23 149.726 1548.84 Q146.671 1553.42 140.861 1553.42 Q135.05 1553.42 131.972 1548.84 Q128.916 1544.23 128.916 1535.5 Q128.916 1526.75 131.972 1522.17 Q135.05 1517.56 140.861 1517.56 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M113.546 1026.19 L101.74 1044.64 L113.546 1044.64 L113.546 1026.19 M112.319 1022.11 L118.199 1022.11 L118.199 1044.64 L123.129 1044.64 L123.129 1048.53 L118.199 1048.53 L118.199 1056.67 L113.546 1056.67 L113.546 1048.53 L97.9442 1048.53 L97.9442 1044.01 L112.319 1022.11 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M140.861 1025.19 Q137.25 1025.19 135.421 1028.76 Q133.615 1032.3 133.615 1039.43 Q133.615 1046.54 135.421 1050.1 Q137.25 1053.64 140.861 1053.64 Q144.495 1053.64 146.3 1050.1 Q148.129 1046.54 148.129 1039.43 Q148.129 1032.3 146.3 1028.76 Q144.495 1025.19 140.861 1025.19 M140.861 1021.49 Q146.671 1021.49 149.726 1026.1 Q152.805 1030.68 152.805 1039.43 Q152.805 1048.16 149.726 1052.76 Q146.671 1057.35 140.861 1057.35 Q135.05 1057.35 131.972 1052.76 Q128.916 1048.16 128.916 1039.43 Q128.916 1030.68 131.972 1026.1 Q135.05 1021.49 140.861 1021.49 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M111.277 541.456 Q108.129 541.456 106.277 543.608 Q104.449 545.761 104.449 549.511 Q104.449 553.238 106.277 555.414 Q108.129 557.567 111.277 557.567 Q114.426 557.567 116.254 555.414 Q118.106 553.238 118.106 549.511 Q118.106 545.761 116.254 543.608 Q114.426 541.456 111.277 541.456 M120.56 526.803 L120.56 531.062 Q118.801 530.229 116.995 529.789 Q115.213 529.349 113.453 529.349 Q108.824 529.349 106.37 532.474 Q103.939 535.599 103.592 541.919 Q104.958 539.905 107.018 538.84 Q109.078 537.752 111.555 537.752 Q116.764 537.752 119.773 540.923 Q122.805 544.071 122.805 549.511 Q122.805 554.835 119.657 558.053 Q116.509 561.27 111.277 561.27 Q105.282 561.27 102.111 556.687 Q98.9395 552.081 98.9395 543.354 Q98.9395 535.159 102.828 530.298 Q106.717 525.414 113.268 525.414 Q115.027 525.414 116.81 525.761 Q118.615 526.108 120.56 526.803 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M140.861 529.118 Q137.25 529.118 135.421 532.683 Q133.615 536.224 133.615 543.354 Q133.615 550.46 135.421 554.025 Q137.25 557.567 140.861 557.567 Q144.495 557.567 146.3 554.025 Q148.129 550.46 148.129 543.354 Q148.129 536.224 146.3 532.683 Q144.495 529.118 140.861 529.118 M140.861 525.414 Q146.671 525.414 149.726 530.02 Q152.805 534.604 152.805 543.354 Q152.805 552.081 149.726 556.687 Q146.671 561.27 140.861 561.27 Q135.05 561.27 131.972 556.687 Q128.916 552.081 128.916 543.354 Q128.916 534.604 131.972 530.02 Q135.05 525.414 140.861 525.414 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M110.699 48.1121 Q107.365 48.1121 105.444 49.8945 Q103.546 51.6769 103.546 54.8019 Q103.546 57.9269 105.444 59.7093 Q107.365 61.4917 110.699 61.4917 Q114.032 61.4917 115.953 59.7093 Q117.875 57.9038 117.875 54.8019 Q117.875 51.6769 115.953 49.8945 Q114.055 48.1121 110.699 48.1121 M106.023 46.1214 Q103.014 45.3807 101.324 43.3205 Q99.6571 41.2603 99.6571 38.2974 Q99.6571 34.1539 102.597 31.7465 Q105.56 29.3391 110.699 29.3391 Q115.861 29.3391 118.801 31.7465 Q121.74 34.1539 121.74 38.2974 Q121.74 41.2603 120.051 43.3205 Q118.384 45.3807 115.398 46.1214 Q118.777 46.9084 120.652 49.2001 Q122.551 51.4918 122.551 54.8019 Q122.551 59.825 119.472 62.5102 Q116.416 65.1954 110.699 65.1954 Q104.981 65.1954 101.902 62.5102 Q98.8469 59.825 98.8469 54.8019 Q98.8469 51.4918 100.745 49.2001 Q102.643 46.9084 106.023 46.1214 M104.31 38.7372 Q104.31 41.4224 105.977 42.927 Q107.666 44.4316 110.699 44.4316 Q113.708 44.4316 115.398 42.927 Q117.111 41.4224 117.111 38.7372 Q117.111 36.052 115.398 34.5474 Q113.708 33.0428 110.699 33.0428 Q107.666 33.0428 105.977 34.5474 Q104.31 36.052 104.31 38.7372 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M140.861 33.0428 Q137.25 33.0428 135.421 36.6076 Q133.615 40.1492 133.615 47.2788 Q133.615 54.3853 135.421 57.9501 Q137.25 61.4917 140.861 61.4917 Q144.495 61.4917 146.3 57.9501 Q148.129 54.3853 148.129 47.2788 Q148.129 40.1492 146.3 36.6076 Q144.495 33.0428 140.861 33.0428 M140.861 29.3391 Q146.671 29.3391 149.726 33.9456 Q152.805 38.5289 152.805 47.2788 Q152.805 56.0056 149.726 60.6121 Q146.671 65.1954 140.861 65.1954 Q135.05 65.1954 131.972 60.6121 Q128.916 56.0056 128.916 47.2788 Q128.916 38.5289 131.972 33.9456 Q135.05 29.3391 140.861 29.3391 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M26.9983 1122.29 Q33.364 1124.77 35.3056 1127.13 Q37.2471 1129.48 37.2471 1133.43 L37.2471 1138.11 L32.3455 1138.11 L32.3455 1134.67 Q32.3455 1132.25 31.1997 1130.92 Q30.0539 1129.58 25.7888 1127.96 L23.1152 1126.91 L-11.9598 1141.32 L-11.9598 1135.12 L15.922 1123.98 L-11.9598 1112.84 L-11.9598 1106.63 L26.9983 1122.29 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M-25.7734 1063.76 Q-18.4528 1068.02 -11.2914 1070.09 Q-4.12998 1072.16 3.22241 1072.16 Q10.5748 1072.16 17.7999 1070.09 Q24.9931 1067.99 32.2819 1063.76 L32.2819 1068.85 Q24.8022 1073.63 17.5771 1076.01 Q10.352 1078.37 3.22241 1078.37 Q-3.87535 1078.37 -11.0686 1076.01 Q-18.2618 1073.66 -25.7734 1068.85 L-25.7734 1063.76 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M-25.837 1052.62 L-25.837 1046.73 L3.41338 1046.73 L-11.9598 1029.26 L-11.9598 1021.78 L4.71835 1040.68 L23.6882 1020.98 L23.6882 1028.62 L6.27795 1046.73 L23.6882 1046.73 L23.6882 1052.62 L-25.837 1052.62 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M-5.11667 986.893 Q-9.0634 984.697 -10.9413 981.641 Q-12.8192 978.586 -12.8192 974.448 Q-12.8192 968.878 -8.90426 965.854 Q-5.02118 962.83 2.17207 962.83 L23.6882 962.83 L23.6882 968.719 L2.36304 968.719 Q-2.76135 968.719 -5.24398 970.533 Q-7.7266 972.347 -7.7266 976.071 Q-7.7266 980.623 -4.70289 983.264 Q-1.67918 985.906 3.5407 985.906 L23.6882 985.906 L23.6882 991.794 L2.36304 991.794 Q-2.79318 991.794 -5.24398 993.609 Q-7.7266 995.423 -7.7266 999.21 Q-7.7266 1003.7 -4.67107 1006.34 Q-1.64735 1008.98 3.5407 1008.98 L23.6882 1008.98 L23.6882 1014.87 L-11.9598 1014.87 L-11.9598 1008.98 L-6.42163 1008.98 Q-9.69997 1006.98 -11.2596 1004.18 Q-12.8192 1001.37 -12.8192 997.524 Q-12.8192 993.64 -10.8458 990.935 Q-8.87243 988.198 -5.11667 986.893 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M-25.7734 952.072 L-25.7734 946.98 Q-18.2618 942.206 -11.0686 939.85 Q-3.87535 937.463 3.22241 937.463 Q10.352 937.463 17.5771 939.85 Q24.8022 942.206 32.2819 946.98 L32.2819 952.072 Q24.9931 947.839 17.7999 945.77 Q10.5748 943.67 3.22241 943.67 Q-4.12998 943.67 -11.2914 945.77 Q-18.4528 947.839 -25.7734 952.072 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><g clip-path="url(#clip462)">
+<image width="3277" height="1984" xlink:href="data:image/png;base64,
+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
+" transform="translate(213, 47)"/>
+</g>
+<defs>
+  <clipPath id="clip463">
+    <rect x="3569" y="47" width="121" height="1985"/>
+  </clipPath>
+</defs>
+<g clip-path="url(#clip463)">
+<image width="120" height="1984" xlink:href="data:image/png;base64,
+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
+" transform="translate(3570, 47)"/>
+</g>
+<path clip-path="url(#clip460)" d="M3749.76 1843.61 L3779.44 1843.61 L3779.44 1847.55 L3749.76 1847.55 L3749.76 1843.61 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3789.58 1825.88 L3807.93 1825.88 L3807.93 1829.81 L3793.86 1829.81 L3793.86 1838.29 Q3794.88 1837.94 3795.9 1837.78 Q3796.92 1837.59 3797.93 1837.59 Q3803.72 1837.59 3807.1 1840.76 Q3810.48 1843.93 3810.48 1849.35 Q3810.48 1854.93 3807.01 1858.03 Q3803.54 1861.11 3797.22 1861.11 Q3795.04 1861.11 3792.77 1860.74 Q3790.53 1860.37 3788.12 1859.63 L3788.12 1854.93 Q3790.2 1856.06 3792.43 1856.62 Q3794.65 1857.18 3797.12 1857.18 Q3801.13 1857.18 3803.47 1855.07 Q3805.81 1852.96 3805.81 1849.35 Q3805.81 1845.74 3803.47 1843.63 Q3801.13 1841.53 3797.12 1841.53 Q3795.25 1841.53 3793.37 1841.94 Q3791.52 1842.36 3789.58 1843.24 L3789.58 1825.88 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3829.69 1828.96 Q3826.08 1828.96 3824.25 1832.52 Q3822.45 1836.06 3822.45 1843.19 Q3822.45 1850.3 3824.25 1853.87 Q3826.08 1857.41 3829.69 1857.41 Q3833.33 1857.41 3835.13 1853.87 Q3836.96 1850.3 3836.96 1843.19 Q3836.96 1836.06 3835.13 1832.52 Q3833.33 1828.96 3829.69 1828.96 M3829.69 1825.25 Q3835.5 1825.25 3838.56 1829.86 Q3841.64 1834.44 3841.64 1843.19 Q3841.64 1851.92 3838.56 1856.53 Q3835.5 1861.11 3829.69 1861.11 Q3823.88 1861.11 3820.81 1856.53 Q3817.75 1851.92 3817.75 1843.19 Q3817.75 1834.44 3820.81 1829.86 Q3823.88 1825.25 3829.69 1825.25 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3859.86 1828.96 Q3856.24 1828.96 3854.42 1832.52 Q3852.61 1836.06 3852.61 1843.19 Q3852.61 1850.3 3854.42 1853.87 Q3856.24 1857.41 3859.86 1857.41 Q3863.49 1857.41 3865.3 1853.87 Q3867.12 1850.3 3867.12 1843.19 Q3867.12 1836.06 3865.3 1832.52 Q3863.49 1828.96 3859.86 1828.96 M3859.86 1825.25 Q3865.67 1825.25 3868.72 1829.86 Q3871.8 1834.44 3871.8 1843.19 Q3871.8 1851.92 3868.72 1856.53 Q3865.67 1861.11 3859.86 1861.11 Q3854.05 1861.11 3850.97 1856.53 Q3847.91 1851.92 3847.91 1843.19 Q3847.91 1834.44 3850.97 1829.86 Q3854.05 1825.25 3859.86 1825.25 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3890.02 1828.96 Q3886.41 1828.96 3884.58 1832.52 Q3882.77 1836.06 3882.77 1843.19 Q3882.77 1850.3 3884.58 1853.87 Q3886.41 1857.41 3890.02 1857.41 Q3893.65 1857.41 3895.46 1853.87 Q3897.29 1850.3 3897.29 1843.19 Q3897.29 1836.06 3895.46 1832.52 Q3893.65 1828.96 3890.02 1828.96 M3890.02 1825.25 Q3895.83 1825.25 3898.88 1829.86 Q3901.96 1834.44 3901.96 1843.19 Q3901.96 1851.92 3898.88 1856.53 Q3895.83 1861.11 3890.02 1861.11 Q3884.21 1861.11 3881.13 1856.53 Q3878.07 1851.92 3878.07 1843.19 Q3878.07 1834.44 3881.13 1829.86 Q3884.21 1825.25 3890.02 1825.25 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3749.76 1461.97 L3779.44 1461.97 L3779.44 1465.9 L3749.76 1465.9 L3749.76 1461.97 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3793.56 1474.86 L3809.88 1474.86 L3809.88 1478.8 L3787.93 1478.8 L3787.93 1474.86 Q3790.6 1472.11 3795.18 1467.48 Q3799.79 1462.82 3800.97 1461.48 Q3803.21 1458.96 3804.09 1457.22 Q3804.99 1455.46 3804.99 1453.77 Q3804.99 1451.02 3803.05 1449.28 Q3801.13 1447.55 3798.03 1447.55 Q3795.83 1447.55 3793.37 1448.31 Q3790.94 1449.07 3788.17 1450.62 L3788.17 1445.9 Q3790.99 1444.77 3793.44 1444.19 Q3795.9 1443.61 3797.93 1443.61 Q3803.31 1443.61 3806.5 1446.3 Q3809.69 1448.98 3809.69 1453.47 Q3809.69 1455.6 3808.88 1457.52 Q3808.1 1459.42 3805.99 1462.01 Q3805.41 1462.68 3802.31 1465.9 Q3799.21 1469.1 3793.56 1474.86 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3819.74 1444.24 L3838.1 1444.24 L3838.1 1448.17 L3824.02 1448.17 L3824.02 1456.64 Q3825.04 1456.3 3826.06 1456.13 Q3827.08 1455.95 3828.1 1455.95 Q3833.88 1455.95 3837.26 1459.12 Q3840.64 1462.29 3840.64 1467.71 Q3840.64 1473.29 3837.17 1476.39 Q3833.7 1479.47 3827.38 1479.47 Q3825.2 1479.47 3822.93 1479.1 Q3820.69 1478.73 3818.28 1477.99 L3818.28 1473.29 Q3820.37 1474.42 3822.59 1474.98 Q3824.81 1475.53 3827.29 1475.53 Q3831.29 1475.53 3833.63 1473.42 Q3835.97 1471.32 3835.97 1467.71 Q3835.97 1464.1 3833.63 1461.99 Q3831.29 1459.88 3827.29 1459.88 Q3825.41 1459.88 3823.54 1460.3 Q3821.68 1460.72 3819.74 1461.6 L3819.74 1444.24 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3859.86 1447.31 Q3856.24 1447.31 3854.42 1450.88 Q3852.61 1454.42 3852.61 1461.55 Q3852.61 1468.66 3854.42 1472.22 Q3856.24 1475.76 3859.86 1475.76 Q3863.49 1475.76 3865.3 1472.22 Q3867.12 1468.66 3867.12 1461.55 Q3867.12 1454.42 3865.3 1450.88 Q3863.49 1447.31 3859.86 1447.31 M3859.86 1443.61 Q3865.67 1443.61 3868.72 1448.22 Q3871.8 1452.8 3871.8 1461.55 Q3871.8 1470.28 3868.72 1474.88 Q3865.67 1479.47 3859.86 1479.47 Q3854.05 1479.47 3850.97 1474.88 Q3847.91 1470.28 3847.91 1461.55 Q3847.91 1452.8 3850.97 1448.22 Q3854.05 1443.61 3859.86 1443.61 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3890.02 1447.31 Q3886.41 1447.31 3884.58 1450.88 Q3882.77 1454.42 3882.77 1461.55 Q3882.77 1468.66 3884.58 1472.22 Q3886.41 1475.76 3890.02 1475.76 Q3893.65 1475.76 3895.46 1472.22 Q3897.29 1468.66 3897.29 1461.55 Q3897.29 1454.42 3895.46 1450.88 Q3893.65 1447.31 3890.02 1447.31 M3890.02 1443.61 Q3895.83 1443.61 3898.88 1448.22 Q3901.96 1452.8 3901.96 1461.55 Q3901.96 1470.28 3898.88 1474.88 Q3895.83 1479.47 3890.02 1479.47 Q3884.21 1479.47 3881.13 1474.88 Q3878.07 1470.28 3878.07 1461.55 Q3878.07 1452.8 3881.13 1448.22 Q3884.21 1443.61 3890.02 1443.61 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3761.71 1065.67 Q3758.1 1065.67 3756.27 1069.23 Q3754.46 1072.78 3754.46 1079.91 Q3754.46 1087.01 3756.27 1090.58 Q3758.1 1094.12 3761.71 1094.12 Q3765.34 1094.12 3767.15 1090.58 Q3768.98 1087.01 3768.98 1079.91 Q3768.98 1072.78 3767.15 1069.23 Q3765.34 1065.67 3761.71 1065.67 M3761.71 1061.97 Q3767.52 1061.97 3770.57 1066.57 Q3773.65 1071.16 3773.65 1079.91 Q3773.65 1088.63 3770.57 1093.24 Q3767.52 1097.82 3761.71 1097.82 Q3755.9 1097.82 3752.82 1093.24 Q3749.76 1088.63 3749.76 1079.91 Q3749.76 1071.16 3752.82 1066.57 Q3755.9 1061.97 3761.71 1061.97 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3755.39 711.571 L3771.71 711.571 L3771.71 715.507 L3749.76 715.507 L3749.76 711.571 Q3752.43 708.817 3757.01 704.187 Q3761.62 699.534 3762.8 698.192 Q3765.04 695.669 3765.92 693.933 Q3766.82 692.173 3766.82 690.484 Q3766.82 687.729 3764.88 685.993 Q3762.96 684.257 3759.86 684.257 Q3757.66 684.257 3755.2 685.021 Q3752.77 685.785 3750 687.335 L3750 682.613 Q3752.82 681.479 3755.27 680.9 Q3757.73 680.322 3759.76 680.322 Q3765.13 680.322 3768.33 683.007 Q3771.52 685.692 3771.52 690.183 Q3771.52 692.312 3770.71 694.234 Q3769.93 696.132 3767.82 698.724 Q3767.24 699.396 3764.14 702.613 Q3761.04 705.808 3755.39 711.571 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3781.57 680.947 L3799.93 680.947 L3799.93 684.882 L3785.85 684.882 L3785.85 693.354 Q3786.87 693.007 3787.89 692.845 Q3788.91 692.659 3789.93 692.659 Q3795.71 692.659 3799.09 695.831 Q3802.47 699.002 3802.47 704.419 Q3802.47 709.997 3799 713.099 Q3795.53 716.178 3789.21 716.178 Q3787.03 716.178 3784.76 715.808 Q3782.52 715.437 3780.11 714.696 L3780.11 709.997 Q3782.19 711.132 3784.42 711.687 Q3786.64 712.243 3789.12 712.243 Q3793.12 712.243 3795.46 710.136 Q3797.8 708.03 3797.8 704.419 Q3797.8 700.808 3795.46 698.701 Q3793.12 696.595 3789.12 696.595 Q3787.24 696.595 3785.37 697.011 Q3783.51 697.428 3781.57 698.308 L3781.57 680.947 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3821.68 684.025 Q3818.07 684.025 3816.24 687.59 Q3814.44 691.132 3814.44 698.261 Q3814.44 705.368 3816.24 708.933 Q3818.07 712.474 3821.68 712.474 Q3825.32 712.474 3827.12 708.933 Q3828.95 705.368 3828.95 698.261 Q3828.95 691.132 3827.12 687.59 Q3825.32 684.025 3821.68 684.025 M3821.68 680.322 Q3827.49 680.322 3830.55 684.928 Q3833.63 689.511 3833.63 698.261 Q3833.63 706.988 3830.55 711.595 Q3827.49 716.178 3821.68 716.178 Q3815.87 716.178 3812.8 711.595 Q3809.74 706.988 3809.74 698.261 Q3809.74 689.511 3812.8 684.928 Q3815.87 680.322 3821.68 680.322 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3851.85 684.025 Q3848.24 684.025 3846.41 687.59 Q3844.6 691.132 3844.6 698.261 Q3844.6 705.368 3846.41 708.933 Q3848.24 712.474 3851.85 712.474 Q3855.48 712.474 3857.29 708.933 Q3859.12 705.368 3859.12 698.261 Q3859.12 691.132 3857.29 687.59 Q3855.48 684.025 3851.85 684.025 M3851.85 680.322 Q3857.66 680.322 3860.71 684.928 Q3863.79 689.511 3863.79 698.261 Q3863.79 706.988 3860.71 711.595 Q3857.66 716.178 3851.85 716.178 Q3846.04 716.178 3842.96 711.595 Q3839.9 706.988 3839.9 698.261 Q3839.9 689.511 3842.96 684.928 Q3846.04 680.322 3851.85 680.322 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3751.22 299.302 L3769.58 299.302 L3769.58 303.237 L3755.5 303.237 L3755.5 311.71 Q3756.52 311.362 3757.54 311.2 Q3758.56 311.015 3759.58 311.015 Q3765.37 311.015 3768.75 314.186 Q3772.12 317.358 3772.12 322.774 Q3772.12 328.353 3768.65 331.455 Q3765.18 334.534 3758.86 334.534 Q3756.69 334.534 3754.42 334.163 Q3752.17 333.793 3749.76 333.052 L3749.76 328.353 Q3751.85 329.487 3754.07 330.043 Q3756.29 330.598 3758.77 330.598 Q3762.77 330.598 3765.11 328.492 Q3767.45 326.385 3767.45 322.774 Q3767.45 319.163 3765.11 317.057 Q3762.77 314.95 3758.77 314.95 Q3756.89 314.95 3755.02 315.367 Q3753.17 315.784 3751.22 316.663 L3751.22 299.302 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3791.34 302.381 Q3787.73 302.381 3785.9 305.946 Q3784.09 309.487 3784.09 316.617 Q3784.09 323.723 3785.9 327.288 Q3787.73 330.83 3791.34 330.83 Q3794.97 330.83 3796.78 327.288 Q3798.61 323.723 3798.61 316.617 Q3798.61 309.487 3796.78 305.946 Q3794.97 302.381 3791.34 302.381 M3791.34 298.677 Q3797.15 298.677 3800.2 303.284 Q3803.28 307.867 3803.28 316.617 Q3803.28 325.344 3800.2 329.95 Q3797.15 334.534 3791.34 334.534 Q3785.53 334.534 3782.45 329.95 Q3779.39 325.344 3779.39 316.617 Q3779.39 307.867 3782.45 303.284 Q3785.53 298.677 3791.34 298.677 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3821.5 302.381 Q3817.89 302.381 3816.06 305.946 Q3814.25 309.487 3814.25 316.617 Q3814.25 323.723 3816.06 327.288 Q3817.89 330.83 3821.5 330.83 Q3825.13 330.83 3826.94 327.288 Q3828.77 323.723 3828.77 316.617 Q3828.77 309.487 3826.94 305.946 Q3825.13 302.381 3821.5 302.381 M3821.5 298.677 Q3827.31 298.677 3830.37 303.284 Q3833.44 307.867 3833.44 316.617 Q3833.44 325.344 3830.37 329.95 Q3827.31 334.534 3821.5 334.534 Q3815.69 334.534 3812.61 329.95 Q3809.56 325.344 3809.56 316.617 Q3809.56 307.867 3812.61 303.284 Q3815.69 298.677 3821.5 298.677 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3851.66 302.381 Q3848.05 302.381 3846.22 305.946 Q3844.42 309.487 3844.42 316.617 Q3844.42 323.723 3846.22 327.288 Q3848.05 330.83 3851.66 330.83 Q3855.3 330.83 3857.1 327.288 Q3858.93 323.723 3858.93 316.617 Q3858.93 309.487 3857.1 305.946 Q3855.3 302.381 3851.66 302.381 M3851.66 298.677 Q3857.47 298.677 3860.53 303.284 Q3863.61 307.867 3863.61 316.617 Q3863.61 325.344 3860.53 329.95 Q3857.47 334.534 3851.66 334.534 Q3845.85 334.534 3842.77 329.95 Q3839.72 325.344 3839.72 316.617 Q3839.72 307.867 3842.77 303.284 Q3845.85 298.677 3851.66 298.677 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><polyline clip-path="url(#clip460)" style="stroke:#000000; stroke-linecap:butt; stroke-linejoin:round; stroke-width:4; stroke-opacity:1; fill:none" points="
+  3689.76,2031.54 3689.76,1846.79 3729.76,1846.79 3689.76,1846.79 3689.76,1465.14 3729.76,1465.14 3689.76,1465.14 3689.76,1083.5 3729.76,1083.5 3689.76,1083.5 
+  3689.76,701.855 3729.76,701.855 3689.76,701.855 3689.76,320.211 3729.76,320.211 3689.76,320.211 3689.76,47.2441 
+  "/>
+<path clip-path="url(#clip460)" d="M3909.2 1507.04 L3909.2 1501.72 L3941.6 1501.72 L3941.6 1507.04 L3909.2 1507.04 M3896.58 1507.04 L3896.58 1501.72 L3903.32 1501.72 L3903.32 1507.04 L3896.58 1507.04 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3910.44 1467.26 L3915.42 1467.26 Q3914.17 1469.51 3913.57 1471.8 Q3912.93 1474.06 3912.93 1476.37 Q3912.93 1481.55 3916.23 1484.41 Q3919.5 1487.28 3925.43 1487.28 Q3931.36 1487.28 3934.66 1484.41 Q3937.93 1481.55 3937.93 1476.37 Q3937.93 1474.06 3937.32 1471.8 Q3936.68 1469.51 3935.44 1467.26 L3940.36 1467.26 Q3941.4 1469.48 3941.92 1471.89 Q3942.44 1474.26 3942.44 1476.95 Q3942.44 1484.27 3937.84 1488.58 Q3933.24 1492.89 3925.43 1492.89 Q3917.5 1492.89 3912.96 1488.55 Q3908.42 1484.18 3908.42 1476.6 Q3908.42 1474.14 3908.94 1471.8 Q3909.43 1469.46 3910.44 1467.26 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3924.07 1430.28 L3926.67 1430.28 L3926.67 1454.76 Q3932.17 1454.41 3935.06 1451.46 Q3937.93 1448.48 3937.93 1443.18 Q3937.93 1440.12 3937.18 1437.25 Q3936.42 1434.36 3934.92 1431.52 L3939.95 1431.52 Q3941.17 1434.39 3941.81 1437.4 Q3942.44 1440.4 3942.44 1443.5 Q3942.44 1451.26 3937.93 1455.8 Q3933.42 1460.31 3925.72 1460.31 Q3917.76 1460.31 3913.1 1456.03 Q3908.42 1451.72 3908.42 1444.43 Q3908.42 1437.89 3912.64 1434.1 Q3916.84 1430.28 3924.07 1430.28 M3922.51 1435.6 Q3918.14 1435.66 3915.53 1438.06 Q3912.93 1440.43 3912.93 1444.37 Q3912.93 1448.82 3915.45 1451.52 Q3917.96 1454.18 3922.54 1454.58 L3922.51 1435.6 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 1406.52 L3909.2 1400.88 L3936.4 1390.75 L3909.2 1380.62 L3909.2 1374.98 L3941.6 1387.14 L3941.6 1394.37 L3909.2 1406.52 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3924.07 1339.91 L3926.67 1339.91 L3926.67 1364.39 Q3932.17 1364.05 3935.06 1361.09 Q3937.93 1358.11 3937.93 1352.82 Q3937.93 1349.75 3937.18 1346.89 Q3936.42 1343.99 3934.92 1341.16 L3939.95 1341.16 Q3941.17 1344.02 3941.81 1347.03 Q3942.44 1350.04 3942.44 1353.14 Q3942.44 1360.89 3937.93 1365.43 Q3933.42 1369.95 3925.72 1369.95 Q3917.76 1369.95 3913.1 1365.67 Q3908.42 1361.35 3908.42 1354.06 Q3908.42 1347.52 3912.64 1343.73 Q3916.84 1339.91 3924.07 1339.91 M3922.51 1345.24 Q3918.14 1345.3 3915.53 1347.7 Q3912.93 1350.07 3912.93 1354 Q3912.93 1358.46 3915.45 1361.15 Q3917.96 1363.81 3922.54 1364.22 L3922.51 1345.24 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3896.58 1331.17 L3896.58 1325.85 L3941.6 1325.85 L3941.6 1331.17 L3896.58 1331.17 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3912.93 1302.15 Q3912.93 1306.44 3916.29 1308.92 Q3919.61 1311.41 3925.43 1311.41 Q3931.25 1311.41 3934.6 1308.95 Q3937.93 1306.46 3937.93 1302.15 Q3937.93 1297.9 3934.57 1295.41 Q3931.22 1292.92 3925.43 1292.92 Q3919.67 1292.92 3916.31 1295.41 Q3912.93 1297.9 3912.93 1302.15 M3908.42 1302.15 Q3908.42 1295.21 3912.93 1291.24 Q3917.44 1287.28 3925.43 1287.28 Q3933.39 1287.28 3937.93 1291.24 Q3942.44 1295.21 3942.44 1302.15 Q3942.44 1309.13 3937.93 1313.09 Q3933.39 1317.03 3925.43 1317.03 Q3917.44 1317.03 3912.93 1313.09 Q3908.42 1309.13 3908.42 1302.15 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3910.44 1255.13 L3915.42 1255.13 Q3914.17 1257.39 3913.57 1259.68 Q3912.93 1261.93 3912.93 1264.25 Q3912.93 1269.43 3916.23 1272.29 Q3919.5 1275.16 3925.43 1275.16 Q3931.36 1275.16 3934.66 1272.29 Q3937.93 1269.43 3937.93 1264.25 Q3937.93 1261.93 3937.32 1259.68 Q3936.68 1257.39 3935.44 1255.13 L3940.36 1255.13 Q3941.4 1257.36 3941.92 1259.76 Q3942.44 1262.14 3942.44 1264.83 Q3942.44 1272.15 3937.84 1276.46 Q3933.24 1280.77 3925.43 1280.77 Q3917.5 1280.77 3912.96 1276.43 Q3908.42 1272.06 3908.42 1264.48 Q3908.42 1262.02 3908.94 1259.68 Q3909.43 1257.33 3910.44 1255.13 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 1245.87 L3909.2 1240.55 L3941.6 1240.55 L3941.6 1245.87 L3909.2 1245.87 M3896.58 1245.87 L3896.58 1240.55 L3903.32 1240.55 L3903.32 1245.87 L3896.58 1245.87 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3900 1224.14 L3909.2 1224.14 L3909.2 1213.18 L3913.33 1213.18 L3913.33 1224.14 L3930.93 1224.14 Q3934.89 1224.14 3936.02 1223.07 Q3937.15 1221.97 3937.15 1218.65 L3937.15 1213.18 L3941.6 1213.18 L3941.6 1218.65 Q3941.6 1224.81 3939.32 1227.15 Q3937 1229.5 3930.93 1229.5 L3913.33 1229.5 L3913.33 1233.4 L3909.2 1233.4 L3909.2 1229.5 L3900 1229.5 L3900 1224.14 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3944.61 1192.69 Q3950.4 1194.95 3952.17 1197.09 Q3953.93 1199.23 3953.93 1202.82 L3953.93 1207.07 L3949.47 1207.07 L3949.47 1203.95 Q3949.47 1201.75 3948.43 1200.53 Q3947.39 1199.32 3943.51 1197.84 L3941.08 1196.89 L3909.2 1209.99 L3909.2 1204.35 L3934.54 1194.23 L3909.2 1184.1 L3909.2 1178.46 L3944.61 1192.69 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 1152.27 L3909.2 1146.95 L3941.6 1146.95 L3941.6 1152.27 L3909.2 1152.27 M3896.58 1152.27 L3896.58 1146.95 L3903.32 1146.95 L3903.32 1152.27 L3896.58 1152.27 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3922.04 1108.87 L3941.6 1108.87 L3941.6 1114.19 L3922.22 1114.19 Q3917.62 1114.19 3915.33 1115.98 Q3913.04 1117.78 3913.04 1121.37 Q3913.04 1125.68 3915.79 1128.17 Q3918.54 1130.66 3923.29 1130.66 L3941.6 1130.66 L3941.6 1136.01 L3909.2 1136.01 L3909.2 1130.66 L3914.23 1130.66 Q3911.31 1128.75 3909.86 1126.17 Q3908.42 1123.57 3908.42 1120.18 Q3908.42 1114.6 3911.89 1111.73 Q3915.33 1108.87 3922.04 1108.87 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 1052.47 L3924.97 1064.19 L3941.6 1051.86 L3941.6 1058.14 L3928.87 1067.58 L3941.6 1077.01 L3941.6 1083.29 L3924.65 1070.7 L3909.2 1082.22 L3909.2 1075.94 L3920.74 1067.35 L3909.2 1058.75 L3909.2 1052.47 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3923 1047.03 L3923 1031.44 L3927.74 1031.44 L3927.74 1047.03 L3923 1047.03 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3914.12 1001.63 L3896.58 1001.63 L3896.58 996.31 L3941.6 996.31 L3941.6 1001.63 L3936.74 1001.63 Q3939.64 1003.31 3941.05 1005.89 Q3942.44 1008.43 3942.44 1012.02 Q3942.44 1017.9 3937.76 1021.6 Q3933.07 1025.27 3925.43 1025.27 Q3917.79 1025.27 3913.1 1021.6 Q3908.42 1017.9 3908.42 1012.02 Q3908.42 1008.43 3909.83 1005.89 Q3911.22 1003.31 3914.12 1001.63 M3925.43 1019.78 Q3931.3 1019.78 3934.66 1017.37 Q3937.99 1014.94 3937.99 1010.72 Q3937.99 1006.49 3934.66 1004.06 Q3931.3 1001.63 3925.43 1001.63 Q3919.56 1001.63 3916.23 1004.06 Q3912.87 1006.49 3912.87 1010.72 Q3912.87 1014.94 3916.23 1017.37 Q3919.56 1019.78 3925.43 1019.78 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 985.343 L3909.2 980.019 L3941.6 980.019 L3941.6 985.343 L3909.2 985.343 M3896.58 985.343 L3896.58 980.019 L3903.32 980.019 L3903.32 985.343 L3896.58 985.343 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3914.17 950.1 Q3913.65 950.997 3913.42 952.068 Q3913.16 953.11 3913.16 954.383 Q3913.16 958.897 3916.11 961.327 Q3919.03 963.729 3924.53 963.729 L3941.6 963.729 L3941.6 969.082 L3909.2 969.082 L3909.2 963.729 L3914.23 963.729 Q3911.28 962.051 3909.86 959.36 Q3908.42 956.669 3908.42 952.82 Q3908.42 952.271 3908.5 951.605 Q3908.56 950.94 3908.7 950.129 L3914.17 950.1 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3924.07 918.098 L3926.67 918.098 L3926.67 942.577 Q3932.17 942.23 3935.06 939.279 Q3937.93 936.298 3937.93 931.003 Q3937.93 927.936 3937.18 925.072 Q3936.42 922.178 3934.92 919.343 L3939.95 919.343 Q3941.17 922.207 3941.81 925.216 Q3942.44 928.226 3942.44 931.322 Q3942.44 939.076 3937.93 943.619 Q3933.42 948.133 3925.72 948.133 Q3917.76 948.133 3913.1 943.85 Q3908.42 939.539 3908.42 932.248 Q3908.42 925.708 3912.64 921.918 Q3916.84 918.098 3924.07 918.098 M3922.51 923.422 Q3918.14 923.48 3915.53 925.882 Q3912.93 928.255 3912.93 932.19 Q3912.93 936.646 3915.45 939.337 Q3917.96 941.999 3922.54 942.404 L3922.51 923.422 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3910.44 886.038 L3915.42 886.038 Q3914.17 888.295 3913.57 890.581 Q3912.93 892.838 3912.93 895.153 Q3912.93 900.332 3916.23 903.197 Q3919.5 906.061 3925.43 906.061 Q3931.36 906.061 3934.66 903.197 Q3937.93 900.332 3937.93 895.153 Q3937.93 892.838 3937.32 890.581 Q3936.68 888.295 3935.44 886.038 L3940.36 886.038 Q3941.4 888.266 3941.92 890.668 Q3942.44 893.041 3942.44 895.732 Q3942.44 903.052 3937.84 907.363 Q3933.24 911.675 3925.43 911.675 Q3917.5 911.675 3912.96 907.334 Q3908.42 902.965 3908.42 895.384 Q3908.42 892.925 3908.94 890.581 Q3909.43 888.237 3910.44 886.038 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3900 871.513 L3909.2 871.513 L3909.2 860.547 L3913.33 860.547 L3913.33 871.513 L3930.93 871.513 Q3934.89 871.513 3936.02 870.442 Q3937.15 869.343 3937.15 866.015 L3937.15 860.547 L3941.6 860.547 L3941.6 866.015 Q3941.6 872.178 3939.32 874.522 Q3937 876.866 3930.93 876.866 L3913.33 876.866 L3913.33 880.772 L3909.2 880.772 L3909.2 876.866 L3900 876.866 L3900 871.513 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3909.2 853.544 L3909.2 848.22 L3941.6 848.22 L3941.6 853.544 L3909.2 853.544 M3896.58 853.544 L3896.58 848.22 L3903.32 848.22 L3903.32 853.544 L3896.58 853.544 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3912.93 824.522 Q3912.93 828.805 3916.29 831.293 Q3919.61 833.782 3925.43 833.782 Q3931.25 833.782 3934.6 831.322 Q3937.93 828.834 3937.93 824.522 Q3937.93 820.269 3934.57 817.781 Q3931.22 815.292 3925.43 815.292 Q3919.67 815.292 3916.31 817.781 Q3912.93 820.269 3912.93 824.522 M3908.42 824.522 Q3908.42 817.578 3912.93 813.614 Q3917.44 809.65 3925.43 809.65 Q3933.39 809.65 3937.93 813.614 Q3942.44 817.578 3942.44 824.522 Q3942.44 831.496 3937.93 835.46 Q3933.39 839.395 3925.43 839.395 Q3917.44 839.395 3912.93 835.46 Q3908.42 831.496 3908.42 824.522 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3922.04 773.886 L3941.6 773.886 L3941.6 779.21 L3922.22 779.21 Q3917.62 779.21 3915.33 781.004 Q3913.04 782.798 3913.04 786.386 Q3913.04 790.697 3915.79 793.186 Q3918.54 795.674 3923.29 795.674 L3941.6 795.674 L3941.6 801.027 L3909.2 801.027 L3909.2 795.674 L3914.23 795.674 Q3911.31 793.764 3909.86 791.189 Q3908.42 788.585 3908.42 785.2 Q3908.42 779.615 3911.89 776.751 Q3915.33 773.886 3922.04 773.886 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3896.64 731.641 Q3903.29 735.518 3909.8 737.399 Q3916.31 739.28 3923 739.28 Q3929.68 739.28 3936.25 737.399 Q3942.79 735.489 3949.42 731.641 L3949.42 736.271 Q3942.62 740.611 3936.05 742.781 Q3929.48 744.922 3923 744.922 Q3916.55 744.922 3910.01 742.781 Q3903.47 740.64 3896.64 736.271 L3896.64 731.641 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3915.42 696.08 Q3911.83 694.083 3910.12 691.306 Q3908.42 688.528 3908.42 684.766 Q3908.42 679.703 3911.97 676.954 Q3915.5 674.205 3922.04 674.205 L3941.6 674.205 L3941.6 679.558 L3922.22 679.558 Q3917.56 679.558 3915.3 681.207 Q3913.04 682.857 3913.04 686.242 Q3913.04 690.38 3915.79 692.781 Q3918.54 695.183 3923.29 695.183 L3941.6 695.183 L3941.6 700.536 L3922.22 700.536 Q3917.53 700.536 3915.3 702.185 Q3913.04 703.834 3913.04 707.278 Q3913.04 711.358 3915.82 713.759 Q3918.57 716.161 3923.29 716.161 L3941.6 716.161 L3941.6 721.514 L3909.2 721.514 L3909.2 716.161 L3914.23 716.161 Q3911.25 714.338 3909.83 711.792 Q3908.42 709.245 3908.42 705.744 Q3908.42 702.214 3910.21 699.755 Q3912 697.266 3915.42 696.08 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3898.4 654.124 L3898.4 649.205 L3947.1 664.251 L3947.1 669.17 L3898.4 654.124 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3944.61 630.137 Q3950.4 632.394 3952.17 634.535 Q3953.93 636.676 3953.93 640.264 L3953.93 644.518 L3949.47 644.518 L3949.47 641.393 Q3949.47 639.194 3948.43 637.978 Q3947.39 636.763 3943.51 635.287 L3941.08 634.332 L3909.2 647.44 L3909.2 641.798 L3934.54 631.67 L3909.2 621.543 L3909.2 615.901 L3944.61 630.137 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3914.17 589.773 Q3913.65 590.67 3913.42 591.74 Q3913.16 592.782 3913.16 594.055 Q3913.16 598.569 3916.11 600.999 Q3919.03 603.401 3924.53 603.401 L3941.6 603.401 L3941.6 608.754 L3909.2 608.754 L3909.2 603.401 L3914.23 603.401 Q3911.28 601.723 3909.86 599.032 Q3908.42 596.341 3908.42 592.492 Q3908.42 591.943 3908.5 591.277 Q3908.56 590.612 3908.7 589.801 L3914.17 589.773 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /><path clip-path="url(#clip460)" d="M3896.64 585.027 L3896.64 580.398 Q3903.47 576.057 3910.01 573.916 Q3916.55 571.746 3923 571.746 Q3929.48 571.746 3936.05 573.916 Q3942.62 576.057 3949.42 580.398 L3949.42 585.027 Q3942.79 581.179 3936.25 579.298 Q3929.68 577.388 3923 577.388 Q3916.31 577.388 3909.8 579.298 Q3903.29 581.179 3896.64 585.027 Z" fill="#000000" fill-rule="evenodd" fill-opacity="1" /></svg>
+<h2 id="Different-Lengthscales"><a class="docs-heading-anchor" href="#Different-Lengthscales">Different Lengthscales</a><a id="Different-Lengthscales-1"></a><a class="docs-heading-anchor-permalink" href="#Different-Lengthscales" title="Permalink"></a></h2><p>Now let&#39;s look at how the velocity along a flowline changes with L.</p><pre><code class="language-julia hljs">L_values =  [160, 80, 40, 20, 10, 5]*1.0e3</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6-element Vector{Float64}:
+ 160000.0
+  80000.0
+  40000.0
+  20000.0
+  10000.0
+   5000.0</code></pre><p>We loop over these values and store the info:</p><pre><code class="language-julia hljs">#U_flowline = zeros(80, length(L_values))
+#grid_flowline = zeros(80, length(L_values))
+#for (count,L) in enumerate(L_values)</code></pre><p>gridL = grid(L = L)    z<em>bL = z</em>b.(gridL.xxh,gridL.yyh; α = 0.5, ω = 2π/L );    initial<em>conditions = InitialConditions(initial</em>thickness = 1000. .* ones(80, 80))    model = Model(grid = gridL,                bed<em>elevation = z</em>bL,                initial<em>conditions = initial</em>conditions)    update<em>state!(model)    grid</em>flowline[:, count] .= model.grid.xxh[:, round(Int, gridL.nx/4)]    U_flowline[:,count] .= model.fields.gh.u[:, round(Int, gridL.nx/4)]</p><pre><code class="language-julia hljs">#end
+
+#And make the plot in a single command
+#plot(grid_flowline/1e3,</code></pre><p>U_flowline,    layout = (2,3),    framestyle = :box,    xlabel = &quot;x (km)&quot;,    ylabel = &quot;horizontal velocity (m/yr)&quot;,    label = :none,    title =  [&quot;160km&quot; &quot;80km&quot; &quot;40km&quot; &quot;20km&quot; &quot;10km&quot; &quot;5km&quot;])</p><pre><code class="language-julia hljs">#plot!(size = (1000,550))</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="planar_one_dimensional_flow.html">« One-dimensional planar flow</a><a class="docs-footer-nextpage" href="../physics/overview.html">Overview »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Tuesday 2 November 2021 18:11">Tuesday 2 November 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

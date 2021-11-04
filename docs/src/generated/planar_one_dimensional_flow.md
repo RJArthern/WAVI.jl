@@ -31,10 +31,10 @@ using WAVI, Plots
 ## Instantiating and configuring a model
 We first build a WAVI `model`, by passing it a grid, information about the problem we would like to solve.
 
-Below, we build a grid with 150 grid points in the `x` direction. We use 2 grid points in the `y` direction (the minimum number of grid points in any dimension). This grid has a resolution of 12km.
+Below, we build a grid with 300 grid points in the `x` direction. We use 2 grid points in the `y` direction (the minimum number of grid points in any dimension). This grid has a resolution of 12km.
 
 ````@example planar_one_dimensional_flow
-grid = Grid(nx = 150, ny = 2, dx = 12000.0, dy = 12000.0);
+grid = Grid(nx = 300, ny = 2, dx = 12000.0, dy = 12000.0);
 nothing #hide
 ````
 
@@ -133,7 +133,7 @@ Now, let's think about advancing time. To do so, we set up a simulation, which t
 A `TimesteppingParams` object controls parameters related to timestepping. Let's set the model to run for 1000 years with a timestep of 0.5 years:
 
 ````@example planar_one_dimensional_flow
-timestepping_params = TimesteppingParams(dt = 0.5, end_time = 1000.);
+timestepping_params = TimesteppingParams(dt = 0.5, end_time = 10000.);
 nothing #hide
 ````
 
@@ -162,7 +162,7 @@ What and when to output is specified in WAVI.jl by an instance of an `Outputting
 
 ````@example planar_one_dimensional_flow
 output_params = OutputParams(outputs = (h = model.fields.gh.h,u = model.fields.gh.u, b = model.fields.gh.b,s = model.fields.gh.s),
-                            output_freq = 100.,
+                            output_freq = 1000.,
                             output_path = folder);
 nothing #hide
 ````
@@ -214,7 +214,13 @@ pl = Plots.plot(simulation.model.grid.xxh[:,1], simulation.model.fields.gh.b[:,1
                     legend = :none)
 Plots.plot!(pl,simulation.model.grid.xxh[:,1], surface_out, legend = :none, linecolor = :blue)
 Plots.plot!(pl,simulation.model.grid.xxh[:,1], base_out, legend = :none, linecolor = :red)
-#display(pl)
+````
+
+Finally, we clear up the files we just outputted
+
+````@example planar_one_dimensional_flow
+rm(folder, force = true, recursive = true);
+nothing #hide
 ````
 
 ---
