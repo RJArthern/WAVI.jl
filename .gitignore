@@ -4,10 +4,10 @@ Manifest.toml
 .ipynb_checkpoints
 *.mat
 *.tif
-#*.jld2
+*.jld2
 *.nc
-*.md
-#*.bin
+#*.md
+*.bin
 *.png
 
 #useful things to ignore when testing driver scripts
