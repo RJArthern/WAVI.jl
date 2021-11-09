@@ -13,14 +13,8 @@
 #
 # First let's make sure we have all required packages installed.
 
-# ```julia
 # using Pkg
-# pkg"add WAVI, Plots"
-# ```
-
-# ## Using `WAVI.jl`
-#
-
+# Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots)
 using WAVI, Plots
 
 # ## Instantiating and configuring a model

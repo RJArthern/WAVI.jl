@@ -22,6 +22,8 @@ examples = [
     "bumpy_bed.jl"
     "overdeepened_bed.jl"
     "melt_rate_parametrizations.jl"
+    "west_antarctica.jl"
+    #variable_slipperiness.jl
 ]
 
 for example in examples
@@ -61,8 +63,8 @@ physics_pages = [
     "Overview" => "physics/overview.md"
     "Governing Equations" => "physics/governing_equations.md"
     "Melt Rates" => "physics/melting.md"
-    "Calving" => "physics/calving.md"
-    "Damage" => "physics/damage.md"
+    #"Calving" => "physics/calving.md"
+    #"Damage" => "physics/damage.md"
 ]
 
 #numerics_pages = [

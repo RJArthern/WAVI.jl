@@ -8,10 +8,8 @@
 #
 # First let's make sure we have all required packages installed.
 
-# ```julia
 # using Pkg
-# pkg"add WAVI, Plots"
-# ```
+# Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots)
 using WAVI, Plots
 
 # ## Basal Topography

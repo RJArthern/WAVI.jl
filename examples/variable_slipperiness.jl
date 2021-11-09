@@ -9,7 +9,7 @@
 # First let's make sure we have all required packages installed. 
 
 #using Pkg
-#Pkg.add("WAVI"); Pkg.add("Plots"); 
+#Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots)
 using WAVI, Plots
 
 # ## Model Setup
@@ -27,5 +27,4 @@ params = Params( accumulation_rate = 0.3);
 
 # ## Basal slipperiness
 # We set the basal slipperiness via the model's initial conditions. In the MISMIP 3D experiment, the sliding coefficient is a Gaussian bump:
-# $C = C_0 \left[1 - a  \exp (-(x- x_b)^2 / 2x_c^2  - (y - y_b)^2 / 2y_c^2) \right]
-
+# $C = C_0 \left[1 - a  \exp (-(x- x_b)^2 / 2x_c^2  - (y - y_b)^2 / 2y_c^2) \right] where a = 0.75, x_b = 400km, ...

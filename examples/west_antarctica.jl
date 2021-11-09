@@ -14,7 +14,7 @@
 # As well as WAVI and Plots for plotting, we're going to use the Downloads package to pull some data from a Github repository.
 
 #using Pkg
-#Pkg.add("WAVI"); Pkg.add("Plots"); Pkg.add("Downloads")
+#Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots); Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 
 
