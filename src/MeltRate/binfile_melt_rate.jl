@@ -26,7 +26,7 @@ function update_melt_rate!(melt_model::BinfileMeltRate, fields, grid)
         Error("Input file read error")
     end
 
-    melt_rate .= hton.(melt_rate)
+   # melt_rate .= ntoh.(melt_rate)
     basal_melt[:] = melt_rate[:]
     return nothing
 end

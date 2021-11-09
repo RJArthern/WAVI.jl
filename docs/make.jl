@@ -21,6 +21,7 @@ examples = [
     "planar_one_dimensional_flow.jl"
     "bumpy_bed.jl"
     "overdeepened_bed.jl"
+    "melt_rate_parametrizations.jl"
 ]
 
 for example in examples
@@ -35,8 +36,9 @@ end
 
 example_pages = [
     "One-dimensional planar flow"    => "generated/planar_one_dimensional_flow.md",
-    "Flow over a bumpy bed"          => "generated/bumpy_bed.md"
-    "Two-dimensional flow with overdeepened bed" => "generated/overdeepened_bed.md" 
+    "Flow over a bumpy bed"          => "generated/bumpy_bed.md",
+    "Two-dimensional flow with overdeepened bed" => "generated/overdeepened_bed.md" ,
+    "Melt rate parametrizations" => "generated/melt_rate_parametrizations.md" 
 ]
 
 
