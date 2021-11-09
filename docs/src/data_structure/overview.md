@@ -20,3 +20,4 @@ A `Model` structure contains sub-structures describing the following:
 - Initial conditions (`InitialConditions`): stores initial conditions relating to the ice sheet.
 - Fields (`Fields`): stores information on the current state of the model.
 A `Model` also owns a `dict` named `extra_physics`, which contains information on parametrizations of physical processes used by the model. See the Parametrizations tab on the left for more information.
+- Supplementary physics: this describes various other models that can be coupled to WAVI.jl. At present, this is restricted to melt rate physics, but models of damage and calving are coming soon
