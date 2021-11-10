@@ -28,13 +28,7 @@ Physically, ice sheets to do not stand alone, but are forced by their interactio
 
 ``WAVI.jl`` was designed to be used by both researchers (including those without prior ice sheet modelling experience) and students. ``WAVI.jl`` employs a number of tools to improve computational speed, making it appropriate for high-resolution simulations of large ice sheets. (Wavelet-based Adaptive-grid refers to one such tools: an adaptive-grid preconditioner that uses a wavelet-based method that originated in solutions of similar elliptic systems of equations which arise in studies of electrical impedence [Vasilyev2005@].)  `WAVI.jl` also includes a simple, user friendly API, which is facilitated by Julia's convenient syntax, and the repository includes a number of well-documented examples, which demonstrate the software's capabilities in a wide variety of situations.
 
-`WAVI.jl` is successor to a similar code that was written in MATLAB, but was retained "in-house" at the British Antarctic Survey. This predecessor code has been used extensively as research software (e.g. [@Arthern2017] [@Arthern2015]), as well as having participated in the most recent ice sheet model intercomparison exercise [@Cornford2020], which acts as a benchmark for ice-flow models. The successor code `WAVI.jl` has been verified independently to agree well with its predecessor; similar speed. `WAVI.jl` also benefits from being more transparent than its predecessor, having been written in an open source language and hosted in a public repository. 
-
-Being in an open repository, and written in an open source language, the successor `WAVI.jl` is more transparent
-
-The new code is written in an open source language and also 
-
-MATLAB version WAVI has been used in research and participated in MISMIP (etc) experiments [figure], version written in Julia is open source, more friendly, similar in speed (with plans to develop parallelisation)
+`WAVI.jl` is successor to a similar code that was written in MATLAB, but was retained "in-house" at the British Antarctic Survey. This predecessor code has been used extensively as research software (e.g. [@Arthern2017] [@Arthern2015]), as well as having participated in the most recent ice sheet model intercomparison exercise [@Cornford2020], which acts as a benchmark for ice-flow models. The successor code `WAVI.jl` has been verified independently to agree well with its predecessor; ?? in these benchmark experiments, `WAVI.jl` is similar in speed to its predecessor, but superior parallelisation is ??. Since `WAVI.jl` is written in an open source language and is hosted in a public repository, it also benefits from being more transparent than its predecessor. 
 
 Other ice similar ice sheet models are...all ice sheet models make approximations and include different physics, so comparison between them is where there value arises.
 
