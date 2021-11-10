@@ -13,8 +13,8 @@ Keyword arguments
 
 - 'initial_thickness': (nx x ny) matrix defining ice thickness at t = 0
 - 'initial_viscosity': (nx x ny x nz) matrix defining viscosity on sigma levels at t = 0
-- 'initial_temperature': (nx x ny) matrix defining temperature on sigma levels at t = 0
-- 'initial_damage': (nx x ny) matrix defining depth averaged damage at t = 0
+- 'initial_temperature': (nx x ny x nz) matrix defining temperature on sigma levels at t = 0
+- 'initial_damage': (nx x ny x nz) matrix defining ice damage at t = 0
 """
 @with_kw struct InitialConditions{T <: Real}
     initial_thickness::Array{T,2} = fill!(Array{Float64}(undef,1,1),NaN)
