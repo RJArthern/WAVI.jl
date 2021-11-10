@@ -80,7 +80,7 @@ pages = [
     "WAVI Setup" => data_structure_pages,
     "Simulation tips" => "simulation_tips.md",
     "MITgcm coupling" => "mitgcm_coupling.md",
-    "Contributor's guide" => "contributing.md",
+    "Contact us" => "contact.md",
     "References" => "references.md",
 ]
 
