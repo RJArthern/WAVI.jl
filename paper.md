@@ -30,9 +30,7 @@ Physically, ice sheets to do not stand alone, but are forced by their interactio
 
 `WAVI.jl` is successor to a similar code that was written in MATLAB, but was retained "in-house" at the British Antarctic Survey. This predecessor code has been used extensively as research software (e.g. [@Arthern2017] [@Arthern2015]), as well as having participated in the most recent ice sheet model intercomparison exercise [@Cornford2020], which acts as a benchmark for ice-flow models. The successor code `WAVI.jl` has been verified independently to agree well with its predecessor; ?? in these benchmark experiments, `WAVI.jl` is similar in speed to its predecessor, but superior parallelisation is ??. Since `WAVI.jl` is written in an open source language and is hosted in a public repository, it also benefits from being more transparent than its predecessor. 
 
-Other ice similar ice sheet models are...all ice sheet models make approximations and include different physics, so comparison between them is where there value arises.
-
-
+There currently exists a wide variety of ice sheet models of varying complexity. Examples include (but are certainly not limited to) the Ice Sheet System Model [@Larour2012], the Parallel Ice Sheet Model [@Bueler2009], BISICLES [@Cornford2013],  Elmer/Ice [Gagliardini2013], and Úa [Gudmundsson2019]. Every ice sheet model makes approximations in order to facilitate the numerical solution of the appropriate governing equations, and the lack of analytic solutions to these equations, the _intercomparison_ between ice sheet models is of high importance when assessing the trustworthiness of models; `WAVI.jl` contributes to this community of ice sheet models.
 
 # Acknowledgements
 
