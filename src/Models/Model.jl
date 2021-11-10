@@ -8,7 +8,25 @@ struct Model{T <: Real, N <: Integer,A,W, M <:AbstractMeltRate} <: AbstractModel
 end
 
 """
- Model constructor
+    Model(;
+        grid = nothing, 
+        bed_elevation = nothing,
+        params = Params(),
+        solver_params = SolverParams(),
+        initial_conditions = InitialConditions(),
+        melt_rate = UniformMeltRate())
+
+Construct a WAVI.jl model object.
+
+Keyword arguments
+=================
+
+    - `grid`: (required) an instance of a `Grid` object, which defines the computational grid
+    - `bed_elevation`: (required) an array of size `grid.nx` x `grid.ny` which defines the bed elevation
+    - `params`: a `Params` object that defines physical parameters 
+    - `solver_params`: a `SolverParams` object that defines parameters relating to the numerical scheme
+    - `initial_conditions`: an `InitialConditions` object that (optionally) defines the initial ice thickness, temperature, viscosity, and damage
+    - `melt_rate`: a melt rate model, responsible for controlling/setting the basal melt rate
 """
 function Model(;
     grid = nothing, 
