@@ -16,7 +16,7 @@ struct VGrid{T <: Real, N <: Int}
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
                  βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
              dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
-                    v :: Array{T,2}
+                    v :: Array{T,2}                            # Ice velocity in the y-direction
 end
 
     
