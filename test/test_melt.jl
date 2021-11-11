@@ -10,7 +10,7 @@ using Test, WAVI
 
         #write a binary file 
         m = ones(grid.nx, grid.ny)
-        m .= hton.(m)
+        #m .= hton.(m)
         filename =  "melt_test_file.bin"
         mfileID =  open(filename,"w")
           write(mfileID, m[:,:])
@@ -34,7 +34,7 @@ using Test, WAVI
 
         #change the binary file and check we can update
         m = 2 .* ones(grid.nx, grid.ny)
-        m .= hton.(m)
+        #m .= hton.(m)
         mfileID =  open(filename,"w")
           write(mfileID, m[:,:])
         close(mfileID)
