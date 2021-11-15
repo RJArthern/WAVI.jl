@@ -12,10 +12,8 @@ This example demonstrates: How to use WAVI.jl in plan view (two horizontal spati
 
 First let's make sure we have all required packages installed.
 
-```julia
 using Pkg
-pkg"add WAVI, Plots"
-```
+Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots)
 
 ````@example bumpy_bed
 using WAVI, Plots

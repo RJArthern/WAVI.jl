@@ -34,10 +34,10 @@ if group == "utils" || group == "all"
 end
 
 if group == "verification" || group == "all"
-   # include("verification_tests.jl")
+    include("verification_tests.jl")
 end
 
 if group == "version_update" || group == "all"
-   # include(joinpath("version_update_test_verification","test_version_updates.jl"))
+    include(joinpath("version_update_test_verification","test_version_updates.jl"))
 end
 

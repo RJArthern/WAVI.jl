@@ -41,7 +41,7 @@ h = ntoh.(h);
 # (The final line simply converts the endianness from big-endian --  the format in which this file is stored -- to little-endian.)
 
 # Now we make an InitialConditions object to store this ice thickness:
-initial_conditions = InitialConditions(initial_thickness = h);
+global initial_conditions = InitialConditions(initial_thickness = h);
 
 # ## Melt Rate Models 
 # We'll loop over each of the melt rate models mentioned above. For each, we'll produce a map of the melt rate in the MISMIP+ geometry that we just pulled from online.
@@ -79,7 +79,7 @@ close(out);
 binfile_melt = BinfileMeltRate(input_filename = joinpath(folder,"melt.bin"));
 
 # It's useful to put these into a dictionary, so we can iterate over them:
-melt_rates = Dict("Quadratic" => melt_quad, "PME" => melt_PME, "PICO" => melt_PICO, "Binary file" => binfile_melt);
+global melt_rates = Dict("Quadratic" => melt_quad, "PME" => melt_PME, "PICO" => melt_PICO, "Binary file" => binfile_melt);
 
 # ## Visualizing
 # We'll loop over the melt rate models instantiated above. Each time, we make a model with the appropriate melt rate specifier using the 'melt_rate' keyword.  
@@ -118,7 +118,7 @@ end
 # In this section, we show how to specify a new melt rate model. In this example, we define a structure which can be passed to a model (via the `melt_rate` keyword) which specifies the melt rate according to the MISMIP+ experiment: 
 # melt rate on floating cells in $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$ where $z_d$ is the ice shelf draft and $z_d - z_b$ is the cavity thickness. 
 # There are three steps to defining a new melt rate model. First, we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
-struct MISMIPMeltRateOne{T <: Real} <: AbstractMeltRate 
+struct MISMIPMeltRateOne{T <: Real} <: WAVI.AbstractMeltRate 
     α  :: T
     ρi :: T
     ρw :: T
@@ -134,12 +134,11 @@ MISMIPMeltRateOne(; α = 1.0, ρi = 918.0, ρw = 1028.0) = MISMIPMeltRateOne(α,
 # here, TYPE is the name of the structure we just made. 
 # Note that the arguments of this function must be as mentioned here, so that the multiple dispatch capability can be leveraged! This function defines another method named `update_melt_rate!`, which sets the melt rate according to this function when the input melt rate is of type "TYPE". One of these function is defined for each of the melt rate models mentioned above.
 function update_melt_rate!(melt_rate::WAVI.MISMIPMeltRateOne, fields, grid)
-    @unpack basal_melt, h, b  = fields.gh
-    draft = -(melt_rate.ρi / melt_rate.ρw) .* h
-    cavity_thickness = draft .- b
+    draft = -(melt_rate.ρi / melt_rate.ρw) .* fields.gh.h
+    cavity_thickness = draft .- fields.gh.b
     cavity_thickness = max.(cavity_thickness, 0)
     m =  melt_rate.α .* 0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
-    basal_melt[:] .= m[:]
+    fields.gh.basal_melt[:] .= m[:]
 end
 
 # Now we can plot the melt rate with this model:
@@ -167,4 +166,4 @@ plot!(size = (500,300))
 
 
 # Finally, let's clean up the files we just made
-rm(folder, force = true, recursive = true);
+rm(joinpath(@__DIR__, "melt_rate_parametrizations"), force = true, recursive = true);

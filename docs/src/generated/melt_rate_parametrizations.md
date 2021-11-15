@@ -20,8 +20,8 @@ First let's make sure we have all required packages installed.
 As well as WAVI and Plots for plotting, we're going to use the Downloads package to pull some data from a Github repository.
 
 ````@example melt_rate_parametrizations
-using Pkg
-Pkg.add("WAVI"); Pkg.add("Plots"); Pkg.add("Downloads")
+#using Pkg
+#pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots), Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 ````
 
@@ -47,7 +47,7 @@ To save time, we're going to pull the steady state ice thickness from Github, wh
 Note that this ice thickness is the result of the "overdeepened bed" example, but with 2km resolution.
 
 ````@example melt_rate_parametrizations
-fname = Downloads.download("https://github.com/alextbradley/MISMIP_data/raw/main/WAVI_ice0_2km_thick.bin");
+fname = Downloads.download("https://github.com/alextbradley/WAVI_example_data/MISMIP_PLUS/raw/main/WAVI_ice0_2km_thick.bin");
 h = Array{Float64,2}(undef, nx, ny);
 read!(fname, h);
 h = ntoh.(h);
@@ -169,7 +169,7 @@ melt rate on floating cells in $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$ wh
 There are three steps to defining a new melt rate model. First, we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
 
 ````@example melt_rate_parametrizations
-struct MISMIPMeltRateOne{T <: Real} <: AbstractMeltRate
+struct MISMIPMeltRateOne{T <: Real} <: WAVI.AbstractMeltRate
     α  :: T
     ρi :: T
     ρw :: T
@@ -231,7 +231,7 @@ plot!(size = (500,300))
 Finally, let's clean up the files we just made
 
 ````@example melt_rate_parametrizations
-rm(folder, force = true, recursive = true);
+rm(joinpath(@__DIR__, "melt_rate_parametrizations"), force = true, recursive = true);
 nothing #hide
 ````
 

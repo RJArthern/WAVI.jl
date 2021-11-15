@@ -17,12 +17,8 @@ flow down a flat plane in one horizontal dimension. This example demonstrates
 
 First let's make sure we have all required packages installed.
 
-```julia
 using Pkg
-pkg"add WAVI, Plots"
-```
-
-## Using `WAVI.jl`
+Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots)
 
 ````@example planar_one_dimensional_flow
 using WAVI, Plots
