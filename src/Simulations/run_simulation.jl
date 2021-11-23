@@ -191,8 +191,10 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
      end
     end
     
-    uVel_file_string = string(simulation.output_params.prefix,  "_U.bin")
-    vVel_file_string = string(simulation.output_params.prefix,  "_V.bin")
+    clock_time_s=Int(simulation.clock.time*(3600*24*365))
+        
+    uVel_file_string = string(simulation.output_params.prefix, "_U", lpad(clock_time_s, 10,"0") ,".bin")
+    vVel_file_string = string(simulation.output_params.prefix, "_V", lpad(clock_time_s, 10,"0") ,".bin")
     
     u_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +2 + y_s +y_n)
     v_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +2 + y_s +y_n)
@@ -236,7 +238,6 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
      end
      h_out_b .= hton.(h_out_b)
      
-     clock_time_s=Int(simulation.clock.time*(3600*24*365))
         
      hb_file_string = string(simulation.output_params.prefix, "_Hb", lpad(clock_time_s, 10,"0") ,".bin")
     
