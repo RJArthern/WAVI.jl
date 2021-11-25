@@ -48,7 +48,8 @@ function UGrid(;
                 mask = trues(nxu,nyu),
                 levels,
                 dx,
-                dy)
+                dy,
+                u = zeros(nxu,nyu))
 
     #check the sizes of inputs
     (size(mask) == (nxu,nyu)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxu x nyu (i.e. $nxu x $nyu)"))
@@ -69,7 +70,6 @@ function UGrid(;
     grounded_fraction = ones(nxu,nyu)
     βeff = zeros(nxu,nyu)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    u = zeros(nxu,nyu)
 
 
     #size assertions
