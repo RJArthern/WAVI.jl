@@ -31,20 +31,20 @@ end
     
 if all(isnan.(initial_conditions.initial_u))
     @info "Did not find a specified initial U vel guess, reverting to zero\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
-    initial_conditions = @set initial_conditions.initial_u =  zeros(grid.nxu, grid.nyu)
+    initial_conditions = @set initial_conditions.initial_u =  zeros(grid.nx + 1, grid.ny)
 end
     
 if all(isnan.(initial_conditions.initial_v))
     @info "Did not find a specified initial V vel guess, reverting to zero\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
-    initial_conditions = @set initial_conditions.initial_v =  zeros(grid.nxv, grid.nyv)
+    initial_conditions = @set initial_conditions.initial_v =  zeros(grid.nx, grid.ny + 1)
 end
 #check sizes are compatible
 (size(initial_conditions.initial_thickness) == (grid.nx, grid.ny)) || throw(DimensionMismatch("Initial thickness field is not compatible with grid size. Input thickess field is has size $(size(initial_conditions.initial_thickness)), which must match horizontal grid size ($(grid.nx) x $(grid.ny))"))
 (size(initial_conditions.initial_temperature) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial temperature field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
 (size(initial_conditions.initial_viscosity) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial viscosity field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
 (size(initial_conditions.initial_damage) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial damage field is not compatible with grid size.Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
-(size(initial_conditions.initial_u) == (grid.nxu, grid.nyu)) || throw(DimensionMismatch("Initial U vel field is not compatible with grid size. Input U vel field has size $(size(initial_conditions.initial_u)), which must match horizontal grid size ($(grid.nxu) x $(grid.nyu))"))
-(size(initial_conditions.initial_v) == (grid.nxv, grid.nyv)) || throw(DimensionMismatch("Initial V vel field is not compatible with grid size. Input V vel field has size $(size(initial_conditions.initial_v)), which must match horizontal grid size ($(grid.nxv) x $(grid.nyv))"))
+(size(initial_conditions.initial_u) == (grid.nx + 1, grid.ny)) || throw(DimensionMismatch("Initial U vel field is not compatible with grid size. Input U vel field has size $(size(initial_conditions.initial_u)), which must match horizontal grid size ($(grid.nx + 1) x $(grid.ny))"))
+(size(initial_conditions.initial_v) == (grid.nx, grid.ny + 1)) || throw(DimensionMismatch("Initial V vel field is not compatible with grid size. Input V vel field has size $(size(initial_conditions.initial_v)), which must match horizontal grid size ($(grid.nx) x $(grid.ny + 1))"))
 return initial_conditions
 end
 
