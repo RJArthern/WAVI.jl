@@ -49,7 +49,8 @@ function VGrid(;
         mask = trues(nxv,nyv),
         levels,
         dx,
-        dy)
+        dy,
+        v = zeros(nxv,nyv))
 
     #check the sizes of inputs
     (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
@@ -70,7 +71,7 @@ function VGrid(;
     grounded_fraction = ones(nxv,nyv)
     βeff = zeros(nxv,nyv)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    v = zeros(nxv,nyv)
+   
 
     #size assertions
     @assert size(mask)==(nxv,nyv)
