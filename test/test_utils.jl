@@ -27,7 +27,7 @@ using Test, WAVI
         initial_conditions = InitialConditions(initial_thickness = 500.0*ones(grid.nx, grid.ny))
         model = Model(grid = grid, bed_elevation = bed, initial_conditions = initial_conditions)
         update_state!(model)
-        @test WAVI.volume_above_floatation(model.fields.gh.h, model.fields.gh.b, Ref(model.params), model.grid) ≈ (500.0 - (1028.0/918.0)*(200.0) ) .* 25 .* 20 .* 1000.0 .^2
+        @test volume_above_floatation(model.fields.gh.h, model.fields.gh.b, Ref(model.params), model.grid) ≈ (500.0 - (1028.0/918.0)*(200.0) ) .* 25 .* 20 .* 1000.0 .^2
 
     end
 end
