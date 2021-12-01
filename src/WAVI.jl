@@ -21,6 +21,9 @@ export
     #Melt rates
     PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne, PICO, QuadraticMeltRate
 
+    #Post-processing controls
+    volume_above_floatation, height_above_floatation
+
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
 @reexport using Setfield
