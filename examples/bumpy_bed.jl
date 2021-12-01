@@ -1,6 +1,6 @@
 # # Ice Flow over a Bumpy Bed 
 
-# This is the first two dimensional example: flow down a plane with bumps with different length scales.
+# This is the first two dimensional example: flow down a plane with bumps on different length scales.
 # This example is similar in spirit to Experiment A in the Ice Sheet Model Intercomparison Exercise - Higher Order Model (ISMIP-HOM): doi: 10.5194/tc-2-95-2008
 # This example demonstrates: How to use WAVI.jl in plan view (two horizontal spatial dimensions) with arbitrary bed shapes, and how to interact with Grid objects.
 

@@ -1,14 +1,15 @@
 # # Melt rates 
 #
-# This example demonstrates the wealth of melt rate parametrizations that are included in WAVI.jl. 
-# We produce a picture of the melt rate for the MISMIP+ steady state geometry for each of the melt rate specifications included in WAVI.jl. These are:
+# This example demonstrates the how to use melt rate parametrizations in WAVI.jl. 
+# We first demonstrate the parametrizations included in WAVI.jl, by produce a map of the melt rate for each of these in the MISMIP+ steady state geometry. (MISMIP+ is the latest ice sheet model intercomparison exercise, for more info see doi:10.5194/tc-14-2283-2020)
+# Explicitly, these parametrizations are:
 #   * Quadratic melt rates
 #   * A plume melt emulator
 #   * PICO melt rate model
 #   * Binary file melt rate
 # You can find more info on each of these models in the Physics --> Melt Rates tab.
 # 
-# We also demonstrate how to add a simple melt rate model to WAVI.jl.
+# Secondly, we demonstrate how to add a simple melt rate model to WAVI.jl.
 
 
 # ## Install dependencies
@@ -20,24 +21,22 @@
 #pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots), Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 
-# ## Setting up the  grid 
-# First we'll make the grid, which has 2km resolution, with 320 grid points in the x-direction and 40 grid points in the y-direction:
+# ## Setting up the grid 
+# First we'll make the grid. The MISMIP+ grid has length 640km and 80km in the x and y directions, respectively. We're going to choose 2km resolution in both directions, i.e. 320 grid points in the x-direction and 40 grid points in the y-direction:
 nx = 320;
 ny = 40;
 grid = Grid(nx=nx,ny=ny,dx=2000.,dy=2000.);
 
-# For the bed, we'll cheat a little and use the "hard coded" form of the MISMIP+ bed (see the overdeepened bed example to see how to do this properly)
+# For the bed, we'll cheat a little and use the "hard coded" form of the MISMIP+ bed (see the "overdeepened bed" example to see how to define this bed properly)
 bed = WAVI.mismip_plus_bed; # function definition
 
-
 # ## Getting the ice thickness
-# To save time, we're going to pull the steady state ice thickness from Github, where it is stored as a binary file.
-# Note that this ice thickness is the result of the "overdeepened bed" example, but with 2km resolution.
-fname = Downloads.download("https://github.com/alextbradley/WAVI_example_data/MISMIP_PLUS/raw/main/WAVI_ice0_2km_thick.bin");
+# To allow us to focus on the melt rate parametrizations, we're not going to run a simulation to define the steady state ice thickness, but rather pull it from Github, where it is stored as a binary file.
+# (Note that this ice thickness is the result of the "overdeepened bed" example, but with 2km resolution.)
+fname = Downloads.download("https://github.com/alextbradley/WAVI_example_data/raw/main/MISMIP_PLUS/WAVI_ice0_2km_thick.bin");
 h = Array{Float64,2}(undef, nx, ny);
 read!(fname, h);
 h = ntoh.(h);
-
 # (The final line simply converts the endianness from big-endian --  the format in which this file is stored -- to little-endian.)
 
 # Now we make an InitialConditions object to store this ice thickness:
@@ -48,9 +47,9 @@ global initial_conditions = InitialConditions(initial_thickness = h);
 
 # First let's make the melt rate models in turn, starting with quadratic, which is imposed on the model via a `QuadraticMeltRate` object.
 melt_quad = QuadraticMeltRate(γT = 0.745*1e-3)
-# The parameter $\gamma_T$ is a normalization cofficient, chosen so that the mean melt rate on the shelf is approx 10m/a. (See the WAVI Setup -->  Melt Rate Models section for information on all keyword parameters, here and for the below models.)
+# The parameter $\gamma_T$ is a normalization cofficient. The value here is chosen so that the mean melt rate on the shelf is approx 10m/a. (See the "WAVI Setup" -->  "Melt Rate Models" section for information on all keyword parameters, here and for the below models.)
 
-# Next up: PICO. For this parametrization, we first have to make a mask defining where the ice front is, and then pass it when we instantiate the `PICO` object which stores the information.
+# Next up: PICO. For this parametrization, we first have to make a mask defining where the ice front is, and then pass it as a keyword argument when we instantiate the `PICO` melt rate object.
 ice_front_mask = zeros(nx,ny);
 ice_front_mask[end,:] .= 1;
 melt_PICO = PICO(ice_front_mask = ice_front_mask, 
@@ -62,9 +61,9 @@ melt_PICO = PICO(ice_front_mask = ice_front_mask,
 
 # Next up: plume model emulator:
 melt_PME = PlumeEmulator(α=1.49);
-# In this case, the normalization coefficent is named $\alpha$, and has a slightly different meaning but we can use it in the same role: the control the mean melt rate on the shelf.
+# In this case, the normalization coefficent is named $\alpha$, and has a slightly different meaning to $\gamma_T$ above, but we use it in the same role: to the set the mean melt rate on the shelf.
 
-# Finally, a binary file, in which the melt rate is read in from a file. First, we'll create such a file, which will set the melt rate to be unifrom on the shelf.
+# Finally, a binary file melt rate, in which the melt rate is read in from a binary file. First, we'll create such a file, which will set the melt rate to be uniform on the shelf.
 isfloat = (h .< -918.0/1028.0 .* bed.(grid.xxh, grid.yyh)) #indices of floating elements
 m = zeros(nx,ny);
 m[isfloat] .= 10.0; #set everywhere floating to 10m/a
@@ -75,19 +74,19 @@ out = open(joinpath(folder,"melt.bin"), "w");
 write(out, m);
 close(out);
 
-# Now we can point our binary file melt rate, an instance of a `BinaryFileMeltRate` here
+# Now we instantiate out melt rate opject, pointing it to this file we just created:
 binfile_melt = BinfileMeltRate(input_filename = joinpath(folder,"melt.bin"));
 
 # It's useful to put these into a dictionary, so we can iterate over them:
 global melt_rates = Dict("Quadratic" => melt_quad, "PME" => melt_PME, "PICO" => melt_PICO, "Binary file" => binfile_melt);
 
 # ## Visualizing
-# We'll loop over the melt rate models instantiated above. Each time, we make a model with the appropriate melt rate specifier using the 'melt_rate' keyword.  
-# We use the `update_state!` method to bring the melt (as well as all other quantities such as grounded fraction) in line and plot the results.
-# We set the number of Picard iterations to 1 (we don't care about the velocity solve being completely accurate!)
+# We'll loop over the melt rate models instantiated above. Each time, we make a WAVI.jl `Model` with the appropriate melt rate parametrization specified via the `melt_rate` keyword.  
+# We use the `update_state!` method to bring the melt (as well as all other quantities, such as the grounded fraction) in line with the specified thickness, and then plot the melt rate.
+# (We alsoset the number of Picard iterations to 1 -- each time we do an `update_state!` we perform a velocity solve; in this example, we don't care about the velocity solve being completely accurate, so we'll do the minimum number of iterations in this process!)
 for (key, melt) in melt_rates
     #instantiate the model with the appropriate melt rate
-    model = Model(grid = grid,
+    local model = Model(grid = grid,
             bed_elevation = bed, 
             initial_conditions = initial_conditions,
             solver_params = SolverParams(maxiter_picard=1),
@@ -114,34 +113,54 @@ for (key, melt) in melt_rates
     #display(plt) #uncomment to show in (e.g.) VSCode
 end
 
+# As expected, the binary file melt rate has the same (10m/a)melt rate over the whole shelf. 
+# The PICO parametrization, which divides the shelf up into discrete blocks, has a corresponding banded structure, with highest melt rates at the grounding line.
+# The quadratic melt rate parametrizations similarly has the highest melt rate near the grounding line, but drops off with distance from the grounding line much quicker than the PICO parametrization.
+# These plots can be compared to corresponding results for the Elmer ice sheet model  (Favier et al. 2019 doi:10.5194/gmd-12-2255-2019)
+
 # ## Defining A New Melt Rate Model
-# In this section, we show how to specify a new melt rate model. In this example, we define a structure which can be passed to a model (via the `melt_rate` keyword) which specifies the melt rate according to the MISMIP+ experiment: 
-# melt rate on floating cells in $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$ where $z_d$ is the ice shelf draft and $z_d - z_b$ is the cavity thickness. 
-# There are three steps to defining a new melt rate model. First, we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
-struct MISMIPMeltRateOne{T <: Real} <: WAVI.AbstractMeltRate 
+# In this section, we show how to specify a new melt rate model. There are four steps:
+# * Create a file to store code
+# * Define the appropriate structure, which stores information required to prescribe the melt rate
+# * Define a constructor of this structure
+# * Write a function to update the melt rate appropriately, and export this
+# This is quite abstract, so let's do an example. We'll create a melt rate model which sets the melt rate as it is specified in the MISMIP+ experiment: 
+# the melt rate on floating cells is $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$, where $z_d$ is the ice shelf draft and $z_d - z_b$ is the cavity thickness. 
+# We'll follow the steps above: first, we create a file to store the code. For this example, we've already create the file, you can see it at it at "src/MeltRate/mismip_melt_rate.jl".
+
+# Next we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
+""" 
+struct MISMIPMeltRateOne{T <: Real} <: AbstractMeltRate 
     α  :: T
     ρi :: T
     ρw :: T
 end
+"""
 # In this case, a normalization coefficient $\alpha$, and the denisities of ice and ocean, $\rho_i$ and $\rho_w$, respectively. 
 
-# Now we define a "constructor", a function that defines how to create one of these structures:
+# Now we define our "constructor", a function that defines how to create one of these structures:
+""" 
 MISMIPMeltRateOne(; α = 1.0, ρi = 918.0, ρw = 1028.0) = MISMIPMeltRateOne(α,ρi, ρw)
+""" 
 # In this case, the constructor simply sets the default values for the parameters $\alpha$, $\rho_i$, and $\rho_w$. 
 # For more complicated melt rate models, constructors might be more elaborate!
 
 # The final step is to define a function `update_melt_rate!(melt_rate::TYPE, fields, grid)` which tells WAVI how to update the melt rate in this example.
 # here, TYPE is the name of the structure we just made. 
-# Note that the arguments of this function must be as mentioned here, so that the multiple dispatch capability can be leveraged! This function defines another method named `update_melt_rate!`, which sets the melt rate according to this function when the input melt rate is of type "TYPE". One of these function is defined for each of the melt rate models mentioned above.
-function update_melt_rate!(melt_rate::WAVI.MISMIPMeltRateOne, fields, grid)
+# Note that the arguments of this function must be as mentioned here, so that the multiple dispatch capability can be leveraged! This procedure defines another method named `update_melt_rate!`, which sets the melt rate according to this function when the input melt rate is of type "TYPE". One of these function is defined for each of the melt rate models mentioned above.
+""" 
+function update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid) 
     draft = -(melt_rate.ρi / melt_rate.ρw) .* fields.gh.h
     cavity_thickness = draft .- fields.gh.b
     cavity_thickness = max.(cavity_thickness, 0)
     m =  melt_rate.α .* 0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
     fields.gh.basal_melt[:] .= m[:]
 end
+""" 
 
-# Now we can plot the melt rate with this model:
+# Finally, we tell point WAVI to this code by adding `include("mismip_melt_rate.jl")` to the file "src/MeltRate/MeltRate.jl", and add this structure to the export section in "src/WAVI.jl" file. 
+
+# Now we can create a model which takes this melt rate andplot the result:
 model = Model(grid = grid,
             bed_elevation = bed, 
             initial_conditions = initial_conditions,
@@ -158,12 +177,13 @@ plt = Plots.heatmap(model.grid.xxh[:,1]/1e3, model.grid.yyh[1,:]/1e3, msat',
             xlabel = "x (km)", 
             ylabel = "y (km)",
             colorbar_title = "melt rate (m/yr)",
-            title = key,
+            title = "MISMIP melt rate",
             framestyle = "box")
 xlims!((420, 640))
 plot!(size = (500,300))
 #display(plt)
 
+# Hopefully this example demonstrates clearly the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)
 
 # Finally, let's clean up the files we just made
 rm(joinpath(@__DIR__, "melt_rate_parametrizations"), force = true, recursive = true);

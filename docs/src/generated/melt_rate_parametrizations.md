@@ -59,7 +59,7 @@ nothing #hide
 Now we make an InitialConditions object to store this ice thickness:
 
 ````@example melt_rate_parametrizations
-initial_conditions = InitialConditions(initial_thickness = h);
+global initial_conditions = InitialConditions(initial_thickness = h);
 nothing #hide
 ````
 
@@ -123,7 +123,7 @@ nothing #hide
 It's useful to put these into a dictionary, so we can iterate over them:
 
 ````@example melt_rate_parametrizations
-melt_rates = Dict("Quadratic" => melt_quad, "PME" => melt_PME, "PICO" => melt_PICO, "Binary file" => binfile_melt);
+global melt_rates = Dict("Quadratic" => melt_quad, "PME" => melt_PME, "PICO" => melt_PICO, "Binary file" => binfile_melt);
 nothing #hide
 ````
 
@@ -193,12 +193,11 @@ Note that the arguments of this function must be as mentioned here, so that the 
 
 ````@example melt_rate_parametrizations
 function update_melt_rate!(melt_rate::WAVI.MISMIPMeltRateOne, fields, grid)
-    @unpack basal_melt, h, b  = fields.gh
-    draft = -(melt_rate.ρi / melt_rate.ρw) .* h
-    cavity_thickness = draft .- b
+    draft = -(melt_rate.ρi / melt_rate.ρw) .* fields.gh.h
+    cavity_thickness = draft .- fields.gh.b
     cavity_thickness = max.(cavity_thickness, 0)
     m =  melt_rate.α .* 0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
-    basal_melt[:] .= m[:]
+    fields.gh.basal_melt[:] .= m[:]
 end
 ````
 
