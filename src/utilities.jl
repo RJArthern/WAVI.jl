@@ -276,9 +276,9 @@ height_above_floatation(h,b,params) = h - (params.density_ocean/params.density_i
 """
     volume_above_floatation(h,b,params)
 
-Compute the volume above floatation
+Compute the volume above floatation: integrated height above floatation for cells with positive height above floatation
 """
-volume_above_floatation(h,b,params,grid) = sum(sum(height_above_floatation.(h,b,params))) .* grid.dx .* grid.dy
+volume_above_floatation(h,b,params,grid) = sum(sum(height_above_floatation.(h,b,params)[height_above_floatation.(h,b, params) .> 0])) .* grid.dx .* grid.dy
 
 """
     glen_b(temperature,damage,params)
