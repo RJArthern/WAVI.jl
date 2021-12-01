@@ -272,6 +272,14 @@ Compute height above floatation.
 """
 height_above_floatation(h,b,params) = h - (params.density_ocean/params.density_ice)*(params.sea_level_wrt_geoid - b)
 
+
+"""
+    volume_above_floatation(h,b,params)
+
+Compute the volume above floatation
+"""
+volume_above_floatation(h,b,params,grid) = sum(sum(height_above_floatation.(h,b,params))) .* grid.dx .* grid.dy
+
 """
     glen_b(temperature,damage,params)
 
