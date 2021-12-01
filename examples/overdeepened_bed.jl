@@ -93,7 +93,7 @@ model = Model(grid = grid,
             solver_params = solver_params);
 
 # ## Assembling the Simulation 
-# To get to steady state, we need to run our simulation for a good chunk of time, on the order of 10s of 1000s of years. We'll run for 10000 years, with a timestep of half a year:
+# To get to steady state, we need to run our simulation for a good chunk of time, on the order of tens of 1000s of years. We'll run for 10000 years, with a timestep of half a year:
 timestepping_params = TimesteppingParams(dt = 0.5, 
                                         end_time = 100.,);
 # NB!! We have to specify the end time as `10000.` (a float number) rather than `10000` (an integer) because WAVI.jl expects the same type for the timestep `dt` and the end time `end_time`.
@@ -141,8 +141,12 @@ filename = joinpath(@__DIR__, "overdeepened_bed", "outfile.nc");
 h = ncread(filename, "h");
 grfrac = ncread(filename, "grfrac");
 time = ncread(filename, "TIME");
-vaf = sum(sum(h .* grfrac .* dx .*dy,dims = 1),dims = 2); #volume of ice above floatation
-Plots.plot(time, vaf[1,1,:]/1e9,
+#compute the volume above floatation
+vaf = zeros(1,length(time))
+for i = 1:length(time)
+    vaf[i] = volume_above_floatation(h[:,:,i], simulation.model.fields.gh.b, Ref(simulation.model.params), simulation.model.grid )
+end
+Plots.plot(time, vaf[:]/1e9,
              marker = true, 
              label = :none,
              xlabel = "time",
