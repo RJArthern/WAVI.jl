@@ -58,10 +58,10 @@ function run_simulation!(simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
     if output_params.dump_vel
-       h_out_line_w = zeros(model.grid.Cyu - model.grid.Cyl +1) 
-       h_out_line_e = zeros(model.grid.Cyu - model.grid.Cyl +1)
-       h_out_line_s = zeros(model.grid.Cxu - model.grid.Cxl +1) 
-       h_out_line_n = zeros(model.grid.Cxu - model.grid.Cxl +1) 
+       h_out_line_w = zeros(model.grid.Cyu - model.grid.Cyl +3) 
+       h_out_line_e = zeros(model.grid.Cyu - model.grid.Cyl +3)
+       h_out_line_s = zeros(model.grid.Cxu - model.grid.Cxl +3) 
+       h_out_line_n = zeros(model.grid.Cxu - model.grid.Cxl +3) 
     end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
@@ -127,27 +127,54 @@ function run_simulation!(simulation)
 
         #check the dump velocity flag at the final timestep
         if (i == timestepping_params.n_iter_total) && output_params.dump_vel
+         x_w=0  
+         x_e=0     
+         y_s=0
+         y_n=0
+         if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny  
+          if output_params.PC_west
+           if model.grid.Cxl > 1 
+           x_w=x_w+1
+           end
+          end
+          if output_params.PC_east
+           if model.grid.Cxu <  model.grid.nx
+           x_e=x_e+1
+           end
+          end
+          if output_params.PC_south
+           if model.grid.Cyl > 1 
+           y_s=y_s+1
+           end
+          end
+          if output_params.PC_north
+           if model.grid.Cyu <  model.grid.ny
+           y_n=y_n+1
+           end
+          end
+         end
+            
          if output_params.PC_west
           if model.grid.Cxl > 1
-           h_out_line_w = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
+           h_out_line_w = model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl-y_s:model.grid.Cyu+y_n]
           end
          end
          if output_params.PC_east
           if model.grid.Cxu < model.grid.nx
-          h_out_line_e = model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
+          h_out_line_e = model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl-y_s:model.grid.Cyu+y_n]
           end
          end  
          if output_params.PC_south
           if model.grid.Cyl > 1
-          h_out_line_s = model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
+          h_out_line_s = model.fields.gh.h[model.grid.Cxl-x_w:model.grid.Cxu+x_e,model.grid.Cyl-1]
           end
          end
          if output_params.PC_north
           if model.grid.Cyu < model.grid.ny
-          h_out_line_n = model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
+          h_out_line_n = model.fields.gh.h[model.grid.Cxl-x_w:model.grid.Cxu+x_e,model.grid.Cyu+1]
           end
          end
-            write_vel(simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s)
+            write_vel(simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s,x_w,x_e,y_s,y_n)
         end
     end
 
@@ -162,34 +189,8 @@ end
 
 Write the velocity at the the final timestep of the simulation (used in the coupled wavi-mitgcm model to communicate with streamice)
 """
-function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s)
+function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s,x_w,x_e,y_s,y_n)
     @unpack model, output_params = simulation  
-    x_w=0  
-    x_e=0     
-    y_s=0
-    y_n=0
-    if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny  
-     if output_params.PC_west
-      if model.grid.Cxl > 1 
-       x_w=x_w+1
-      end
-     end
-     if output_params.PC_east
-      if model.grid.Cxu <  model.grid.nx
-       x_e=x_e+1
-      end
-     end
-     if output_params.PC_south
-      if model.grid.Cyl > 1 
-       y_s=y_s+1
-      end
-     end
-     if output_params.PC_north
-      if model.grid.Cyu <  model.grid.ny
-       y_n=y_n+1
-      end
-     end
-    end
     
     clock_time_s=Int(simulation.clock.time*(3600*24*365))
         
@@ -218,22 +219,22 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
      h_out_b = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w ,model.grid.Cyu - model.grid.Cyl +1 + 2 + y_s + y_n)
      if output_params.PC_west       
       if model.grid.Cxl > 1
-                h_out_b[2,y_s+2:end-y_n-1] .= h_out_line_w[:]
+                h_out_b[2,2:end-1] .= h_out_line_w[:]
       end
      end
      if output_params.PC_east
       if model.grid.Cxu < model.grid.nx
-                h_out_b[end-1,y_s+2:end-y_n-1] .= h_out_line_e[:]
+                h_out_b[end-1,2:end-1] .= h_out_line_e[:]
       end
      end
      if output_params.PC_south
       if model.grid.Cyl > 1
-                h_out_b[x_w+2:end-x_e-1,2] .= h_out_line_s[:]
+                h_out_b[2:end-1,2] .= h_out_line_s[:]
       end
      end
      if output_params.PC_north
       if model.grid.Cyu < model.grid.ny
-                h_out_b[x_w+2:end-x_e-1,end-1] .= h_out_line_n[:]
+                h_out_b[2:end-1,end-1] .= h_out_line_n[:]
       end
      end
      h_out_b .= hton.(h_out_b)
