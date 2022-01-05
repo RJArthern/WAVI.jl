@@ -13,7 +13,7 @@ struct OutputParams{T <: Real, R <: Real, O}
     PC_west::Bool      #toggle Parent child for western boundary
     PC_south::Bool     #toggle Parent child for southern boundary
     zip_format::String     #specify whether or not to zip the output, and the format
-    dt_coup:: T        #timestep of the ocean model, which is being coupled
+    dt_coup::T        #timestep of the ocean model, which is being coupled
 end
 
 #output constructor
