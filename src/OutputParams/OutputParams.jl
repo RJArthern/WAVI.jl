@@ -13,6 +13,7 @@ struct OutputParams{T <: Real, R <: Real, O}
     PC_west::Bool      #toggle Parent child for western boundary
     PC_south::Bool     #toggle Parent child for southern boundary
     zip_format::String     #specify whether or not to zip the output, and the format
+    dt_coup:: T        #timestep of the ocean model, which is being coupled
 end
 
 #output constructor
@@ -27,7 +28,8 @@ function OutputParams(;
     PC_north = false,
     PC_west = false,
     PC_south = false,
-    zip_format = "none")
+    zip_format = "none",
+    dt_coup = 1.0)
 
     #default the n_iter_out to -1 (this is updated in simulation once we know timestep from timestepping_params)
     n_iter_out = -1
