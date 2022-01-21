@@ -37,6 +37,8 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     rel_resid = norm(b .- op*x)/norm(b)
     converged = rel_resid < solver_params.tol_picard
 
+    println(" Current rel_resid at iteration ", i_picard, " is ", rel_resid) 
+
     p=get_preconditioner(model,op)
     precondition!(x, p, b)
 

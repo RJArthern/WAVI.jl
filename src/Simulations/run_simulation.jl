@@ -5,6 +5,7 @@ Perform one timestep of the simulation
 """
 function timestep!(simulation)
     @unpack model,timestepping_params, output_params = simulation
+    println(" Time in simulation is ", simulation.clock.time, " years") 
     update_state!(model)
     #write solution if at the first timestep (hack for https://github.com/RJArthern/WAVI.jl/issues/46 until synchronicity is fixed)
     if (output_params.output_start) && (simulation.clock.n_iter == 0)
