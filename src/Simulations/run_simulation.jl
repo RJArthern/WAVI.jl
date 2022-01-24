@@ -192,7 +192,7 @@ Write the velocity at the the final timestep of the simulation (used in the coup
 function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n,h_out_line_s,x_w,x_e,y_s,y_n)
     @unpack model, output_params = simulation  
     
-    clock_time_C=Int((simulation.clock.time*(3600*24*365))/output_params.dt_coup)
+    clock_time_C=Int(round((simulation.clock.time*(3600*24*365))/output_params.dt_coup))
         
     uVel_file_string = string(simulation.output_params.prefix, "_U", lpad(clock_time_C, 10,"0") ,".bin")
     vVel_file_string = string(simulation.output_params.prefix, "_V", lpad(clock_time_C, 10,"0") ,".bin")
