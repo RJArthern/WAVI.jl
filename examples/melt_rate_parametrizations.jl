@@ -64,7 +64,7 @@ melt_PME = PlumeEmulator(α=1.49);
 # In this case, the normalization coefficent is named $\alpha$, and has a slightly different meaning to $\gamma_T$ above, but we use it in the same role: to the set the mean melt rate on the shelf.
 
 # Finally, a binary file melt rate, in which the melt rate is read in from a binary file. First, we'll create such a file, which will set the melt rate to be uniform on the shelf.
-isfloat = (h .< -918.0/1028.0 .* bed.(grid.xxh, grid.yyh)) #indices of floating elements
+isfloat = (h .< -918.0/1028.0 .* bed) #indices of floating elements
 m = zeros(nx,ny);
 m[isfloat] .= 10.0; #set everywhere floating to 10m/a
 folder = joinpath(@__DIR__, "melt_rate_parametrizations");
