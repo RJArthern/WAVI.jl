@@ -5,6 +5,7 @@ include("./plume_emulator.jl")
 include("./pico.jl")
 include("./quadratic_melt_rate.jl")
 include("./mismip_melt_rate.jl")
+include("./uniform_melt_float_only.jl")
 
              
 
