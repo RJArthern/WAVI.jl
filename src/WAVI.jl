@@ -1,9 +1,9 @@
 module WAVI
 
 #Useful packages
-using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
+using LinearAlgebra, SparseArrays, LinearMaps, Parameters, MKLSparse,
       IterativeSolvers, Interpolations, BenchmarkTools, Reexport,
-      NetCDF, JLD2, Setfield, MAT, ImageFiltering
+      NetCDF, JLD2, Setfield, MAT, ImageFiltering, AutoPreallocation
 
 #Import functions so they can be modified in this module.
 import LinearAlgebra: ldiv!

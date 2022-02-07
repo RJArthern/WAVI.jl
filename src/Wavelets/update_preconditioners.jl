@@ -18,8 +18,11 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     restrict_fun(x) = restrictvec(model,x)
     prolong_fun(x) = prolongvec(model,x)
 
-    restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+    dummy, preallocated_restrict_fun = preallocate(restrict_fun,zeros(T,n))
+    dummy, preallocated_prolong_fun = preallocate(prolong_fun,zeros(T,n_coarse))
+
+    restrict=LinearMap{T}(preallocated_restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+    prolong=LinearMap{T}(preallocated_prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
 
     op_diag=get_op_diag(model,op)
 
@@ -75,7 +78,7 @@ end
  Get diagonal of operator for use in preconditioner.
 
 """
-function get_op_diag(model::AbstractModel,op::LinearMap)
+function get_op_diag(model::AbstractModel{T,N},op::LinearMap) where {T,N}
     @unpack gu,gv=model.fields
     @unpack params,solver_params=model
     m,n=size(op)
@@ -87,7 +90,7 @@ function get_op_diag(model::AbstractModel,op::LinearMap)
     e=zeros(Bool,n)
     for i = unique(sweep)
         e[sweep .== i] .= true
-        op_diag[e] .= (op*e)[e]
+        op_diag[e] .= (op*convert(Vector{T},e))[e]
         e[sweep .== i] .= false
     end
     return op_diag

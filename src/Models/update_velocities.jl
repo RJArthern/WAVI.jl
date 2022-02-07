@@ -300,5 +300,6 @@ function get_op(model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
     n = gu.n + gv.n
     op_fun(x) = opvec(model,x)
-    op=LinearMap{T}(op_fun,n;issymmetric=true,ismutating=false,ishermitian=true,isposdef=true)
+    dummy, preallocated_op_fun = preallocate(op_fun,zeros(T,n))
+    op=LinearMap{T}(preallocated_op_fun,n;issymmetric=true,ismutating=false,ishermitian=true,isposdef=true)
 end
