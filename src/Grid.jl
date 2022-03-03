@@ -20,6 +20,7 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
+              basin_ID :: Array{T,2}    # grid of IDs for different basins
 end
 
 """
@@ -33,7 +34,8 @@ end
     y0 = -40000.0,
     h_mask = nothing,
     u_iszero = nothing,
-    v_iszero = nothing)
+    v_iszero = nothing,
+    basin_ID = nothing)
 
 Construct a WAVI.jl grid.
 
@@ -51,6 +53,7 @@ Keyword arguments
     - 'u_iszero': Locations of zero u velocity points
     - 'v_iszero': Locations of zero v velocity points
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
+    - 'basin_ID' : grid of basin IDs (from Zwalley)
 """
 
 #grid constructor
@@ -66,7 +69,8 @@ function Grid(;
     u_iszero = nothing,
     v_iszero = nothing,
     quadrature_weights = nothing,
-    σ = nothing)
+    σ = nothing,
+    basin_ID = nothing)
 
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
@@ -88,6 +92,7 @@ size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) 
 size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
 size(u_iszero)==(nx+1,ny) || throw(DimensionMismatch("u_iszero size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_iszero)==(nx,ny+1) || throw(DimensionMismatch("v_iszero size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
+size(basin_ID)==(nx,ny) || throw(DimensionMismatch("Basin_ID size must be (nx x ny) (i.e. $nx x $ny)"))
 
 #map bit arrays to boolean
 try
@@ -147,7 +152,8 @@ return Grid(nx,
             yyc,
             σ,
             ζ,
-            quadrature_weights)
+            quadrature_weights,
+            basin_ID)
 end
 
 
