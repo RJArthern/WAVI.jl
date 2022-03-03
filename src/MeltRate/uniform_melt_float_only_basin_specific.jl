@@ -32,11 +32,11 @@ function update_melt_rate!(melt_rate::UniformMeltFloatOnlyBasinSpecific, fields,
   m = zeros(grid.nx,grid.ny);
 
     if (melt_rate.melt_partial_cell)  #partial cell melting 
-        m[(grid.basin_ID .==21)] .=   melt_rate.melt_constant_basin_21.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==21)])
-        m[(basin_ID .==22)] .=   melt_rate.melt_constant_basin_22.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==22)])
+        m[(grid.basin_ID .==21.0)] .=   melt_rate.melt_constant_basin_21.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==21.0)])
+        m[(grid.basin_ID .==22.0)] .=   melt_rate.melt_constant_basin_22.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==22.0)])
     elseif ~melt_rate.melt_partial_cell #no partial cell melting
-        m[(grid.basin_ID .==21)] .=  melt_rate.melt_constant_basin_21.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==21)])
-        m[(grid.basin_ID .==22)] .=  melt_rate.melt_constant_basin_22.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==22)])
+        m[(grid.basin_ID .==21.0)] .=  melt_rate.melt_constant_basin_21.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==21.0)])
+        m[(grid.basin_ID .==22.0)] .=  melt_rate.melt_constant_basin_22.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==22.0)])
         m[.~(fields.gh.grounded_fraction .== 0)] .= 0 
     end
     
