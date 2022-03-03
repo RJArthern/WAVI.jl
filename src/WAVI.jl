@@ -19,7 +19,7 @@ export
     update_state!, timestep!, run_simulation!,
 
     #Melt ratesS
-    PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne, PICO, QuadraticMeltRate, UniformMeltFloatOnly,
+    PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne, PICO, QuadraticMeltRate, UniformMeltFloatOnly, UniformMeltFloatOnlyBasinSpecific,
 
     #Post-processing controls
     volume_above_floatation, height_above_floatation
