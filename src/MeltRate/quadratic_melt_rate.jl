@@ -62,11 +62,11 @@ function QuadraticMeltRate(;
 end
 
 """
-    update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid)
+    update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid, clock)
 
 Wrapper script to update the melt rate for a QuadraticMeltRate.
 """
-function update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid)
+function update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft

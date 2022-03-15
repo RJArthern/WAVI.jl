@@ -74,11 +74,11 @@ function PICO(;
 end
 
 """
-    function update_melt_rate!(pico::PICO, fields, grid)
+    function update_melt_rate!(pico::PICO, fields, grid, clock)
 
 Update the ice model melt rate for a PICO melt rate parametrization
 """
-function update_melt_rate!(pico::PICO, fields, grid)
+function update_melt_rate!(pico::PICO, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
     
     #check that the ice front mask has the correct dimensions 

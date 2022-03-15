@@ -4,13 +4,13 @@ update_state!(model::AbstractModel)
 
 Update the model to the current situation
 """
-function update_state!(model)
+function update_state!(model, clock)
     update_surface_elevation!(model)
     update_geometry_on_uv_grids!(model)
     update_height_above_floatation!(model)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
-    update_basal_melt!(model)
+    update_basal_melt!(model, clock)
     update_weertman_c!(model)
     update_dsdh!(model)
     update_model_velocities!(model)
@@ -93,8 +93,8 @@ end
 
 Update the basal melt rate.
 """
-function update_basal_melt!(model::AbstractModel)
-    update_melt_rate!(model.melt_rate, model.fields, model.grid)
+function update_basal_melt!(model::AbstractModel, clock)
+    update_melt_rate!(model.melt_rate, model.fields, model.grid, clock)
     return model
 end
 
