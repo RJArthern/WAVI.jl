@@ -123,7 +123,7 @@ elseif melt_rate_model == "MISMIP_1r"
     melt_model = MISMIPMeltRateOne(α = 0.184)
 
 elseif melt_rate_model == "QuadL"
-    melt_model = QuadraticMeltRate(γT = 0.745*1e-3)
+    melt_model = QuadraticMeltRate(γT = 0.4*1e-3)
     #melt_model = QuadraticMeltRate(γT = 0.745*1e-3, melt_partial_cell = true)
     
 elseif melt_rate_model == "QuadNL"

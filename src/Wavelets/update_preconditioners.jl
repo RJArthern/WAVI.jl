@@ -43,28 +43,38 @@ function precondition!(x, p, b)
     @unpack op,op_diag,nsmooth,sweep,sweep_order,smoother_omega,restrict,
             prolong,op_coarse,correction_coarse,tol_coarse,maxiter_coarse = p
 
-
+    println("\n precondition function \n")
     n=size(op,1)
 
     # Multigrid smooth
-    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
+    t = @elapsed x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=sweep_order, smoother_omega = smoother_omega)
-
+    println("gauss seidel smoother 1: ", t)
     resid=b-op*x;
 
     # Multigrid restriction
     b_coarse=restrict*resid
 
     # Multigrid solve for correction
-    cg!(correction_coarse, op_coarse, b_coarse; reltol = tol_coarse, maxiter = maxiter_coarse)
+#    file = matopen("matfile2.mat","w")
+#    write(file, "b_coarse", b_coarse)
+#    write(file, "correction_coarse", correction_coarse)
+    #write(file, "op_coarse", op_coarse)
+#    println(op_coarse)
+#    close(file)
+    
+t = @elapsed cg!(correction_coarse, op_coarse, b_coarse; reltol = tol_coarse, maxiter = maxiter_coarse)
+  #  t = @elapsed bicgstabl!(correction_coarse, op_coarse, b_coarse,2; reltol = tol_coarse)
+    println("cg: ", t)
 
     # Multigrid prolongation
     x .= x .+ prolong*correction_coarse
 
     # Multigrid smooth
-    x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
+    t = @elapsed x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=reverse(sweep_order), smoother_omega = smoother_omega)
-
+    println("gauss seidel smoother 2: ", t)
+    println("end precondition \n")
     return x
 end
 

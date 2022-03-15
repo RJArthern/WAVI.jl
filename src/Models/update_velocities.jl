@@ -19,30 +19,30 @@ i_picard::Int64 = 0
 while !converged && (i_picard < solver_params.maxiter_picard)
 
     i_picard = i_picard + 1
-
-    set_velocities!(model,x)
-    update_shelf_strain_rate!(model)
-    update_av_speed!(model)
-    update_bed_speed!(model)
-    update_β!(model)
-    update_basal_drag!(model)
-    inner_update_viscosity!(model)
-    update_av_viscosity!(model)
-    update_quadrature_falpha!(model)
-    update_βeff!(model)
-    update_βeff_on_uv_grids!(model)
-    update_rheological_operators!(model)
-    op=get_op(model)
+    println("\n inner picard loop")
+    t = @elapsed set_velocities!(model,x); println("set velocities: ", t)
+    t = @elapsed update_shelf_strain_rate!(model); println("update shelf strain rate: ", t)
+    t = @elapsed update_av_speed!(model); println("update av speed: ", t)
+    t = @elapsed update_bed_speed!(model); println("update bed speed: ", t)
+    t = @elapsed update_β!(model); println("update beta: ", t)
+    t = @elapsed update_basal_drag!(model); println("update basal drag: ", t)
+    t = @elapsed inner_update_viscosity!(model); println("update viscosity: ", t)
+    t = @elapsed update_av_viscosity!(model); println("update av viscosity: ", t)
+    t = @elapsed update_quadrature_falpha!(model); println("quadrature falpha: ", t)
+    t = @elapsed update_βeff!(model); println("βeff: ", t)
+    t = @elapsed update_βeff_on_uv_grids!(model); println("βeff on uv grids: ", t)
+    t = @elapsed update_rheological_operators!(model); println("rheology operators: ", t)
+    t = @elapsed op=get_op(model); println("get op:", t)
 
     rel_resid = norm(b .- op*x)/norm(b)
     converged = rel_resid < solver_params.tol_picard
 
-    p=get_preconditioner(model,op)
-    precondition!(x, p, b)
-
+    t=@elapsed p = get_preconditioner(model,op) ; println("get preconditioner: ", t)
+    t=@elapsed precondition!(x, p, b); println("precondition: ", t)
+    
 end
-set_velocities!(model,x)
-
+t = @elapsed set_velocities!(model,x); println("set velocities: ", t)
+println("end picard loop\n ")
 return model
 end
 

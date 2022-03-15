@@ -61,7 +61,7 @@ function run_simulation!(simulation)
     @unpack model, timestepping_params, output_params = simulation
     chkpt_tag = "A"
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
-        timestep!(simulation)
+        t = @elapsed timestep!(simulation); ; println("timestep total: ", t)
         
         #check if we have hit a temporary checkpoint
         if mod(i,timestepping_params.n_iter_chkpt) == 0
