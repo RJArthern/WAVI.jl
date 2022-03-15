@@ -52,7 +52,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
-    levels=solver_params.levels
+    levels=solver_params.levels,
+    u=deepcopy(initial_conditions.initial_u_veloc)
     )
 
     #v-grid
@@ -62,7 +63,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
-    levels=solver_params.levels
+    levels=solver_params.levels,
+    v=deepcopy(initial_conditions.initial_v_veloc)
     )
 
     #c-grid

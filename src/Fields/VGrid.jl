@@ -42,6 +42,7 @@ Keyword arguments
     - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
+    - v:  (required) initial guess of v in y direction
 """
 function VGrid(;
         nxv,
@@ -49,7 +50,8 @@ function VGrid(;
         mask = trues(nxv,nyv),
         levels,
         dx,
-        dy)
+        dy,
+        v)
 
     #check the sizes of inputs
     (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
@@ -70,7 +72,7 @@ function VGrid(;
     grounded_fraction = ones(nxv,nyv)
     βeff = zeros(nxv,nyv)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    v = zeros(nxv,nyv)
+   # v = zeros(nxv,nyv)
 
     #size assertions
     @assert size(mask)==(nxv,nyv)
@@ -82,7 +84,7 @@ function VGrid(;
     @assert size(h)==(nxv,nyv)
     @assert size(grounded_fraction)==(nxv,nyv)
     @assert size(βeff)==(nxv,nyv)
-    @assert size(v)==(nxv,nyv)
+    #@assert size(v)==(nxv,nyv)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
