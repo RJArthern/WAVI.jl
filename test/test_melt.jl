@@ -51,8 +51,30 @@ using Test, WAVI
 
         #remove the file we just made
         rm(filename)
+    end
 
-        
+    @testset "test time dependent quadratic melt rate construction and update" begin 
+
+      @info "Testing dependent quadratic melt rate construction and update"
+      #test construction
+      grid = Grid()
+      initial_conditions = InitialConditions(initial_thickness = 500.0*ones(grid.nx, grid.ny)) #initialize to 500m thickness       
+      quadratic_time_dep_melt_rate = QuadraticTimeDepMeltRate()
+      model = Model(grid = grid, 
+                    bed_elevation = WAVI.mismip_plus_bed, 
+                    initial_conditions = initial_conditions,
+                    melt_rate = quadratic_time_dep_melt_rate,
+                    solver_params = SolverParams(maxiter_picard = 1))
+      @test model.melt_rate isa QuadraticTimeDepMeltRate
+
+      #test error if we try to pass incorrect arguments in ambient temp of salinity
+      @test_throws ArgumentError QuadraticTimeDepMeltRate(Ta = WAVI.isomip_warm0_temp)
+      @test_throws ArgumentError QuadraticTimeDepMeltRate(Sa = WAVI.isomip_warm0_salinity)
+      
+
+
+
+
     end
 
 

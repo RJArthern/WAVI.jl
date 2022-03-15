@@ -1,4 +1,4 @@
-struct QuadraticMeltRate{T <: Real} <: AbstractMeltRate
+struct QuadraticTimeDepMeltRate{T <: Real} <: AbstractMeltRate
     γT :: T                       #(calibrated) heat exchange velocity
     λ1 :: T                       #liquidus slope 
     λ2 :: T                       #liquidus intercept 
@@ -7,10 +7,10 @@ struct QuadraticMeltRate{T <: Real} <: AbstractMeltRate
     ρw :: T                       #water density
     L :: T                        #latent heat of fusion for ice 
     c :: T                        #specific heat capacity of ocean water 
-    Ta :: Function                #Function specifying ambient temperature. Function of depth only. 
-    Sa :: Function                #Function specifying ambient salinity. Function of depth only.
+    Ta :: Function                #Function specifying ambient temperature. Function of depth and time (in that order). 
+    Sa :: Function                #Function specifying ambient salinity. Function of depth only and time (in that order).
     flocal :: Bool                #Flag for local or non-local temperature dependence
-    melt_partial_cell :: Bool       #Flag for melting applied to partial cells or not
+    melt_partial_cell :: Bool     #Flag for melting applied to partial cells or not
 end
 
 """
@@ -28,13 +28,13 @@ Keyword arguments
 - ρw: water density (units kg/m^3)
 - L: latent heat of fusion for ice (units: J/kg)
 - c: specific heat capacity of water (units J/kg/K)
-- Ta: ambient temperature function, defaults to the ISOMIP warm0 scenario. Ta must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
-- Sa: ambient salnity function, defaults to the ISOMIP warm0 scenario.  Sa must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
+- Ta: ambient temperature function, defaults to the ISOMIP warm0 scenario. Ta must be a function of depth and time, in that order
+- Sa: ambient salnity function, defaults to the ISOMIP warm0 scenario.  Sa must be a function of depth and time, in that order
 - flocal: flag for local or non-local temperature dependence. Set to true for local dependence (eqn 4 in Favier 2019 GMD) or false for non-local dependence (eqn 5)
 - melt_partial_cell: flag for specify whether to apply melt on partially floating cells (true) or not (false)
 """
 
-function QuadraticMeltRate(;
+function QuadraticTimeDepMeltRate(;
                             γT = 1.e-3,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
@@ -43,22 +43,34 @@ function QuadraticMeltRate(;
                             c = 3.974e3,
                             ρi = 918.8,
                             ρw = 1028.0,
-                            Ta = isomip_warm0_temp,
-                            Sa = isomip_warm0_salinity,
+                            Ta = nothing,
+                            Sa = nothing,
                             flocal = true,
                             melt_partial_cell = false)
 
-    #check that Ta and Sa accept a single argument
-    try Ta(0.0)
+    # Default non-specified Ta and Sa to constant isomip warm scenarios
+    Ta_default(z,t) = isomip_warm0_temp(z)
+    Sa_default(z,t) = isomip_warm0_salinity(z)
+    ~(Sa === nothing) || (Sa = deepcopy(Sa_default))
+    ~(Ta === nothing) || (Ta = deepcopy(Ta_default))
+
+    println(1)
+
+    #check that Ta and Sa accept only two arguments
+    try Ta(0.0, 0.0)
+        println(Ta(0.0,0.0))
     catch
-        ArgumentError("Ambient temperature function Ta must accept a single argument")
+        println(3)
+        throw(ArgumentError("Ambient temperature function Ta must accept exactly to arguments"))
     end
-    try Sa(0.0)
+    try Sa(0.0, 0.0)
     catch
-        ArgumentError("Ambient salinity function Sa must accept a single argument")
+        throw(ArgumentError("Ambient salinity function Sa must accept exaclty two arguments"))
     end
 
-    return QuadraticMeltRate(γT, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell)
+
+
+    return QuadraticTimeDepMeltRate(γT, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell)
 end
 
 """
@@ -66,28 +78,30 @@ end
 
 Wrapper script to update the melt rate for a QuadraticMeltRate.
 """
-function update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid, clock)
+function update_melt_rate!(quad_melt_rate::QuadraticTimeDepMeltRate, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft
     zb = fields.gh.b .* (grounded_fraction .== 1) + - quad_melt_rate.ρi / quad_melt_rate.ρw .* fields.gh.h .* (grounded_fraction .< 1)
 
-    set_quadratic_melt_rate!(basal_melt,
+    set_quadratic_time_dep_melt_rate!(basal_melt,
                             quad_melt_rate,
                             zb, 
-                            grounded_fraction)
+                            grounded_fraction,
+                            clock.time)
     return nothing
 end
 
 
-function set_quadratic_melt_rate!(basal_melt,
-                                qmr,
-                                zb, 
-                                grounded_fraction)
+function set_quadratic_time_dep_melt_rate!(basal_melt,
+                                            qmr,
+                                            zb, 
+                                            grounded_fraction,
+                                            t)
 
     #compute freezing temperature and Ta - Tf everywhere
-    Sa_shelf = qmr.Sa.(zb)
-    Ta_shelf = qmr.Ta.(zb)
+    Sa_shelf = qmr.Sa.(zb,t)
+    Ta_shelf = qmr.Ta.(zb,t)
     Tstar = qmr.λ1 .* Sa_shelf .+ qmr.λ2 .+ qmr.λ3 .* zb .- Ta_shelf
     Tstar_shelf_mean = sum(Tstar[grounded_fraction .== 0])/length(Tstar[grounded_fraction .== 0])
 
