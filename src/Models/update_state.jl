@@ -7,7 +7,7 @@ Update the model to the current situation
 function update_state!(model)
     update_surface_elevation!(model)
     update_geometry_on_uv_grids!(model)
-    update_height_above_floatation!(model)
+    #update_height_above_floatation!(model)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
     update_basal_melt!(model)
