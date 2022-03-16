@@ -7,7 +7,7 @@ Update the model to the current situation
 function update_state!(model)
     update_surface_elevation!(model)
     update_geometry_on_uv_grids!(model)
-    #update_height_above_floatation!(model)
+    update_height_above_floatation!(model)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
     update_basal_melt!(model)
@@ -57,7 +57,18 @@ Update height above floatation. Zero value is used to define location of groundi
 function update_height_above_floatation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
+    
+    if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+ 
+    haf_nochild=gh.haf[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]  
+
+    end   
+    
     gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
+    
+    if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
+    gh.haf[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]=haf_nochild[:,:]
+    end
     return model
 end
 
