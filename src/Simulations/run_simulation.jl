@@ -211,7 +211,19 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     close(ufileID) 
     vfileID =  open(vVel_file_string,"w")
     write(vfileID, v_out[:,:])
-    close(vfileID)   
+    close(vfileID)  
+    
+    float_file_string = string(simulation.output_params.prefix, "_F", lpad(clock_time_C, 10,"0") ,".bin")
+    
+    f_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +2 + y_s +y_n)
+    
+    f_out[2:end-1,2:end-1]=model.fields.gh.grounded_fraction[model.grid.Cxl-x_w:model.grid.Cxu+x_e,model.grid.Cyl-y_s:model.grid.Cyu+y_n]
+    
+    f_out .= hton.(f_out)
+    
+    ffileID =  open(float_file_string,"w")
+      write(ffileID, f_out[:,:])
+    close(ffileID) 
     
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
             
