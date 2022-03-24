@@ -35,7 +35,7 @@ Keyword arguments
 """
 
 function QuadraticMeltRate(;
-                            γT = 1.e-3,
+                            γT = 1.0e-3,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
                             λ3 = 7.61e-4,

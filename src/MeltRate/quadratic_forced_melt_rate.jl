@@ -9,8 +9,8 @@ struct QuadraticForcedMeltRate{T <: Real} <: AbstractMeltRate
     ρw :: T                       #water density
     L :: T                        #latent heat of fusion for ice 
     c :: T                        #specific heat capacity of ocean water 
-    TaSpline :: Spline2D                #ambient temperature spline
-    SaSpline :: Spline2d                #ambient salinity spline
+    TaSpline :: Spline2D          #ambient temperature spline
+    SaSpline :: Spline2D          #ambient salinity spline
     flocal :: Bool                #Flag for local or non-local temperature dependence
     melt_partial_cell :: Bool     #Flag for melting applied to partial cells or not
 end
@@ -34,15 +34,15 @@ Keyword arguments
 - ρw: water density (units kg/m^3)
 - L: latent heat of fusion for ice (units: J/kg)
 - c: specific heat capacity of water (units J/kg/K)
-- tref: reference time co-ordinates, size (N x 1)
-- zref: reference z co-ordinates, size (1 x M)
+- ref_tome: reference time co-ordinates, size (N x 1). Must be in increasing order. 
+- ref_depth: reference depth co-ordinates, size (1 x M). Must be in increasing order, measured in -z.
 - Ta:   reference ambient temperature, size (M x N) 
 - Ta:   reference ambient salinity, size (M x N) 
 - flocal: flag for local or non-local temperature dependence. Set to true for local dependence (eqn 4 in Favier 2019 GMD) or false for non-local dependence (eqn 5)
 - melt_partial_cell: flag for specify whether to apply melt on partially floating cells (true) or not (false)
 """
 
-function QuadraticTimeDepMeltRate(;
+function QuadraticForcedMeltRate(;
                             γT = 1.e-3,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
@@ -51,8 +51,8 @@ function QuadraticTimeDepMeltRate(;
                             c = 3.974e3,
                             ρi = 918.8,
                             ρw = 1028.0,
-                            zref = nothing,
-                            tref = nothing,
+                            ref_time = nothing,
+                            ref_depth = nothing,
                             Ta = nothing,
                             Sa = nothing,
                             flocal = true,
@@ -61,16 +61,22 @@ function QuadraticTimeDepMeltRate(;
     # Check that reference values are passed
     ~(Sa === nothing) || throw(ArgumentError("Must pass reference salinity"))
     ~(Ta === nothing) || throw(ArgumentError("Must pass reference temperature"))
-    ~(zref === nothing) || throw(ArgumentError("Must pass reference depths"))
-    ~(tref === nothing) || throw(ArgumentError("Must pass reference times"))
+    ~(ref_depth === nothing) || throw(ArgumentError("Must pass reference depths"))
+    ~(ref_time === nothing) || throw(ArgumentError("Must pass reference times"))
 
     #check sizes of input variables
-    (size(Ta) == (length(tref), length(zref))) || throw(DimensionMismatch("size of reference ambient temperature must be (length(tref), length(zref)"))
-    (size(Sa) == (length(tref), length(zref))) || throw(DimensionMismatch("size of reference ambient temperature must be (length(tref), length(zref)"))
+    (size(Ta) == (length(ref_time), length(ref_depth))) || throw(DimensionMismatch("size of reference ambient temperature must be (length(tref), length(zref)"))
+    (size(Sa) == (length(ref_time), length(ref_depth))) || throw(DimensionMismatch("size of reference ambient temperature must be (length(tref), length(zref)"))
+
+    #check that depth and time in increasing order
+    tdiff = ref_time[2:end] - ref_time[1:end-1]
+    zdiff = ref_depth[2:end] - ref_depth[1:end-1]
+    all(tdiff .> 0) || throw(ArgumentError("Reference time points must be in increasing order"))
+    all(zdiff .> 0) || throw(ArgumentError("Reference depth points must be in increasing order"))
 
     #make splines of ambient temperature and salinity profiles
-    TaSpline = Spline2D(tref, zref, Ta)
-    SaSpline = Spline2D(tref, zref, Sa)
+    TaSpline = Spline2D(ref_time, ref_depth, Ta)
+    SaSpline = Spline2D(ref_time, ref_depth, Sa)
 
     return QuadraticForcedMeltRate(γT, λ1, λ2, λ3, ρi, ρw, L, c, TaSpline, SaSpline, flocal, melt_partial_cell)
 end
@@ -91,7 +97,9 @@ function update_melt_rate!(quad_melt_rate::QuadraticForcedMeltRate, fields, grid
                             quad_melt_rate,
                             zb, 
                             grounded_fraction,
-                            clock.time)
+                            clock.time,
+                            grid.nx,
+                            grid.ny)
     return nothing
 end
 
@@ -100,14 +108,25 @@ function set_quadratic_forced_melt_rate!(basal_melt,
                                             qmr,
                                             zb, 
                                             grounded_fraction,
-                                            t)
+                                            t,
+                                            nx, 
+                                            ny)
 
     #compute ambient temperature and salinity on the shelf
-    Sa_shelf = qmr.SaSpline.(t,zb)
-    Ta_shelf = qmr.TaSpline.(t,zb)
+    zb .= -zb                 #we use positive depths in the input format so adjust draft accordingly
+    Sa_shelf = zeros(nx,ny)
+    Ta_shelf = zeros(nx,ny)
+    for i = 1:nx
+        for j = 1:ny
+            Sa_shelf[i,j] = qmr.SaSpline(t,zb[i,j])
+            Ta_shelf[i,j] = qmr.TaSpline(t,zb[i,j])
+        end
+    end
+
+    
 
     #compute thermal driving
-    Tstar = qmr.λ1 .* Sa_shelf .+ qmr.λ2 .+ qmr.λ3 .* zb .- Ta_shelf
+    Tstar = qmr.λ1 .* Sa_shelf .+ qmr.λ2 .- qmr.λ3 .* zb .- Ta_shelf #note negative sign on zb because it's depth
     Tstar_shelf_mean = sum(Tstar[grounded_fraction .== 0])/length(Tstar[grounded_fraction .== 0])
 
     #set melt rate
@@ -126,5 +145,6 @@ function set_quadratic_forced_melt_rate!(basal_melt,
         basal_melt[.~(grounded_fraction .== 0)] .= 0 
     end
     basal_melt[:] .= basal_melt[:].* 365.25*24*60*60
+
     return nothing
 end
