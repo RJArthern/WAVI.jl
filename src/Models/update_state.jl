@@ -58,17 +58,22 @@ function update_height_above_floatation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
     
+    if params.step_haf
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
  
     haf_nochild=gh.haf[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]  
 
-    end   
+    end
+    end
     
     gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
     
+    if params.step_haf
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
     gh.haf[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]=haf_nochild[:,:]
     end
+    end
+    
     return model
 end
 
