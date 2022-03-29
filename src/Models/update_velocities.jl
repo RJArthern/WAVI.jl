@@ -41,6 +41,8 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     precondition!(x, p, b)
 
 end
+println("Converged: $(converged)")
+println("Residual: $(rel_resid)")   
 set_velocities!(model,x)
 
 return model
