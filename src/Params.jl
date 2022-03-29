@@ -122,6 +122,6 @@ function Params(; g = 9.81,
                   weertman_reg_speed,
                   sea_level_wrt_geoid,
                   minimum_thickness,
-                  step_haf = true,
+                  step_haf,
                   )
 end
