@@ -20,6 +20,7 @@ glen_a_activation_energy :: T
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
        minimum_thickness :: T 
+                step_haf :: Bool   
 end
 
 
@@ -45,7 +46,8 @@ Params(;
         weertman_m = 3.0,
         weertman_reg_speed = 1.0e-5, 
         sea_level_wrt_geoid = 0.0,
-        minimum_thickness = 50.0)
+        minimum_thickness = 50.0, 
+        step_haf = true)
 
 Construct a WAVI.jl parameters object for holding physical parameters.
 
@@ -92,7 +94,8 @@ function Params(; g = 9.81,
                   weertman_m  = 3.0,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
-                  minimum_thickness = 50.0)
+                  minimum_thickness = 50.0,
+                  step_haf = true)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
@@ -118,6 +121,7 @@ function Params(; g = 9.81,
                   weertman_m,
                   weertman_reg_speed,
                   sea_level_wrt_geoid,
-                  minimum_thickness
+                  minimum_thickness,
+                  step_haf = true,
                   )
 end
