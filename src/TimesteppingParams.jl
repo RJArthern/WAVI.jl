@@ -11,6 +11,7 @@ struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
       n_iter_chkpt :: C      #number of iterations per temporary checkpoint
      n_iter_pchkpt :: P      #number of iterations per permanent checkpoint
     step_thickness :: Bool   #toggle whether to step the thickness at each timestep or not (coupling control)
+          step_haf :: Bool   #toggle whether to step the haf at each timestep or not (coupling control)
 end
 
 
@@ -39,6 +40,7 @@ Keyword arguments
 - 'pchkpt_freq': Frequecy with which permanent checkpoints are pass
 - 'chkpt_path' : Path to location checkpoint output
 - 'step_thickness': Toggle whether to update the ice thickness (true) or not (false) at each timestep
+- 'step_haf': Toggle whether to update the ice haf (true) or not (false) at each timestep
 """
 
 function TimesteppingParams(;
@@ -50,7 +52,8 @@ function TimesteppingParams(;
                         chkpt_freq = Inf,
                         pchkpt_freq = Inf,
                         chkpt_path = "./",
-                        step_thickness = true)
+                        step_thickness = true,
+                        step_haf = true)
 
 
     #initialize t0 (really you should read start time from pickup file)
