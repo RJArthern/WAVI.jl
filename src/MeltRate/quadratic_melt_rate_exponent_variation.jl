@@ -98,9 +98,9 @@ function set_quadratic_melt_rate_exponent_variation!(basal_melt,
     #set melt rate
     if (qmr.melt_partial_cell) && (qmr.flocal) #partial cell melting and local 
      #   basal_melt[:] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[:].^(qmr.melt_exp) .* (1 .- grounded_fraction[:])
-     # basal_melt=zeros(size(grounded_fraction)); 
-      basal_melt[grounded_fraction .< 1] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .< 1].^(qmr.melt_exp) .* (1 .- grounded_fraction[grounded_fraction .< 1])
-
+     # basal_melt[grounded_fraction .< 1] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .< 1].^(qmr.melt_exp) .* (1 .- grounded_fraction[grounded_fraction .< 1])
+     basal_melt[grounded_fraction .< 1] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .< 1].^(qmr.melt_exp)
+     basal_melt[:] .=  basal_melt[:] .* (1 .- grounded_fraction[:])
 
     elseif ~(qmr.melt_partial_cell) && (qmr.flocal) #no partial cell melting and local
         basal_melt[grounded_fraction .== 0] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[grounded_fraction .== 0].^(qmr.melt_exp)
