@@ -1,10 +1,12 @@
-#Struct to hold model state
 include("HGrid.jl")
 include("CGrid.jl")
 include("VGrid.jl")
 include("UGrid.jl")
 include("SigmaGrid.jl")
 
+"""
+    Structure to hold all field variables in WAVI.jl
+"""
 struct Fields{T <: Real, N <: Real}
     gh::HGrid{T,N}
     gu::UGrid{T,N}
@@ -52,7 +54,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
-    levels=solver_params.levels
+    levels=solver_params.levels,
+    u=deepcopy(initial_conditions.initial_u_veloc)
     )
 
     #v-grid
@@ -62,7 +65,8 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
-    levels=solver_params.levels
+    levels=solver_params.levels,
+    v=deepcopy(initial_conditions.initial_v_veloc)
     )
 
     #c-grid

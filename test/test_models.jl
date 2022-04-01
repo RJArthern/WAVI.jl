@@ -108,4 +108,28 @@ using Test, WAVI
     @test model isa Model
     end
 
+    @testset "Test passing velocity guesses and errors" begin 
+        grid = Grid()
+        bed_elevation = zeros(grid.nx, grid.ny)
+
+        #test error if input velocity wrong size
+        @test_throws DimensionMismatch model = Model(grid = grid, 
+                                        bed_elevation = bed_elevation, 
+                                        initial_conditions = InitialConditions(initial_u_veloc = ones(1,1)))
+        @test_throws DimensionMismatch model = Model(grid = grid, 
+                                        bed_elevation = bed_elevation, 
+                                        initial_conditions = InitialConditions(initial_v_veloc = ones(1,1)))
+
+        #check velocities pushed through model build
+        initial_conditions = InitialConditions(initial_v_veloc = ones(grid.nx, grid.ny+1),initial_u_veloc = ones(grid.nx+1, grid.ny))
+        model = Model(grid = grid, 
+                    bed_elevation = bed_elevation, 
+                    initial_conditions = initial_conditions)
+        @test model isa Model
+        @test all(model.fields.gu.u .== 1)
+        @test all(model.fields.gv.v .== 1)
+
+
+    end
+
 end
