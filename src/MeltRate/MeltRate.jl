@@ -5,10 +5,11 @@ include("./plume_emulator.jl")
 include("./pico.jl")
 include("./quadratic_melt_rate.jl")
 include("./quadratic_melt_rate_exponent_variation.jl")
+include("./melt_rate_exponent_variation_basins.jl")
 include("./mismip_melt_rate.jl")
 include("./uniform_melt_float_only.jl")
 include("./uniform_melt_float_only_basin_specific.jl")
-
+include("./quadratic_melt_rate_exponent_variation_basins.jl")
              
 
 ##### default temperature and salinity profiles #####
