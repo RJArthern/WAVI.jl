@@ -25,6 +25,14 @@ using Test, WAVI
     #check that an array weertman_c works
     model = Model(grid = grid, bed_elevation = bed_elevation, params = Params(accumulation_rate =1.0*ones(grid.nx, grid.ny)))
     @test model isa Model
+
+    #check that a scalar glen_a_ref passed to model emerges as an array
+    model = Model(grid = grid, bed_elevation = bed_elevation, params = Params(glen_a_ref = 1.0))
+    @test model.params.glen_a_ref == 1.0 *ones(grid.nx, grid.ny)
+
+    #check that an array glen_a_ref works
+    model = Model(grid = grid, bed_elevation = bed_elevation, params = Params(glen_a_ref =1.0*ones(grid.nx, grid.ny)))
+    @test model isa Model
     end
 
     @testset "Initial Conditions" begin 
