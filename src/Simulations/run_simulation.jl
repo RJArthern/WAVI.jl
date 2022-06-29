@@ -194,7 +194,9 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     
     clock_time_C=Int(round(((simulation.clock.time - simulation.timestepping_params.dt)*(3600*24*365))/output_params.dt_coup))
     clock_time_Cn=Int(round((simulation.clock.time*(3600*24*365))/output_params.dt_coup))
-        
+    
+    if output_params.Output_vel    
+    
     uVel_file_string = string(simulation.output_params.prefix, "_U", lpad(clock_time_C, 10,"0") ,".bin")
     vVel_file_string = string(simulation.output_params.prefix, "_V", lpad(clock_time_C, 10,"0") ,".bin")
     
@@ -214,6 +216,10 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     write(vfileID, v_out[:,:])
     close(vfileID)  
     
+    end
+    
+    if output_params.Output_float 
+        
     float_file_string = string(simulation.output_params.prefix, "_F", lpad(clock_time_C, 10,"0") ,".bin")
     
     f_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +2 + y_s +y_n)
@@ -224,7 +230,29 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
     
     ffileID =  open(float_file_string,"w")
       write(ffileID, f_out[:,:])
-    close(ffileID) 
+    close(ffileID)
+        
+    end
+    
+    if output_params.Output_dhdt 
+    
+        dhdt_file_string = string(simulation.output_params.prefix, "_dhdt", lpad(clock_time_C, 10,"0") ,".bin")   
+        
+        dhdt_out = zeros(model.grid.Cxu - model.grid.Cxl + 1 + 2 + x_e +x_w,model.grid.Cyu - model.grid.Cyl +1 +2 + y_s +y_n)
+        
+       #doesn't include boundary rows if present
+        
+        dhdt_out[2+x_w:end-1-x_e,2+y_s:end-1-y_n]=model.fields.gh.dhdt[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]
+        
+        dhdt_out .= hton.(dhdt_out)
+        
+        ffileID =  open(dhdt_file_string,"w")
+        write(ffileID, dhdt_out[:,:])
+        close(ffileID)
+        
+    end
+   
+    if output_params.Output_Hb
     
     if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny 
             
@@ -258,6 +286,8 @@ function write_vel(simulation::Simulation,h_out_line_w,h_out_line_e,h_out_line_n
      hbfileID =  open(hb_file_string,"w")
      write(hbfileID, h_out_b[:,:])
      close(hbfileID) 
+     
+     end
         
     end
  end 
