@@ -14,6 +14,10 @@ struct OutputParams{T <: Real, R <: Real, O}
     PC_south::Bool     #toggle Parent child for southern boundary
     zip_format::String     #specify whether or not to zip the output, and the format
     dt_coup::T        #timestep of the ocean model, which is being coupled
+    Output_vel::Bool      #toggle output Velocity for coupling
+    Output_float::Bool     #toggle output grounded fraction field for coupling
+    Output_dhdt::Bool     #toggle output dhdt field for coupling
+    Output_Hb::Bool      #toggle output thickness at ocean/ice domain boundary for coupling
 end
 
 #output constructor
@@ -29,7 +33,11 @@ function OutputParams(;
     PC_west = false,
     PC_south = false,
     zip_format = "none",
-    dt_coup = 1.0)
+    dt_coup = 1.0,
+    Output_vel = false,
+    Output_float = false,
+    Output_dhdt = false,
+    Output_Hb = false)
 
     #default the n_iter_out to -1 (this is updated in simulation once we know timestep from timestepping_params)
     n_iter_out = -1
