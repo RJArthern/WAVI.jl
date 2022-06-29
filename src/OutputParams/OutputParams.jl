@@ -65,7 +65,7 @@ function OutputParams(;
         zip_format = "none"
     end
 
-    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, PC_east, PC_north, PC_west, PC_south, zip_format, dt_coup)
+    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, PC_east, PC_north, PC_west, PC_south, zip_format, dt_coup, Output_vel, Output_float, Output_dhdt, Output_Hb)
 end
 
 include("output_writing.jl")
