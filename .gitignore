@@ -14,3 +14,6 @@ Manifest.toml
 driver_updated.jl 
 *.box
 *.data
+*.bin
+*.mat
+*.nc
