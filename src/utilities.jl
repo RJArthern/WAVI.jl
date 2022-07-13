@@ -11,21 +11,74 @@ Function to multiply a vector by the momentum operator.
 """
 function opvec(model::AbstractModel,vec::AbstractVector)
     @unpack gh,gu,gv,gc=model.fields
+    @unpack_Workspace model.fields.work
     @assert length(vec)==(gu.n+gv.n)
-    uspread=gu.spread*vec[1:gu.n]
-    vspread=gv.spread*vec[(gu.n+1):(gu.n+gv.n)]
-    extra = gh.dimplicit[]*(gu.∂x*(gu.crop*(gu.h[:].*uspread)).+gv.∂y*(gv.crop*(gv.h[:].*vspread)))
-    opvecprod=
+
+    #Split vector into u- and v- components
+    usamp .= vec[1:gu.n]
+    vsamp .= vec[(gu.n+1):(gu.n+gv.n)]
+
+    #Spread to vectors that include all grid points within rectangular domain.
+@!  uspread = gu.spread*usamp
+@!  vspread = gv.spread*vsamp
+
+    #Extensional resistive stresses
+@!  dudx = gu.∂x*uspread
+@!  dvdy = gv.∂y*vspread
+    r_xx_strain_rate_sum .= 2dudx .+ dvdy
+    r_yy_strain_rate_sum .= 2dvdy .+ dudx
+@!  r_xx = -2gh.dneghηav[]*r_xx_strain_rate_sum
+@!  r_yy = -2gh.dneghηav[]*r_yy_strain_rate_sum
+    
+    #Shearing resistive stresses
+@!  dudy_c = gu.∂y*uspread
+@!  dvdx_c = gv.∂x*vspread
+    r_xy_strain_rate_sum_c .= dudy_c .+ dvdx_c
+@!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
+    r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
+@!  r_xy = -gh.dneghηav[]*r_xy_strain_rate_sum
+@!  r_xy_c = gc.cent'*r_xy
+@!  r_xy_crop_c = gc.crop*r_xy_c
+
+    #Gradients of resisitve stresses
+@!  d_rxx_dx = -gu.∂x'*r_xx
+@!  d_rxy_dy = -gu.∂y'*r_xy_crop_c
+@!  d_ryy_dy = -gv.∂y'*r_yy
+@!  d_rxy_dx = -gv.∂x'*r_xy_crop_c
+
+    #Basal drag
+@!  taubx = -gu.dnegβeff[]*uspread
+@!  tauby = -gv.dnegβeff[]*vspread
+    
+    #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
+    qx .= gu.h[:].*uspread
+@!  qx_crop = gu.crop*qx
+@!  dqxdx = gu.∂x*qx_crop
+    qy .= gv.h[:].*vspread
+@!  qy_crop = gv.crop*qy
+@!  dqydy = gv.∂y*qy_crop
+    divq .= dqxdx .+ dqydy
+@!  extra = gh.dimplicit[]*divq
+@!  d_extra_dx = -gu.∂x'*extra
+@!  d_extra_dy = -gv.∂y'*extra
+    h_d_extra_dx .= gu.h[:].*d_extra_dx
+    h_d_extra_dy .= gv.h[:].*d_extra_dy
+
+    #Resistive forces resolved in x anf y directions
+    fx .= d_rxx_dx .+ d_rxy_dy .- taubx .- h_d_extra_dx
+    fy .= d_ryy_dy .+ d_rxy_dx .- tauby .- h_d_extra_dy
+
+    #Resistive forces sampled at valid grid points
+@!  fx_samp = gu.samp*fx
+@!  fy_samp = gv.samp*fy
+
+    opvecprod .=
     [
      #x-component
-     gu.samp*(gu.∂x'*(2gh.dneghηav[]*(2gu.∂x*uspread .+ gv.∂y*vspread)) .+
-              gu.∂y'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gu.∂y*uspread .+ gv.∂x*vspread )))))) .+
-              gu.dnegβeff[]*uspread .+ (gu.h[:].*(gu.∂x'*(extra))) )
+     fx_samp
         ;
      #y-component
-     gv.samp*(gv.∂y'*(2gh.dneghηav[]*(2gv.∂y*vspread .+ gu.∂x*uspread)) .+
-              gv.∂x'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gv.∂x*vspread .+ gu.∂y*uspread )))))) .+
-              gv.dnegβeff[]*vspread .+ (gv.h[:].*(gv.∂y'*(extra))) )
+     fy_samp
     ]
     return opvecprod
 end
