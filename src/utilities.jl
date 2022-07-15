@@ -64,8 +64,8 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
             @assert length(vec)==(gu.n+gv.n)
 
             #Split vector into u- and v- components
-            usamp .= vec[1:gu.n]
-            vsamp .= vec[(gu.n+1):(gu.n+gv.n)]
+            usamp .= @view vec[1:gu.n]
+            vsamp .= @view vec[(gu.n+1):(gu.n+gv.n)]
 
             #Spread to vectors that include all grid points within rectangular domain.
         @!  uspread = gu.spread*usamp
@@ -84,7 +84,7 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @!  dvdx_c = gv.∂x*vspread
             r_xy_strain_rate_sum_c .= dudy_c .+ dvdx_c
         @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
-            r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
+        @!  r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
         @!  r_xy = -gh.dneghηav[]*r_xy_strain_rate_sum
         @!  r_xy_c = gc.cent'*r_xy
         @!  r_xy_crop_c = gc.crop*r_xy_c
@@ -162,8 +162,8 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
 
     function restrict_fun(vec::AbstractVector)
         @assert length(vec)==(gu.n+gv.n)
-        vecx .= vec[1:gu.n]
-        vecy .= vec[(gu.n+1):(gu.n+gv.n)]
+        vecx .= @view vec[1:gu.n]
+        vecy .= @view vec[(gu.n+1):(gu.n+gv.n)]
 @!      spreadvecx = gu.spread*vecx
 @!      spreadvecy = gv.spread*vecy
 @!      bigoutx = wu.idwt'*spreadvecx
@@ -215,8 +215,8 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
 
         @assert length(waveletvec)==(wu.n[]+wv.n[])
 
-        waveletvecx .= waveletvec[1:wu.n[]]
-        waveletvecy .= waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
+        waveletvecx .= @view waveletvec[1:wu.n[]]
+        waveletvecy .= @view waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
 @!      spreadwaveletvecx = wu.spread[]*waveletvecx
 @!      spreadwaveletvecy = wv.spread[]*waveletvecy
 @!      bigoutx = wu.idwt*spreadwaveletvecx

@@ -122,9 +122,11 @@ function gauss_seidel_smoother!(x, op, b;
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
     resid=b-op*x
+    
+    idx = zeros(Bool,size(sweep))
     for i = 1:iters
         for j = sweep_order
-              idx = sweep .== j
+              idx .= sweep .== j
               x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
               resid .= b .- op*x
         end
