@@ -299,6 +299,6 @@ end
 function get_op(model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
     n = gu.n + gv.n
-    op_fun(x) = opvec(model,x)
+    op_fun = get_op_fun(model)
     op=LinearMap{T}(op_fun,n;issymmetric=true,ismutating=false,ishermitian=true,isposdef=true)
 end

@@ -4,7 +4,6 @@ include("CGrid.jl")
 include("VGrid.jl")
 include("UGrid.jl")
 include("SigmaGrid.jl")
-include("Workspace.jl")
 
 struct Fields{T <: Real, N <: Real}
     gh::HGrid{T,N}
@@ -14,7 +13,6 @@ struct Fields{T <: Real, N <: Real}
     g3d::SigmaGrid{T,N}   
     wu::UWavelets{T,N}
     wv::VWavelets{T,N}
-    work::Workspace{T,N}
 end
 
 """
@@ -96,7 +94,5 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     #Wavelet-grid, v-component.
     wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
 
-    work = Workspace(nxh=grid.nx,nyh=grid.ny,nu=gu.n,nv=gv.n)
-
-    return Fields(gh,gu,gv,gc,g3d,wu,wv,work)
+    return Fields(gh,gu,gv,gc,g3d,wu,wv)
 end
