@@ -9,7 +9,6 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 Returns a function that multiplies a vector by the momentum operator.
 """
-
 function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     
@@ -138,46 +137,107 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
 end
 
 """
-    restrictvec(model::AbstractModel,vec::AbstractVector)
+    get_restrict_fun(model::AbstractModel)
 
-Function to restrict a vector from the fine grid to the coarse grid, used in multigrid preconditioner.
+Returns a function that restricts a vector from the fine grid to the coarse grid, 
+used in multigrid preconditioner.
 """
-function restrictvec(model::AbstractModel,vec::AbstractVector)
+function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
     @unpack wu,wv,gu,gv=model.fields
-    @assert length(vec)==(gu.n+gv.n)
-    vecx=vec[1:gu.n]
-    vecy=vec[(gu.n+1):(gu.n+gv.n)]
-    restrictvec=
-    [
-     #x-component
-     wu.samp[]*(wu.idwt'*(gu.spread*vecx))
-        ;
-     #y-component
-     wv.samp[]*(wv.idwt'*(gv.spread*vecy))
-    ]
-    return restrictvec
-end
-"""
-    prolongvec(model::AbstractModel,waveletvec::AbstractVector)
 
-Function to prolong a vector from the coarse grid to the fine grid, used in multigrid preconditioner.
+    #Preallocate intermediate variables used by restrict_fun
+    nxnyu = gu.nxu*gu.nyu
+    nxnyv = gv.nxv*gv.nyv
+    nxnywu = wu.nxuw*wu.nyuw
+    nxnywv = wv.nxvw*wv.nyvw
+    vecx :: Vector{T} = zeros(gu.n)
+    vecy :: Vector{T} = zeros(gv.n)
+    spreadvecx :: Vector{T} = zeros(nxnyu)
+    spreadvecy :: Vector{T} = zeros(nxnyv)
+    bigoutx :: Vector{T} = zeros(nxnywu)
+    bigouty :: Vector{T} = zeros(nxnywv)
+    outx :: Vector{T} = zeros(wu.n[])
+    outy :: Vector{T} = zeros(wv.n[])
+    restrictvec :: Vector{T} = zeros(wu.n[]+wv.n[])
+
+    function restrict_fun(vec::AbstractVector)
+        @assert length(vec)==(gu.n+gv.n)
+        vecx .= vec[1:gu.n]
+        vecy .= vec[(gu.n+1):(gu.n+gv.n)]
+@!      spreadvecx = gu.spread*vecx
+@!      spreadvecy = gv.spread*vecy
+@!      bigoutx = wu.idwt'*spreadvecx
+@!      bigouty = wv.idwt'*spreadvecy
+@!      outx = wu.samp[]*bigoutx
+@!      outy = wv.samp[]*bigouty
+
+     
+        restrictvec .=
+        [
+        #x-component
+        outx
+            ;
+        #y-component
+        outy
+        ]
+        return restrictvec
+    end
+
+    # Return restrict_fun as a closure
+    return restrict_fun
+end
+
 """
-function prolongvec(model::AbstractModel,waveletvec::AbstractVector)
+    get_prolong_fun(model::AbstractModel)
+
+Returns a function that prolongs a vector from the coarse grid to the fine grid, 
+used in multigrid preconditioner.
+"""
+function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
     @unpack wu,wv,gu,gv=model.fields
-    @assert length(waveletvec)==(wu.n[]+wv.n[])
-    waveletvecx = waveletvec[1:wu.n[]]
-    waveletvecy = waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
-    prolongvec =
-    [
-     #x-component
-     gu.samp*(wu.idwt*(wu.spread[]*waveletvecx))
-        ;
-     #y-component
-     gv.samp*(wv.idwt*(wv.spread[]*waveletvecy))
-    ]
-    return prolongvec
-end
 
+    #Preallocate intermediate variables used by prolong_fun
+    nxnyu = gu.nxu*gu.nyu
+    nxnyv = gv.nxv*gv.nyv
+    nxnywu = wu.nxuw*wu.nyuw
+    nxnywv = wv.nxvw*wv.nyvw
+    waveletvecx :: Vector{T} = zeros(wu.n[])
+    waveletvecy :: Vector{T} = zeros(wv.n[])
+    spreadwaveletvecx :: Vector{T} = zeros(nxnywu)
+    spreadwaveletvecy :: Vector{T} = zeros(nxnywv)
+    bigoutx :: Vector{T} = zeros(nxnyu)
+    bigouty :: Vector{T} = zeros(nxnyv)
+    outx :: Vector{T} = zeros(gu.n)
+    outy :: Vector{T} = zeros(gv.n)
+    prolongvec :: Vector{T} = zeros(gu.n+gv.n)
+
+    function prolong_fun(waveletvec::AbstractVector)
+
+        @assert length(waveletvec)==(wu.n[]+wv.n[])
+
+        waveletvecx .= waveletvec[1:wu.n[]]
+        waveletvecy .= waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
+@!      spreadwaveletvecx = wu.spread[]*waveletvecx
+@!      spreadwaveletvecy = wv.spread[]*waveletvecy
+@!      bigoutx = wu.idwt*spreadwaveletvecx
+@!      bigouty = wv.idwt*spreadwaveletvecy
+@!      outx = gu.samp*bigoutx
+@!      outy = gv.samp*bigouty
+
+        prolongvec .=
+        [
+        #x-component
+        outx
+            ;
+        #y-component
+        outy
+        ]
+        return prolongvec
+    end
+    
+    # Return prolong_fun as a closure
+    return prolong_fun
+end
 """
 pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
 
