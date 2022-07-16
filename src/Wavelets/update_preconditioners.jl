@@ -86,9 +86,8 @@ function get_op_diag(model::AbstractModel,op::LinearMap)
            [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask] ]
     e=zeros(Bool,n)
     for i = unique(sweep)
-        e[sweep .== i] .= true
+        e .= sweep .== i
         op_diag[e] .= (op*e)[e]
-        e[sweep .== i] .= false
     end
     return op_diag
 end
