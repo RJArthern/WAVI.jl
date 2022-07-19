@@ -102,7 +102,8 @@ function HGrid(;
     βeff = zeros(nxh,nyh)
     τbed = zeros(nxh,nyh)
     quad_f1 = zeros(nxh,nyh)
-    quad_f2 = h./(3*ηav)
+    quad_f2 = zeros(nxh,nyh)
+    quad_f2[mask] = h[mask]./(3*ηav[mask])
 
     #check sizes of everything
     @assert size(mask)==(nxh,nyh); @assert mask == clip(mask)
