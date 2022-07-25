@@ -1,4 +1,4 @@
-struct Params{T <: Real, A, W, G}
+struct Params{T <: Real, A, W}
                       dt :: T
                        g :: T
              density_ice :: T
@@ -11,7 +11,7 @@ struct Params{T <: Real, A, W, G}
           default_damage :: T 
        accumulation_rate :: A
 glen_a_activation_energy :: T 
-              glen_a_ref :: G
+              glen_a_ref :: T
     glen_temperature_ref :: T 
                   glen_n :: T 
     glen_reg_strain_rate :: T 
@@ -44,7 +44,7 @@ Keyword arguments
 - 'default_damage': damage value reverted to if no initial thickness passed (dimensionless)
 - 'accumulation_rate': uniform accumulation_rate (m/yr)
 - 'glen_a_activation_energy': activation energy in glen b calculation
-- 'glen_a_ref': array of glen a reference values used in glen b calculation
+- 'glen_a_ref': glen a reference value used in glen b calculation
 - 'glen_temperature_ref': reference temperature using in glen b calculation
 - 'glen_n': exponent in glen b calculation
 - 'glen_reg_strain_rate': strain rate regularization value
@@ -63,7 +63,7 @@ function Params(; g = 9.81,
                   sec_per_year =3600*24*365.25,
                   default_thickness= 100.,
                   default_viscosity= 1.0e7,
-                  default_temperature=263.15,
+                  default_temperature=265.700709,
                   default_damage= 0.0,
                   accumulation_rate= 0.0,
                   glen_a_activation_energy = 5.8631e+04,

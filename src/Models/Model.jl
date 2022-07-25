@@ -1,6 +1,6 @@
-struct Model{T <: Real, N <: Integer,A,W,G, M <:AbstractMeltRate} <: AbstractModel{T,N,M}
+struct Model{T <: Real, N <: Integer,A,W, M <:AbstractMeltRate} <: AbstractModel{T,N,M}
     grid::Grid{T,N}
-    params::Params{T,A,W,G}
+    params::Params{T,A,W}
     solver_params::SolverParams{T,N}
     initial_conditions::InitialConditions{T}
     fields::Fields{T,N}
@@ -66,18 +66,8 @@ function Model(;
     if isa(params.accumulation_rate, Number) 
         params = @set params.accumulation_rate = params.accumulation_rate*ones(grid.nx,grid.ny)
     end
-    #check size compatibility of resulting accumulation rate
-    (size(params.accumulation_rate)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input accumulation must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
-
-    #if accumulation is passed as a scalar, replace accumulation parameters with matrix of this value
-    if isa(params.glen_a_ref, Number) 
-        params = @set params.glen_a_ref = params.glen_a_ref*ones(grid.nx,grid.ny)
-    end
-    #check size compatibility of resulting glen a ref
-    (size(params.glen_a_ref)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input glen_a_ref must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
-
-
-
+    #check size compatibility of resulting weertman C
+    (size(params.accumulation_rate)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input weertman c must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
 
     #Setup the fields 
     fields = setup_fields(grid, initial_conditions, solver_params, params, bed_array)

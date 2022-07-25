@@ -74,7 +74,7 @@ function PlumeEmulator(;
 end
 
 
-function update_melt_rate!(plume_emulator::PlumeEmulator, fields, grid, clock)
+function update_melt_rate!(plume_emulator::PlumeEmulator, fields, grid)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
     set_plume_emulator_melt_rate!(basal_melt, 
                                 h, 

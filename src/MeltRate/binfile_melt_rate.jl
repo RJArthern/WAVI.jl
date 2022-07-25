@@ -13,7 +13,7 @@ function BinfileMeltRate(;
 end
 
 
-function update_melt_rate!(melt_model::BinfileMeltRate, fields, grid, clock)
+function update_melt_rate!(melt_model::BinfileMeltRate, fields, grid)
     @unpack input_filename = melt_model
     @unpack basal_melt = fields.gh
     

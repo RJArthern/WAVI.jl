@@ -1,29 +1,8 @@
 
 """
-update_state!(model::AbstractModel, clock)
-
-Update the model to the current time dependent situation
-"""
-function update_state!(model, clock)
-    update_surface_elevation!(model)
-    update_geometry_on_uv_grids!(model)
-    update_height_above_floatation!(model)
-    update_grounded_fraction_on_huv_grids!(model)
-    update_accumulation_rate!(model)
-    update_basal_melt!(model, clock)
-    update_weertman_c!(model)
-    update_dsdh!(model)
-    update_model_velocities!(model)
-    update_velocities_on_h_grid!(model)
-    update_dhdt!(model)
-    update_model_wavelets!(model)
-    return nothing
-end
-
-"""
 update_state!(model::AbstractModel)
 
-Update the model to the current time-indepdent situation
+Update the model to the current situation
 """
 function update_state!(model)
     update_surface_elevation!(model)
@@ -31,7 +10,7 @@ function update_state!(model)
     update_height_above_floatation!(model)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
-    update_basal_melt!(model, WAVI.Clock())
+    update_basal_melt!(model)
     update_weertman_c!(model)
     update_dsdh!(model)
     update_model_velocities!(model)
@@ -40,8 +19,6 @@ function update_state!(model)
     update_model_wavelets!(model)
     return nothing
 end
-
-
 
 """
     update_surface_elevation!(model::AbstractModel)
@@ -116,8 +93,8 @@ end
 
 Update the basal melt rate.
 """
-function update_basal_melt!(model::AbstractModel, clock)
-    update_melt_rate!(model.melt_rate, model.fields, model.grid, clock)
+function update_basal_melt!(model::AbstractModel)
+    update_melt_rate!(model.melt_rate, model.fields, model.grid)
     return model
 end
 

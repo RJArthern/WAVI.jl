@@ -18,11 +18,11 @@ Keyword arguments
 MISMIPMeltRateOne(; α = 1.0, ρi = 918.0, ρw = 1028.0) = MISMIPMeltRateOne(α,ρi, ρw)
 
 """
-    update_melt_rate(melt_rate::MISMIPMeltRateOne, fields, grid, clock) 
+    update_melt_rate(melt_rate::MISMIPMeltRateOne, fields, grid) 
 
 Update the melt rate when for the MISMIPMeltRateOne type, used in MISMIP Ice 1x experiments
 """
-function update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid, clock) 
+function update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid) 
     draft = -(melt_rate.ρi / melt_rate.ρw) .* fields.gh.h
     cavity_thickness = draft .- fields.gh.b
     cavity_thickness = max.(cavity_thickness, 0)

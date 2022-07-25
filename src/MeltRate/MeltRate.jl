@@ -5,7 +5,6 @@ include("./plume_emulator.jl")
 include("./pico.jl")
 include("./quadratic_melt_rate.jl")
 include("./mismip_melt_rate.jl")
-include("./quadratic_forced_melt_rate.jl")
 
              
 
@@ -43,7 +42,7 @@ UniformMeltRate(; m = 0.0) = UniformMeltRate(m)
 Update the melt rate when for the UniformMeltRate type
 
 """
-function update_melt_rate!(melt_rate::UniformMeltRate, fields, grid, clock) 
+function update_melt_rate!(melt_rate::UniformMeltRate, fields, grid) 
     @unpack basal_melt = fields.gh
     basal_melt .= melt_rate.m
     return nothing
