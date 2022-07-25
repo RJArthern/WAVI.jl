@@ -41,6 +41,7 @@ Keyword arguments
     - levels: (required) Number of levels in the preconditioner
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
+    - u : (required) first guess of u in x direction
 """
 function UGrid(;
                 nxu,
@@ -48,7 +49,8 @@ function UGrid(;
                 mask = trues(nxu,nyu),
                 levels,
                 dx,
-                dy)
+                dy,
+                u)
 
     #check the sizes of inputs
     (size(mask) == (nxu,nyu)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxu x nyu (i.e. $nxu x $nyu)"))
@@ -69,7 +71,7 @@ function UGrid(;
     grounded_fraction = ones(nxu,nyu)
     βeff = zeros(nxu,nyu)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    u = zeros(nxu,nyu)
+   # u = zeros(nxu,nyu)
 
 
     #size assertions
@@ -82,7 +84,7 @@ function UGrid(;
     @assert size(h)==(nxu,nyu)
     @assert size(grounded_fraction)==(nxu,nyu)
     @assert size(βeff)==(nxu,nyu)
-    @assert size(u)==(nxu,nyu)
+   # @assert size(u)==(nxu,nyu)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
