@@ -7,8 +7,8 @@ struct QuadraticMeltRate{T <: Real} <: AbstractMeltRate
     ρw :: T                       #water density
     L :: T                        #latent heat of fusion for ice 
     c :: T                        #specific heat capacity of ocean water 
-    Ta :: Function                #Function specifying ambient temperature  
-    Sa :: Function                #Function specifying ambient salinity
+    Ta :: Function                #Function specifying ambient temperature. Function of depth only. 
+    Sa :: Function                #Function specifying ambient salinity. Function of depth only.
     flocal :: Bool                #Flag for local or non-local temperature dependence
     melt_partial_cell :: Bool       #Flag for melting applied to partial cells or not
 end
@@ -35,7 +35,7 @@ Keyword arguments
 """
 
 function QuadraticMeltRate(;
-                            γT = 1.e-3,
+                            γT = 1.0e-3,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
                             λ3 = 7.61e-4,
@@ -62,11 +62,11 @@ function QuadraticMeltRate(;
 end
 
 """
-    update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid)
+    update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid, clock)
 
 Wrapper script to update the melt rate for a QuadraticMeltRate.
 """
-function update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid)
+function update_melt_rate!(quad_melt_rate::QuadraticMeltRate, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft
