@@ -1,14 +1,14 @@
 #Struct to hold information on wavelet-grid (u-component).
-struct UWavelets{T <: Real, N <: Integer}
-          nxuw :: N                                       # Number of grid points in x in UWavelets (equal to UGrid)
-          nyuw :: N                                       # Number of grid points in y in UWavelets (equal to UGrid)
+struct UWavelets{T <: Real, N <: Integer, K <: KronType{T}} 
+          nxuw :: N                                     # Number of grid points in x in UWavelets (equal to UGrid)
+          nyuw :: N                                     # Number of grid points in y in UWavelets (equal to UGrid)
         mask :: Array{Bool,2}                           # Model domain on the U grid
            n :: Base.RefValue{N}                        # Number of grid points in domain
         crop :: Base.RefValue{Diagonal{T,Array{T,1}}}   # Crop matrix: diagonal matrix with mask entries on diag
         samp :: Base.RefValue{SparseMatrixCSC{T,N}}     # Sampling matrix: take full domain to model domain 
       spread :: Base.RefValue{SparseMatrixCSC{T,N}}     # Spread matrix: take model domain to full domain
       levels :: N                                       # Number of wavelet levels 
-        idwt :: KronType{T,N}                           # Wavelet matrix cross produce
+        idwt :: K                                       # Wavelet matrix cross produce
     wavelets :: Array{T,2}                              # Wavelet matrix
 end
  

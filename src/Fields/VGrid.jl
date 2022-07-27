@@ -1,16 +1,16 @@
-struct VGrid{T <: Real, N <: Int}
-                   nxv :: N                                     # Number of frid cells in x-direction in UGrid
-                   nyv :: N                                     # Number of grid cells in y-direction in UGrid 
+struct VGrid{T <: Real, N <: Int, K <: KronType{T}, KY <: KronType{T}}
+                   nxv :: N                                    # Number of frid cells in x-direction in UGrid
+                   nyv :: N                                    # Number of grid cells in y-direction in UGrid 
                  mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
                     n :: N                                     # Total number of cells in model domain 
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Spread matrix: take model domain to full domain
-                 cent :: KronType{T,N}                         # Map from U grid to H grid 
-                   ∂x :: KronType{T,N}                         # Matrix representation of differentiation wrt x 
-                   ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
+                 cent :: KY                                    # Map from U grid to H grid 
+                   ∂x :: K                                     # Matrix representation of differentiation wrt x 
+                   ∂y :: KY                                    # Matrix representation of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                  dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
+                  dwt :: K                                     # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
@@ -59,9 +59,9 @@ function VGrid(;
     crop = Diagonal(float(mask[:]))
     samp = crop[mask[:],:]
     spread = sparse(samp')
-    cent = c(nyv-1) ⊗ spI(nxv)
+    cent = c(nyv-1) ⊗ I(nxv)
     ∂x = χ(nyv-2) ⊗ ∂1d(nxv-1,dx)
-    ∂y = ∂1d(nyv-1,dy) ⊗ spI(nxv)
+    ∂y = ∂1d(nyv-1,dy) ⊗ I(nxv)
     dωt = wavelet_matrix(nyv,levels,"forward" ) ⊗ wavelet_matrix(nxv,levels,"forward")
 
     #fields stored on UGrid

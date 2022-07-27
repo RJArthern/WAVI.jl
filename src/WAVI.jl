@@ -38,8 +38,7 @@ abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
 
 
 #Type alias, just for abreviation
-const KronType{T,N} = LinearMaps.KroneckerMap{T,Tuple{LinearMaps.WrappedMap{T,SparseMatrixCSC{T,N}},
-                        LinearMaps.WrappedMap{T,SparseMatrixCSC{T,N}}}} where {T <: Real, N <: Integer}
+const KronType{T} = LinearMaps.KroneckerMap{T, <: Tuple{LinearMap, LinearMap}} where {T <: Real}
 const MapOrMatrix{T} = Union{LinearMap{T}, AbstractMatrix{T}}
 #Concrete types
 
