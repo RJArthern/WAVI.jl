@@ -133,7 +133,7 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     end
 
     #Return op_fun as a closure
-    return op_fun
+    return op_fun!
 end
 
 """
@@ -184,7 +184,7 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
     end
 
     # Return restrict_fun as a closure
-    return restrict_fun
+    return restrict_fun!
 end
 
 """
@@ -236,7 +236,7 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
     end
     
     # Return prolong_fun as a closure
-    return prolong_fun
+    return prolong_fun!
 end
 """
 pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
