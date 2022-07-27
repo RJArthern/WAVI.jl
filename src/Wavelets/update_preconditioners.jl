@@ -20,6 +20,8 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
 
     restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
     prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+    op_coarse = restrict*op*prolong
+
 
     op_diag=get_op_diag(model,op)
 
@@ -27,7 +29,11 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     sweep=[[1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask]]
     sweep_order=[1,3,2,4]
 
-    p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order,
+    O=typeof(op)
+    P=typeof(prolong)
+    C=typeof(op_coarse)
+    R=typeof(restrict)
+    p=Preconditioner{T,N,O,C,R,P}(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
             op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
             maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
