@@ -15,11 +15,11 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     n = gu.n + gv.n
     n_coarse = wu.n[] + wv.n[]
 
-    restrict_fun = get_restrict_fun(model)
-    prolong_fun = get_prolong_fun(model)
+    restrict_fun! = get_restrict_fun(model)
+    prolong_fun! = get_prolong_fun(model)
 
-    restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+    restrict=LinearMap{T}(restrict_fun!,n_coarse,n;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+    prolong=LinearMap{T}(prolong_fun!,n,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
     op_coarse = restrict*op*prolong
 
 

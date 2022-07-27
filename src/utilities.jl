@@ -59,7 +59,7 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     fy_samp :: Vector{T} = zeros(gv.n);                             @assert length(fy_samp) == gv.n
     opvecprod :: Vector{T} = zeros(gu.n+gv.n);                      @assert length(opvecprod) == gu.n + gv.n
 
-    function op_fun(vec::AbstractVector)
+    function op_fun!(opvecprod::AbstractVector,vec::AbstractVector)
 
             @assert length(vec)==(gu.n+gv.n)
 
@@ -160,7 +160,7 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
     outy :: Vector{T} = zeros(wv.n[])
     restrictvec :: Vector{T} = zeros(wu.n[]+wv.n[])
 
-    function restrict_fun(vec::AbstractVector)
+    function restrict_fun!(restrictvec::AbstractVector,vec::AbstractVector)
         @assert length(vec)==(gu.n+gv.n)
         vecx .= @view vec[1:gu.n]
         vecy .= @view vec[(gu.n+1):(gu.n+gv.n)]
@@ -211,7 +211,7 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
     outy :: Vector{T} = zeros(gv.n)
     prolongvec :: Vector{T} = zeros(gu.n+gv.n)
 
-    function prolong_fun(waveletvec::AbstractVector)
+    function prolong_fun!(prolongvec::AbstractVector,waveletvec::AbstractVector)
 
         @assert length(waveletvec)==(wu.n[]+wv.n[])
 
