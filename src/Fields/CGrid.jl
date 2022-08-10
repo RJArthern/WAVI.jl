@@ -1,4 +1,4 @@
-struct CGrid{T <: Real, N <: Integer, K <: KronType{T}}
+struct CGrid{T <: Real, N <: Integer, K1 <: KronType{T}, K2 <: KronType{T}}
         nxc :: N
         nyc :: N
       mask :: Array{Bool,2} 
@@ -6,7 +6,8 @@ struct CGrid{T <: Real, N <: Integer, K <: KronType{T}}
       crop :: Diagonal{T,Array{T,1}}
       samp :: SparseMatrixCSC{T,N} 
     spread :: SparseMatrixCSC{T,N}
-      cent :: K
+      cent :: K1
+     centᵀ :: K2
 end
 
 function CGrid(;
@@ -23,6 +24,7 @@ function CGrid(;
     samp = crop[mask[:],:]
     spread = sparse(samp')
     cent = sparse(c(nyc)') ⊗ sparse(c(nxc)')
+    centᵀ = c(nyc) ⊗ c(nxc)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
@@ -53,6 +55,7 @@ return CGrid(
             crop, 
             samp, 
             spread,
-            cent)
+            cent,
+            centᵀ)
 end
     

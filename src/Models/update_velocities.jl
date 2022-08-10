@@ -74,18 +74,18 @@ function get_rhs(model::AbstractModel)
     onesvec=ones(gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
-        (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂x'*surf_elev_adjusted))
+        (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂xᵀ*surf_elev_adjusted))
         ;
-        (params.density_ice*params.g*gv.h[gv.mask]).*(gv.samp*(-gv.∂y'*surf_elev_adjusted))
+        (params.density_ice*params.g*gv.h[gv.mask]).*(gv.samp*(-gv.∂yᵀ*surf_elev_adjusted))
        ]
     f2=[
         (0.5*params.density_ice*params.g*gu.h[gu.mask].^2
         -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask],gu.h[gu.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gu.h[gu.mask].*gu.s[gu.mask]).*gu.samp*(-gu.∂x'*(gh.crop*onesvec))
+        -params.density_ice*params.g*gu.h[gu.mask].*gu.s[gu.mask]).*gu.samp*(-gu.∂xᵀ*(gh.crop*onesvec))
         ;
         (0.5*params.density_ice*params.g*gv.h[gv.mask].^2
         -0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask],gv.h[gv.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gv.h[gv.mask].*gv.s[gv.mask]).*gv.samp*(-gv.∂y'*(gh.crop*onesvec))
+        -params.density_ice*params.g*gv.h[gv.mask].*gv.s[gv.mask]).*gv.samp*(-gv.∂yᵀ*(gh.crop*onesvec))
         ]
     rhs=f1+f2
     return rhs
@@ -258,15 +258,15 @@ function update_βeff_on_uv_grids!(model::AbstractModel)
     T=eltype(gh.grounded_fraction)
 
     onesvec=ones(T,gh.nxh*gh.nyh)
-    gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    gu.βeff[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
     ipolgfu=zeros(T,gu.nxu,gu.nyu);
-    ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    ipolgfu[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
 
-    gv.βeff[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    gv.βeff[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
     ipolgfv=zeros(T,gv.nxv,gv.nyv);
-    ipolgfv[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    ipolgfv[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
     gv.βeff[ipolgfv .> zero(T)] .= gv.βeff[ipolgfv .> zero(T)].*gv.grounded_fraction[ipolgfv .> zero(T)]./
                                                  ipolgfv[ipolgfv .> zero(T)];
 

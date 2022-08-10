@@ -1,5 +1,5 @@
 #Struct to hold information on wavelet-grid (u-component).
-struct UWavelets{T <: Real, N <: Integer, K <: KronType{T}} 
+struct UWavelets{T <: Real, N <: Integer, K1 <: KronType{T}, K2 <: KronType{T}} 
           nxuw :: N                                     # Number of grid points in x in UWavelets (equal to UGrid)
           nyuw :: N                                     # Number of grid points in y in UWavelets (equal to UGrid)
         mask :: Array{Bool,2}                           # Model domain on the U grid
@@ -8,7 +8,8 @@ struct UWavelets{T <: Real, N <: Integer, K <: KronType{T}}
         samp :: Base.RefValue{SparseMatrixCSC{T,N}}     # Sampling matrix: take full domain to model domain 
       spread :: Base.RefValue{SparseMatrixCSC{T,N}}     # Spread matrix: take model domain to full domain
       levels :: N                                       # Number of wavelet levels 
-        idwt :: K                                       # Wavelet matrix cross produce
+        idwt :: K1                                      # Wavelet matrix cross produce
+       idwtᵀ :: K2                                      # Adjoint of wavelet matrix cross produce
     wavelets :: Array{T,2}                              # Wavelet matrix
 end
  
@@ -44,6 +45,7 @@ function UWavelets(;
     samp  = Ref(crop[][mask[:],:]); @assert samp[] == crop[][mask[:],:]
     spread = Ref(sparse(samp[]')); @assert spread[] == sparse(samp[]')
     idwt =  wavelet_matrix(nyuw,levels,"reverse" ) ⊗ wavelet_matrix(nxuw,levels,"reverse")
+    idwtᵀ =  sparse(wavelet_matrix(nyuw,levels,"reverse" )') ⊗ sparse(wavelet_matrix(nxuw,levels,"reverse")')
     wavelets = zeros(nxuw,nyuw); @assert size(wavelets)==(nxuw,nyuw)
     
     #make sure boolean type rather than bitarray
@@ -59,5 +61,6 @@ function UWavelets(;
                     spread, 
                     levels,
                     idwt,
+                    idwtᵀ,
                     wavelets)
 end

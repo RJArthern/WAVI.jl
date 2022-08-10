@@ -4,6 +4,7 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
 
+
 """
     get_op_fun(model::AbstractModel)
 
@@ -86,14 +87,14 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
         @!  r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
         @!  r_xy = -gh.dneghηav[]*r_xy_strain_rate_sum
-        @!  r_xy_c = gc.cent'*r_xy
+        @!  r_xy_c = gc.centᵀ*r_xy
         @!  r_xy_crop_c = gc.crop*r_xy_c
 
             #Gradients of resisitve stresses
-        @!  d_rxx_dx = -gu.∂x'*r_xx
-        @!  d_rxy_dy = -gu.∂y'*r_xy_crop_c
-        @!  d_ryy_dy = -gv.∂y'*r_yy
-        @!  d_rxy_dx = -gv.∂x'*r_xy_crop_c
+        @!  d_rxx_dx = -gu.∂xᵀ*r_xx
+        @!  d_rxy_dy = -gu.∂yᵀ*r_xy_crop_c
+        @!  d_ryy_dy = -gv.∂yᵀ*r_yy
+        @!  d_rxy_dx = -gv.∂xᵀ*r_xy_crop_c
 
             #Basal drag
         @!  taubx = -gu.dnegβeff[]*uspread
@@ -108,8 +109,8 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @!  dqydy = gv.∂y*qy_crop
             divq .= dqxdx .+ dqydy
         @!  extra = gh.dimplicit[]*divq
-        @!  d_extra_dx = -gu.∂x'*extra
-        @!  d_extra_dy = -gv.∂y'*extra
+        @!  d_extra_dx = -gu.∂xᵀ*extra
+        @!  d_extra_dy = -gv.∂yᵀ*extra
             h_d_extra_dx .= gu.h[:].*d_extra_dx
             h_d_extra_dy .= gv.h[:].*d_extra_dy
 
@@ -166,8 +167,8 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
         vecy .= @view vec[(gu.n+1):(gu.n+gv.n)]
 @!      spreadvecx = gu.spread*vecx
 @!      spreadvecy = gv.spread*vecy
-@!      bigoutx = wu.idwt'*spreadvecx
-@!      bigouty = wv.idwt'*spreadvecy
+@!      bigoutx = wu.idwtᵀ*spreadvecx
+@!      bigouty = wv.idwtᵀ*spreadvecy
 @!      outx = wu.samp[]*bigoutx
 @!      outy = wv.samp[]*bigouty
 
@@ -527,4 +528,43 @@ function clip(trial_mask)
 end
 
 
+function ⊗(A::AbstractMatrix{T},B::AbstractMatrix{T}) where {T}
+    ma, na = size(A)
+    mb, nb = size(B)
+    x :: Vector{T} = zeros(na*nb)
+    y :: Vector{T} = zeros(ma*mb)
+    if nb*ma <= mb*na
+       temp :: Matrix{T} = zeros(nb,ma)
+       function kron_fun1!(y,x) 
+            X = reshape(x, (nb, na))
+            Y = reshape(y, (mb, ma))
+            mul!(temp, X, transpose(A))
+            mul!(Y, B, temp)
+            return y
+        end
+        K=LinearMap{T}(kron_fun1!,ma*mb,na*nb;
+                        issymmetric=issymmetric(A) && issymmetric(B),
+                        ismutating=true,
+                        ishermitian=ishermitian(A) && ishermitian(B),
+                        isposdef=isposdef(A) && isposdef(B))
+    else
+       temp = zeros(mb,na)
+       function kron_fun2!(y,x) 
+            X = reshape(x, (nb, na))
+            Y = reshape(y, (mb, ma))
+            mul!(temp, B, X)
+            mul!(Y, temp, transpose(A))
+            return y
+        end
+        K=LinearMap{T}(kron_fun2!,ma*mb,na*nb;
+                        issymmetric=issymmetric(A) && issymmetric(B),
+                        ismutating=true,
+                        ishermitian=ishermitian(A) && ishermitian(B),
+                        isposdef=isposdef(A) && isposdef(B))
+    end
 
+    return K
+end
+  
+    
+   

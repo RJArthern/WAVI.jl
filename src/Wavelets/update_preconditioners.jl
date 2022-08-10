@@ -15,13 +15,7 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     n = gu.n + gv.n
     n_coarse = wu.n[] + wv.n[]
 
-    restrict_fun! = get_restrict_fun(model)
-    prolong_fun! = get_prolong_fun(model)
-
-    restrict=LinearMap{T}(restrict_fun!,n_coarse,n;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun!,n,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
-    op_coarse = restrict*op*prolong
-
+    restrict,prolong,op_coarse = get_multigrid_ops(model,op)
 
     op_diag=get_op_diag(model,op)
 
@@ -138,3 +132,48 @@ function gauss_seidel_smoother!(x, op, b;
     end
     return x
 end
+
+
+function get_multigrid_ops(model::AbstractModel{T,N},op::LinearMap{T}) where {T, N}
+    @unpack gu,gv,wu,wv=model.fields
+
+    m,n=size(op)
+    @assert m == n == gu.n + gv.n
+
+    n = gu.n + gv.n
+    n_coarse = wu.n[] + wv.n[]
+
+    restrict_fun! = get_restrict_fun(model)
+    prolong_fun! = get_prolong_fun(model)
+
+    restrict=LinearMap{T}(restrict_fun!,n_coarse,n;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+    prolong=LinearMap{T}(prolong_fun!,n,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+
+    op_coarse_fun! = get_op_coarse_fun(op,restrict,prolong)
+
+    op_coarse=LinearMap{T}(op_coarse_fun!,n_coarse,n_coarse;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+
+    return restrict,prolong,op_coarse
+
+end
+
+function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::LinearMap{T}) where {T}
+
+     m,n = size(op)
+     @assert m == n 
+
+     n_coarse = size(restrict,1)
+
+     tmp1 :: Vector{T} = zeros(n)
+     tmp2 :: Vector{T} = zeros(n)
+     out :: Vector{T} = zeros(n_coarse)
+     function op_coarse_fun!(out,in)
+@!        tmp1 = prolong * in
+@!        tmp2 = op * tmp1
+@!        out = restrict * tmp2
+          return out
+     end
+     return op_coarse_fun!
+end
+
+
