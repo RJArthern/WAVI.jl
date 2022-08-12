@@ -23,11 +23,7 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     sweep=[[1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask]]
     sweep_order=[1,3,2,4]
 
-    O=typeof(op)
-    P=typeof(prolong)
-    C=typeof(op_coarse)
-    R=typeof(restrict)
-    p=Preconditioner{T,N,O,C,R,P}(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
+    p=Preconditioner(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
             op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
             maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
