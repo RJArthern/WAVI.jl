@@ -566,5 +566,13 @@ function ⊗(A::AbstractMatrix{T},B::AbstractMatrix{T}) where {T}
     return K
 end
   
-    
+function get_resid(x,op,b)
+    resid=similar(b)
+    get_resid!(resid,x,op,b)
+end
+
+function get_resid!(resid,x,op,b)
+    mul!(resid,op,x)
+    resid .= b .- resid
+end
    

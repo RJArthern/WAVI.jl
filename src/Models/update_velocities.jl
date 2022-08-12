@@ -4,7 +4,7 @@ update_velocities!(model::AbstractModel)
 Solve momentum equation to update the velocities, plus Picard iteration for non-linear rheology.
 
 """
-function update_velocities!(model::AbstractModel)
+function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 @unpack params,solver_params=model
 @unpack gu,gv,wu,wv = model.fields
 n = gu.n + gv.n
@@ -12,8 +12,8 @@ n = gu.n + gv.n
 x=get_start_guess(model)
 b=get_rhs(model)
 
-rel_resid=zero(eltype(b))
-
+resid=zeros(T,n)
+rel_resid=zero(T)
 converged::Bool = false
 i_picard::Int64 = 0
 while !converged && (i_picard < solver_params.maxiter_picard)
@@ -34,7 +34,8 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     update_rheological_operators!(model)
     op=get_op(model)
 
-    rel_resid = norm(b .- op*x)/norm(b)
+    get_resid!(resid,x,op,b)
+    rel_resid = norm(resid)/norm(b)
     converged = rel_resid < solver_params.tol_picard
 
     p=get_preconditioner(model,op)
@@ -68,10 +69,10 @@ end
  Return right hand side vector of momentum equations.
 
 """
-function get_rhs(model::AbstractModel)
+function get_rhs(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     @unpack params=model
-    onesvec=ones(gh.nxh*gh.nyh)
+    onesvec=ones(T,gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     f1=[
         (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂xᵀ*surf_elev_adjusted))
@@ -251,11 +252,9 @@ end
 
 Interpolate the effective drag coefficient onto u- and v-grids, accounting for grounded fraction.
 """
-function update_βeff_on_uv_grids!(model::AbstractModel)
+function update_βeff_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv=model.fields
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
-
-    T=eltype(gh.grounded_fraction)
 
     onesvec=ones(T,gh.nxh*gh.nyh)
     gu.βeff[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))

@@ -23,7 +23,11 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     sweep=[[1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask]]
     sweep_order=[1,3,2,4]
 
-    p=Preconditioner(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
+    O=typeof(op)
+    C=typeof(op_coarse)
+    R=typeof(restrict)
+    P=typeof(prolong)
+    p=Preconditioner{T,N,O,C,R,P}(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
             op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
             maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
@@ -46,7 +50,7 @@ function precondition!(x, p, b)
     x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=sweep_order, smoother_omega = smoother_omega)
 
-    resid=b-op*x;
+    resid=get_resid(x,op,b)
 
     # Multigrid restriction
     b_coarse=restrict*resid
@@ -116,14 +120,14 @@ function gauss_seidel_smoother!(x, op, b;
                                 sweep=(1:size(op,1)),
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
-    resid=b-op*x
+    resid=get_resid(x,op,b)
     
     idx = zeros(Bool,size(sweep))
     for i = 1:iters
         for j = sweep_order
               idx .= sweep .== j
               x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
-              resid .= b .- op*x
+              get_resid!(resid,x,op,b)
         end
     end
     return x
