@@ -81,13 +81,15 @@ function get_op_diag(model::AbstractModel,op::LinearMap)
     m,n=size(op)
     @assert m == n == gu.n + gv.n
     op_diag=zeros(eltype(op),n)
+    ope_tmp=zeros(eltype(op),n)
     sm=solver_params.stencil_margin
     sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];
            [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask] ]
     e=zeros(Bool,n)
     for i = unique(sweep)
         e .= sweep .== i
-        op_diag[e] .= (op*e)[e]
+        mul!(ope_tmp,op,e)
+        op_diag[e] .= ope_tmp[e]
     end
     return op_diag
 end

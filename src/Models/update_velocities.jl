@@ -100,8 +100,8 @@ Set velocities to particular values. Input vector x represents stacked u and v c
 """
 function set_velocities!(model::AbstractModel,x)
     @unpack gh,gu,gv,gc=model.fields
-    gu.u[:] .= gu.spread*x[1:gu.n]
-    gv.v[:] .= gv.spread*x[(gu.n+1):(gu.n+gv.n)]
+    @views gu.u[:] .= gu.spread*x[1:gu.n]
+    @views gv.v[:] .= gv.spread*x[(gu.n+1):(gu.n+gv.n)]
     return model
 end
 

@@ -75,44 +75,55 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
             #Extensional resistive stresses
         @!  dudx = gu.∂x*uspread
         @!  dvdy = gv.∂y*vspread
-            r_xx_strain_rate_sum .= 2dudx .+ dvdy
-            r_yy_strain_rate_sum .= 2dvdy .+ dudx
-        @!  r_xx = -2gh.dneghηav[]*r_xx_strain_rate_sum
-        @!  r_yy = -2gh.dneghηav[]*r_yy_strain_rate_sum
-            
+        @.  r_xx_strain_rate_sum = 2dudx + dvdy
+        @.  r_yy_strain_rate_sum = 2dvdy + dudx
+        @!  r_xx = gh.dneghηav[]*r_xx_strain_rate_sum
+        @.  r_xx = -2r_xx
+        @!  r_yy = gh.dneghηav[]*r_yy_strain_rate_sum
+        @.  r_yy = -2r_yy
+
             #Shearing resistive stresses
         @!  dudy_c = gu.∂y*uspread
         @!  dvdx_c = gv.∂x*vspread
-            r_xy_strain_rate_sum_c .= dudy_c .+ dvdx_c
+        @.  r_xy_strain_rate_sum_c = dudy_c + dvdx_c
         @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
         @!  r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
-        @!  r_xy = -gh.dneghηav[]*r_xy_strain_rate_sum
+        @!  r_xy = gh.dneghηav[]*r_xy_strain_rate_sum
+        @.  r_xy = -r_xy
         @!  r_xy_c = gc.centᵀ*r_xy
         @!  r_xy_crop_c = gc.crop*r_xy_c
 
             #Gradients of resisitve stresses
-        @!  d_rxx_dx = -gu.∂xᵀ*r_xx
-        @!  d_rxy_dy = -gu.∂yᵀ*r_xy_crop_c
-        @!  d_ryy_dy = -gv.∂yᵀ*r_yy
-        @!  d_rxy_dx = -gv.∂xᵀ*r_xy_crop_c
+        @!  d_rxx_dx = gu.∂xᵀ*r_xx
+        @.  d_rxx_dx = - d_rxx_dx 
+        @!  d_rxy_dy = gu.∂yᵀ*r_xy_crop_c
+        @.  d_rxy_dy = - d_rxy_dy 
+        @!  d_ryy_dy = gv.∂yᵀ*r_yy
+        @.  d_ryy_dy = -d_ryy_dy
+        @!  d_rxy_dx = gv.∂xᵀ*r_xy_crop_c
+        @.  d_rxy_dx = -d_rxy_dx
 
             #Basal drag
-        @!  taubx = -gu.dnegβeff[]*uspread
-        @!  tauby = -gv.dnegβeff[]*vspread
+        @!  taubx = gu.dnegβeff[]*uspread
+        @.  taubx = -taubx
+        @!  tauby = gv.dnegβeff[]*vspread
+        @.  tauby = -tauby
             
             #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-            qx .= gu.h[:].*uspread
+            qx .= @view(gu.h[:]).*uspread
         @!  qx_crop = gu.crop*qx
         @!  dqxdx = gu.∂x*qx_crop
-            qy .= gv.h[:].*vspread
+            qy .=  @view(gv.h[:]).*vspread
         @!  qy_crop = gv.crop*qy
         @!  dqydy = gv.∂y*qy_crop
             divq .= dqxdx .+ dqydy
         @!  extra = gh.dimplicit[]*divq
-        @!  d_extra_dx = -gu.∂xᵀ*extra
-        @!  d_extra_dy = -gv.∂yᵀ*extra
-            h_d_extra_dx .= gu.h[:].*d_extra_dx
-            h_d_extra_dy .= gv.h[:].*d_extra_dy
+        @!  d_extra_dx = gu.∂xᵀ*extra
+        @.  d_extra_dx = -d_extra_dx
+        @!  d_extra_dy = gv.∂yᵀ*extra
+        @.  d_extra_dy = -d_extra_dy
+            h_d_extra_dx .= @view(gu.h[:]).*d_extra_dx
+            h_d_extra_dy .= @view(gv.h[:]).*d_extra_dy
 
             #Resistive forces resolved in x anf y directions
             fx .= d_rxx_dx .+ d_rxy_dy .- taubx .- h_d_extra_dx
@@ -122,14 +133,9 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @!  fx_samp = gu.samp*fx
         @!  fy_samp = gv.samp*fy
 
-            opvecprod .=
-            [
-            #x-component
-            fx_samp
-                ;
-            #y-component
-            fy_samp
-            ]
+            opvecprod[1:gu.n] .= fx_samp
+            opvecprod[(gu.n+1):(gu.n+gv.n)] .= fy_samp
+
             return opvecprod
     end
 
@@ -172,15 +178,9 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
 @!      outx = wu.samp[]*bigoutx
 @!      outy = wv.samp[]*bigouty
 
-     
-        restrictvec .=
-        [
-        #x-component
-        outx
-            ;
-        #y-component
-        outy
-        ]
+        restrictvec[1:wu.n[]] .=  outx
+        restrictvec[(wu.n[]+1):(wu.n[]+wv.n[])] .= outy
+
         return restrictvec
     end
 
@@ -225,14 +225,9 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
 @!      outx = gu.samp*bigoutx
 @!      outy = gv.samp*bigouty
 
-        prolongvec .=
-        [
-        #x-component
-        outx
-            ;
-        #y-component
-        outy
-        ]
+        prolongvec[1:gu.n] .= outx
+        prolongvec[(gu.n+1):(gu.n+gv.n)] .= outy
+        
         return prolongvec
     end
     
@@ -536,8 +531,8 @@ function ⊗(A::AbstractMatrix{T},B::AbstractMatrix{T}) where {T}
     if nb*ma <= mb*na
        temp :: Matrix{T} = zeros(nb,ma)
        function kron_fun1!(y,x) 
-            X = reshape(x, (nb, na))
-            Y = reshape(y, (mb, ma))
+            X = Base.ReshapedArray(x, (nb, na),())
+            Y = Base.ReshapedArray(y, (mb, ma),())
             mul!(temp, X, transpose(A))
             mul!(Y, B, temp)
             return y
@@ -550,8 +545,8 @@ function ⊗(A::AbstractMatrix{T},B::AbstractMatrix{T}) where {T}
     else
        temp = zeros(mb,na)
        function kron_fun2!(y,x) 
-            X = reshape(x, (nb, na))
-            Y = reshape(y, (mb, ma))
+            X = Base.ReshapedArray(x, (nb, na),())
+            Y = Base.ReshapedArray(y, (mb, ma),())
             mul!(temp, B, X)
             mul!(Y, temp, transpose(A))
             return y
