@@ -15,6 +15,9 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     n = gu.n + gv.n
     n_coarse = wu.n[] + wv.n[]
 
+    #starting guess for the multigrid coarse correction is cached by the model
+    correction_coarse=get_correction_coarse(model)
+
     restrict,prolong,op_coarse = get_multigrid_ops(model,op)
 
     op_diag=get_op_diag(model,op)
@@ -28,10 +31,14 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     R=typeof(restrict)
     P=typeof(prolong)
     p=Preconditioner{T,N,O,C,R,P}(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
-            op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
+            op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse, correction_coarse = correction_coarse,
             maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
     return p
+end
+
+function get_correction_coarse(p::AbstractPreconditioner)
+    return p.correction_coarse
 end
 
 """
@@ -55,8 +62,10 @@ function precondition!(x, p, b)
     # Multigrid restriction
     b_coarse=restrict*resid
 
+    abstol = tol_coarse*norm(b_coarse)
+
     # Multigrid solve for correction
-    cg!(correction_coarse, op_coarse, b_coarse; reltol = tol_coarse, maxiter = maxiter_coarse)
+    cg!(correction_coarse, op_coarse, b_coarse; abstol = abstol, maxiter = maxiter_coarse)
 
     # Multigrid prolongation
     x .= x .+ prolong*correction_coarse
@@ -178,4 +187,26 @@ function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::Line
      return op_coarse_fun!
 end
 
+function get_correction_coarse(model::AbstractModel{T,N}) where {T,N}
+    @unpack wu,wv = model.fields
+
+    n_coarse = wu.n[] + wv.n[]
+
+    correction_coarse=zeros(T,n_coarse)
+    correction_coarse[1:wu.n[]] .= wu.correction_coarse[]
+    correction_coarse[wu.n[]+1:n_coarse] .= wv.correction_coarse[]
+
+    return correction_coarse
+end
+
+function set_correction_coarse!(model::AbstractModel{T,N},correction_coarse::AbstractVector{T}) where {T,N}
+    @unpack wu,wv = model.fields
+
+    n_coarse = wu.n[] + wv.n[]
+
+    wu.correction_coarse[] .= correction_coarse[ 1 : wu.n[] ]  
+    wv.correction_coarse[] .= correction_coarse[ (wu.n[]+1) : n_coarse]
+
+    return nothing
+end
 

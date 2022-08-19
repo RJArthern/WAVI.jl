@@ -37,10 +37,12 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     get_resid!(resid,x,op,b)
     rel_resid = norm(resid)/norm(b)
     converged = rel_resid < solver_params.tol_picard
-
+    
     p=get_preconditioner(model,op)
     precondition!(x, p, b)
-
+    
+    correction_coarse = get_correction_coarse(p)
+    set_correction_coarse!(model,correction_coarse)
 end
 set_velocities!(model,x)
 
@@ -74,12 +76,13 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     @unpack params=model
     onesvec=ones(T,gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
-    f1=[
+    
+    f1::Vector{T}=[
         (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂xᵀ*surf_elev_adjusted))
         ;
         (params.density_ice*params.g*gv.h[gv.mask]).*(gv.samp*(-gv.∂yᵀ*surf_elev_adjusted))
        ]
-    f2=[
+    f2::Vector{T}=[
         (0.5*params.density_ice*params.g*gu.h[gu.mask].^2
         -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask],gu.h[gu.mask],params.sea_level_wrt_geoid)).^2
         -params.density_ice*params.g*gu.h[gu.mask].*gu.s[gu.mask]).*gu.samp*(-gu.∂xᵀ*(gh.crop*onesvec))

@@ -3,7 +3,7 @@
 
 Compute wavelet transform of velocities to define the coarse grid used in multigrid preconditioner.
 """
-function update_wavelets!(model::AbstractModel)
+function update_wavelets!(model::AbstractModel{T,N}) where {T,N}
     @unpack wu,wv,gu,gv=model.fields
     @unpack params,solver_params=model
 
@@ -24,6 +24,9 @@ function update_wavelets!(model::AbstractModel)
 
     wu.spread[] = sparse(wu.samp[]')
     wv.spread[] = sparse(wv.samp[]')
+
+    wu.correction_coarse[] = zeros(T,wu.n[])
+    wv.correction_coarse[] = zeros(T,wv.n[])
 
     return model
 end

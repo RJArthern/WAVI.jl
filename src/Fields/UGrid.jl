@@ -1,10 +1,4 @@
-struct UGrid{T <: Real, N <: Integer, K1 <: KronType{T},
-                                      K2 <: KronType{T},
-                                      K3 <: KronType{T},
-                                      K4 <: KronType{T},
-                                      K5 <: KronType{T},
-                                      K6 <: KronType{T},
-                                      K7 <: KronType{T}}
+struct UGrid{T <: Real, N <: Integer}
                    nxu :: N                                    # Number of frid cells in x-direction in UGrid
                    nyu :: N                                    # Number of grid cells in y-direction in UGrid 
                  mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
@@ -12,14 +6,14 @@ struct UGrid{T <: Real, N <: Integer, K1 <: KronType{T},
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Spread matrix: take model domain to full domain
-                 cent :: K1                                    # Map from U grid to H grid 
-                centᵀ :: K2                                    # Adjont of map from U grid to H grid 
-                   ∂x :: K3                                    # Matrix representation of differentiation wrt x 
-                  ∂xᵀ :: K4                                    # Adjoint of differentiation wrt x 
-                   ∂y :: K5                                    # Matrix representation of differentiation wrt y
-                  ∂yᵀ :: K6                                    # Adjoint of differentiation wrt y
+                 cent :: KronType{T,N}                         # Map from U grid to H grid 
+                centᵀ :: KronType{T,N}                         # Adjont of map from U grid to H grid 
+                   ∂x :: KronType{T,N}                         # Matrix representation of differentiation wrt x 
+                  ∂xᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt x 
+                   ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
+                  ∂yᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                  dwt :: K7                                    # Wavelet matrix product on u grid 
+                  dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction

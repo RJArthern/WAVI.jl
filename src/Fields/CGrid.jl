@@ -1,4 +1,4 @@
-struct CGrid{T <: Real, N <: Integer, K1 <: KronType{T}, K2 <: KronType{T}}
+struct CGrid{T <: Real, N <: Integer}
         nxc :: N
         nyc :: N
       mask :: Array{Bool,2} 
@@ -6,8 +6,8 @@ struct CGrid{T <: Real, N <: Integer, K1 <: KronType{T}, K2 <: KronType{T}}
       crop :: Diagonal{T,Array{T,1}}
       samp :: SparseMatrixCSC{T,N} 
     spread :: SparseMatrixCSC{T,N}
-      cent :: K1
-     centᵀ :: K2
+      cent :: KronType{T,N}
+     centᵀ :: KronType{T,N}
 end
 
 function CGrid(;

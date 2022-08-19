@@ -522,45 +522,6 @@ function clip(trial_mask)
     return mask
 end
 
-
-function ⊗(A::AbstractMatrix{T},B::AbstractMatrix{T}) where {T}
-    ma, na = size(A)
-    mb, nb = size(B)
-    x :: Vector{T} = zeros(na*nb)
-    y :: Vector{T} = zeros(ma*mb)
-    if nb*ma <= mb*na
-       temp :: Matrix{T} = zeros(nb,ma)
-       function kron_fun1!(y,x) 
-            X = Base.ReshapedArray(x, (nb, na),())
-            Y = Base.ReshapedArray(y, (mb, ma),())
-            mul!(temp, X, transpose(A))
-            mul!(Y, B, temp)
-            return y
-        end
-        K=LinearMap{T}(kron_fun1!,ma*mb,na*nb;
-                        issymmetric=issymmetric(A) && issymmetric(B),
-                        ismutating=true,
-                        ishermitian=ishermitian(A) && ishermitian(B),
-                        isposdef=isposdef(A) && isposdef(B))
-    else
-       temp = zeros(mb,na)
-       function kron_fun2!(y,x) 
-            X = Base.ReshapedArray(x, (nb, na),())
-            Y = Base.ReshapedArray(y, (mb, ma),())
-            mul!(temp, B, X)
-            mul!(Y, temp, transpose(A))
-            return y
-        end
-        K=LinearMap{T}(kron_fun2!,ma*mb,na*nb;
-                        issymmetric=issymmetric(A) && issymmetric(B),
-                        ismutating=true,
-                        ishermitian=ishermitian(A) && ishermitian(B),
-                        isposdef=isposdef(A) && isposdef(B))
-    end
-
-    return K
-end
-  
 function get_resid(x,op,b)
     resid=similar(b)
     get_resid!(resid,x,op,b)

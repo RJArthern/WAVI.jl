@@ -3,9 +3,10 @@ module WAVI
 #Useful packages
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
       IterativeSolvers, Interpolations, BenchmarkTools, Reexport,
-      NetCDF, JLD2, Setfield, MAT, ImageFiltering, InplaceOps
+      NetCDF, JLD2, Setfield, MAT, ImageFiltering, InplaceOps, SparseMatricesCSR
 
 #Import functions so they can be modified in this module.
+import Base: *, size, eltype
 import LinearAlgebra: ldiv!,mul!
 import Setfield: @set
 
@@ -35,7 +36,6 @@ abstract type AbstractPreconditioner{T <: Real, N <: Integer} end
 #abstract type AbstractSimulation{T,N,R,A,W} end
 
 #Type alias, just for abreviation
-const KronType{T} = LinearMap{T}
 const MapOrMatrix{T} = Union{LinearMap{T}, AbstractMatrix{T}}
 #Concrete types
 
@@ -48,6 +48,7 @@ include("SolverParams.jl")
 include("TimesteppingParams.jl")
 include("Clock.jl")
 include("InitialConditions.jl")
+include("KroneckerProduct.jl")
 include("Wavelets/Wavelets.jl")
 include("Fields/Fields.jl")
 include("Models/Model.jl")
