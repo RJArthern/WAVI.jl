@@ -188,7 +188,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
         area_fraction_quadrant[(z1.<=0.0) .& (z2.<=0.0) .& (z3.<=0.0)].=0.0;
 
         #Don't use any quadrant from an invalid cell of the h-grid.
-        area_fraction_quadrant[.!mask].=0.0;
+        #area_fraction_quadrant[.!mask].=0.0;
     
         #Add areas for each quadrant together.
         #N.B. distance unit for x and y is half a grid cell.
