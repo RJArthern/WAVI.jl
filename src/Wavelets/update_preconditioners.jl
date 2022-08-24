@@ -9,10 +9,10 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     @unpack gu,gv,wu,wv=model.fields
     @unpack params,solver_params=model
 
-    m,n=size(op)
-    @assert m == n == gu.n + gv.n
+    mi,ni = size(op)
+    @assert mi == ni == gu.ni + gv.ni
 
-    n = gu.n + gv.n
+    ni = gu.ni + gv.ni
     n_coarse = wu.n[] + wv.n[]
 
     #starting guess for the multigrid coarse correction is cached by the model
@@ -23,7 +23,12 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     op_diag=get_op_diag(model,op)
 
     #Four colour Jacobi preconditioner. Red-Black checkerboard Jacobi for each velocity component.
-    sweep=[[1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask]]
+    sweep=[
+    [1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask_inner]
+    ;
+    [3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask_inner]
+    ]
+
     sweep_order=[1,3,2,4]
 
     O=typeof(op)
@@ -87,14 +92,14 @@ end
 function get_op_diag(model::AbstractModel,op::LinearMap)
     @unpack gu,gv=model.fields
     @unpack params,solver_params=model
-    m,n=size(op)
-    @assert m == n == gu.n + gv.n
-    op_diag=zeros(eltype(op),n)
-    ope_tmp=zeros(eltype(op),n)
+    mi,ni = size(op)
+    @assert mi == ni == gu.ni + gv.ni
+    op_diag=zeros(eltype(op),ni)
+    ope_tmp=zeros(eltype(op),ni)
     sm=solver_params.stencil_margin
-    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];
-           [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask] ]
-    e=zeros(Bool,n)
+    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nxu, j=1:gu.nyu][gu.mask_inner];
+           [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask_inner] ]
+    e=zeros(Bool,ni)
     for i = unique(sweep)
         e .= sweep .== i
         mul!(ope_tmp,op,e)
@@ -149,16 +154,16 @@ function get_multigrid_ops(model::AbstractModel{T,N},op::LinearMap{T}) where {T,
     @unpack gu,gv,wu,wv=model.fields
 
     m,n=size(op)
-    @assert m == n == gu.n + gv.n
+    @assert m == n == gu.ni + gv.ni
 
-    n = gu.n + gv.n
+    ni = gu.ni + gv.ni
     n_coarse = wu.n[] + wv.n[]
 
     restrict_fun! = get_restrict_fun(model)
     prolong_fun! = get_prolong_fun(model)
 
-    restrict=LinearMap{T}(restrict_fun!,n_coarse,n;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun!,n,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+    restrict=LinearMap{T}(restrict_fun!,n_coarse,ni;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+    prolong=LinearMap{T}(prolong_fun!,ni,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
 
     op_coarse_fun! = get_op_coarse_fun(op,restrict,prolong)
 
@@ -170,13 +175,13 @@ end
 
 function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::LinearMap{T}) where {T}
 
-     m,n = size(op)
-     @assert m == n 
+     mi,ni = size(op)
+     @assert mi == ni 
 
      n_coarse = size(restrict,1)
 
-     tmp1 :: Vector{T} = zeros(n)
-     tmp2 :: Vector{T} = zeros(n)
+     tmp1 :: Vector{T} = zeros(ni)
+     tmp2 :: Vector{T} = zeros(ni)
      out :: Vector{T} = zeros(n_coarse)
      function op_coarse_fun!(out,in)
 @!        tmp1 = prolong * in

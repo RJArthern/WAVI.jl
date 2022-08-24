@@ -46,22 +46,28 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     )
 
     #u-grid
+    u =  deepcopy(initial_conditions.initial_u)
     gu=UGrid(
     nxu=grid.nx+1,
     nyu=grid.ny,
     dx=grid.dx,
     dy=grid.dy,
     mask=u_mask,
+    u_isfixed=grid.u_isfixed,
+    u=u,
     levels=solver_params.levels
     )
 
     #v-grid
+    v = deepcopy(initial_conditions.initial_v)
     gv=VGrid(
     nxv=grid.nx,
     nyv=grid.ny+1,
     dx=grid.dx,
     dy=grid.dy,
     mask=v_mask,
+    v_isfixed=grid.v_isfixed,
+    v=v,
     levels=solver_params.levels
     )
 

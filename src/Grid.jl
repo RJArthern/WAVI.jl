@@ -9,6 +9,8 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                 h_mask :: Array{Bool,2} # Mask defining domain points within grid
               u_iszero :: Array{Bool,2} # Locations of zero u velocity points 
               v_iszero :: Array{Bool,2} # Locations of zero v velocity points
+             u_isfixed :: Array{Bool,2} # Locations of fixed u velocity points 
+             v_isfixed :: Array{Bool,2} # Locations of fixed v velocity points
                    xxh :: Array{T,2}    # x co-ordinates matrix of h grid
                    yyh :: Array{T,2}    # y co-ordinates matrix of h grid
                    xxu :: Array{T,2}    # x co-ordinates matrix of u grid
@@ -33,7 +35,9 @@ end
     y0 = -40000.0,
     h_mask = nothing,
     u_iszero = nothing,
-    v_iszero = nothing)
+    v_iszero = nothing,
+    u_isfixed = nothing,
+    v_isfixed = nothing)
 
 Construct a WAVI.jl grid.
 
@@ -50,6 +54,8 @@ Keyword arguments
     - 'h_mask': Mask defining domain points within grid
     - 'u_iszero': Locations of zero u velocity points
     - 'v_iszero': Locations of zero v velocity points
+    - 'u_isfixed': Locations of fixed u velocity points
+    - 'v_isfixed': Locations of fixed v velocity points
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
 """
 
@@ -65,6 +71,8 @@ function Grid(;
     h_mask = nothing,
     u_iszero = nothing,
     v_iszero = nothing,
+    u_isfixed = nothing,
+    v_isfixed = nothing,
     quadrature_weights = nothing,
     σ = nothing)
 
@@ -75,12 +83,17 @@ function Grid(;
 
 #if boundary conditions passed as string array, assemble these matric
 ~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
-~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(v_iszero,nx,ny+1))
+~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(deepcopy(v_iszero),nx,ny+1))
+~(typeof(u_isfixed) == Vector{String}) || (u_isfixed = orientations2bc(deepcopy(u_isfixed),nx+1,ny))
+~(typeof(v_isfixed) == Vector{String}) || (v_isfixed = orientations2bc(deepcopy(v_isfixed),nx,ny+1))
+
 
 #assemble h_mask, u_iszero, v_iszero (if not passed as string)
 (~(h_mask === nothing)) || (h_mask = trues(nx,ny))
 (~(u_iszero === nothing))|| (u_iszero = falses(nx+1,ny))
 (~(v_iszero === nothing)) || (v_iszero = falses(nx, ny+1))
+(~(u_isfixed === nothing))|| (u_isfixed = falses(nx+1,ny))
+(~(v_isfixed === nothing)) || (v_isfixed = falses(nx, ny+1))
 (~(quadrature_weights === nothing) || (quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1)))
  
 #check the sizes of inputs
@@ -88,6 +101,9 @@ size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) 
 size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
 size(u_iszero)==(nx+1,ny) || throw(DimensionMismatch("u_iszero size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_iszero)==(nx,ny+1) || throw(DimensionMismatch("v_iszero size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
+size(u_isfixed)==(nx+1,ny) || throw(DimensionMismatch("u_isfixed size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
+size(v_isfixed)==(nx,ny+1) || throw(DimensionMismatch("v_isfixed size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
+
 
 #map bit arrays to boolean
 try
@@ -107,6 +123,18 @@ try
     v_iszero = convert(Array{Bool,2}, v_iszero)
 catch
     throw(ArgumentError("v_iszero must be Boolean (or equivalent)"))
+end
+
+try 
+    u_isfixed = convert(Array{Bool,2}, u_isfixed)
+catch 
+    throw(ArgumentError("u_isfixed must be Boolean (or equivalent)"))
+end
+
+try
+    v_isfixed = convert(Array{Bool,2}, v_isfixed)
+catch
+    throw(ArgumentError("v_isfixed must be Boolean (or equivalent)"))
 end
 
 #compute grid co-ordinates
@@ -137,6 +165,8 @@ return Grid(nx,
             h_mask,
             u_iszero,
             v_iszero,
+            u_isfixed,
+            v_isfixed,
             xxh,
             yyh,
             xxu,

@@ -18,8 +18,8 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     nxnyu :: N = gu.nxu*gu.nyu
     nxnyv :: N = gv.nxv*gv.nyv
     nxnyc :: N = gc.nxc*gc.nyc
-    usamp :: Vector{T} = zeros(gu.n);                               @assert length(usamp) == gu.n
-    vsamp :: Vector{T} = zeros(gv.n);                               @assert length(vsamp) == gv.n
+    usampi :: Vector{T} = zeros(gu.ni);                             @assert length(usampi) == gu.ni
+    vsampi :: Vector{T} = zeros(gv.ni);                             @assert length(vsampi) == gv.ni
     uspread :: Vector{T} = zeros(nxnyu);                            @assert length(uspread) == nxnyu
     vspread :: Vector{T} = zeros(nxnyv);                            @assert length(vspread) == nxnyv
     dudx :: Vector{T} = zeros(nxnyh);                               @assert length(dudx) == nxnyh
@@ -56,21 +56,30 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     h_d_extra_dy :: Vector{T} = zeros(nxnyv);                       @assert length(h_d_extra_dy) == nxnyv
     fx :: Vector{T} = zeros(nxnyu);                                 @assert length(fx) == nxnyu
     fy :: Vector{T} = zeros(nxnyv);                                 @assert length(fy) == nxnyv
-    fx_samp :: Vector{T} = zeros(gu.n);                             @assert length(fx_samp) == gu.n
-    fy_samp :: Vector{T} = zeros(gv.n);                             @assert length(fy_samp) == gv.n
-    opvecprod :: Vector{T} = zeros(gu.n+gv.n);                      @assert length(opvecprod) == gu.n + gv.n
+    fx_sampi :: Vector{T} = zeros(gu.ni);                           @assert length(fx_sampi) == gu.ni
+    fy_sampi :: Vector{T} = zeros(gv.ni);                           @assert length(fy_sampi) == gv.ni
+    opvecprod :: Vector{T} = zeros(gu.ni+gv.ni);                    @assert length(opvecprod) == gu.ni + gv.ni
 
-    function op_fun!(opvecprod::AbstractVector,vec::AbstractVector)
-
-            @assert length(vec)==(gu.n+gv.n)
+    function op_fun!(opvecprod::AbstractVector,vec::AbstractVector;vecSampled::Bool=true)
+        if vecSampled
+            @assert length(vec)==(gu.ni+gv.ni)
 
             #Split vector into u- and v- components
-            usamp .= @view vec[1:gu.n]
-            vsamp .= @view vec[(gu.n+1):(gu.n+gv.n)]
+            usampi .= @view vec[1:gu.ni]
+            vsampi .= @view vec[(gu.ni+1):(gu.ni+gv.ni)]
 
             #Spread to vectors that include all grid points within rectangular domain.
-        @!  uspread = gu.spread*usamp
-        @!  vspread = gv.spread*vsamp
+            @!  uspread = gu.spread_inner*usampi
+            @!  vspread = gv.spread_inner*vsampi
+
+        else
+            #Vector already includes all grid points within rectangular domain.
+            @assert length(vec)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
+            
+            uspread .= @view vec[1:gu.nxu*gu.nyu]
+            vspread .= @view vec[(gu.nxu*gu.nyu+1):(gu.nxu*gu.nyu+gv.nxv*gv.nyv)]
+
+        end
 
             #Extensional resistive stresses
         @!  dudx = gu.∂x*uspread
@@ -130,11 +139,11 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
             fy .= d_ryy_dy .+ d_rxy_dx .- tauby .- h_d_extra_dy
 
             #Resistive forces sampled at valid grid points
-        @!  fx_samp = gu.samp*fx
-        @!  fy_samp = gv.samp*fy
+        @!  fx_sampi = gu.samp_inner*fx
+        @!  fy_sampi = gv.samp_inner*fy
 
-            opvecprod[1:gu.n] .= fx_samp
-            opvecprod[(gu.n+1):(gu.n+gv.n)] .= fy_samp
+            opvecprod[1:gu.ni] .= fx_sampi
+            opvecprod[(gu.ni+1):(gu.ni+gv.ni)] .= fy_sampi
 
             return opvecprod
     end
@@ -157,8 +166,8 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
     nxnyv = gv.nxv*gv.nyv
     nxnywu = wu.nxuw*wu.nyuw
     nxnywv = wv.nxvw*wv.nyvw
-    vecx :: Vector{T} = zeros(gu.n)
-    vecy :: Vector{T} = zeros(gv.n)
+    vecx :: Vector{T} = zeros(gu.ni)
+    vecy :: Vector{T} = zeros(gv.ni)
     spreadvecx :: Vector{T} = zeros(nxnyu)
     spreadvecy :: Vector{T} = zeros(nxnyv)
     bigoutx :: Vector{T} = zeros(nxnywu)
@@ -168,11 +177,11 @@ function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
     restrictvec :: Vector{T} = zeros(wu.n[]+wv.n[])
 
     function restrict_fun!(restrictvec::AbstractVector,vec::AbstractVector)
-        @assert length(vec)==(gu.n+gv.n)
-        vecx .= @view vec[1:gu.n]
-        vecy .= @view vec[(gu.n+1):(gu.n+gv.n)]
-@!      spreadvecx = gu.spread*vecx
-@!      spreadvecy = gv.spread*vecy
+        @assert length(vec)==(gu.ni+gv.ni)
+        vecx .= @view vec[1:gu.ni]
+        vecy .= @view vec[(gu.ni+1):(gu.ni+gv.ni)]
+@!      spreadvecx = gu.spread_inner*vecx
+@!      spreadvecy = gv.spread_inner*vecy
 @!      bigoutx = wu.idwtᵀ*spreadvecx
 @!      bigouty = wv.idwtᵀ*spreadvecy
 @!      outx = wu.samp[]*bigoutx
@@ -208,9 +217,9 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
     spreadwaveletvecy :: Vector{T} = zeros(nxnywv)
     bigoutx :: Vector{T} = zeros(nxnyu)
     bigouty :: Vector{T} = zeros(nxnyv)
-    outx :: Vector{T} = zeros(gu.n)
-    outy :: Vector{T} = zeros(gv.n)
-    prolongvec :: Vector{T} = zeros(gu.n+gv.n)
+    outx :: Vector{T} = zeros(gu.ni)
+    outy :: Vector{T} = zeros(gv.ni)
+    prolongvec :: Vector{T} = zeros(gu.ni+gv.ni)
 
     function prolong_fun!(prolongvec::AbstractVector,waveletvec::AbstractVector)
 
@@ -222,11 +231,11 @@ function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
 @!      spreadwaveletvecy = wv.spread[]*waveletvecy
 @!      bigoutx = wu.idwt*spreadwaveletvecx
 @!      bigouty = wv.idwt*spreadwaveletvecy
-@!      outx = gu.samp*bigoutx
-@!      outy = gv.samp*bigouty
+@!      outx = gu.samp_inner*bigoutx
+@!      outy = gv.samp_inner*bigouty
 
-        prolongvec[1:gu.n] .= outx
-        prolongvec[(gu.n+1):(gu.n+gv.n)] .= outy
+        prolongvec[1:gu.ni] .= outx
+        prolongvec[(gu.ni+1):(gu.ni+gv.ni)] .= outy
         
         return prolongvec
     end

@@ -7,12 +7,11 @@ Solve momentum equation to update the velocities, plus Picard iteration for non-
 function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 @unpack params,solver_params=model
 @unpack gu,gv,wu,wv = model.fields
-n = gu.n + gv.n
+ni = gu.ni + gv.ni
 
 x=get_start_guess(model)
-b=get_rhs(model)
 
-resid=zeros(T,n)
+resid=zeros(T,ni)
 rel_resid=zero(T)
 converged::Bool = false
 i_picard::Int64 = 0
@@ -32,9 +31,13 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     update_βeff!(model)
     update_βeff_on_uv_grids!(model)
     update_rheological_operators!(model)
+    
     op=get_op(model)
 
+    b=get_rhs(model)
+
     get_resid!(resid,x,op,b)
+
     rel_resid = norm(resid)/norm(b)
     converged = rel_resid < solver_params.tol_picard
     
@@ -59,8 +62,7 @@ end
 function get_start_guess(model::AbstractModel)
     @unpack gu,gv=model.fields
     @assert eltype(gu.u)==eltype(gv.v)
-    n = gu.n + gv.n
-    x=[gu.samp*gu.u[:];gv.samp*gv.v[:]]
+    x=[gu.samp_inner*gu.u[:];gv.samp_inner*gv.v[:]]
     return x
 end
 
@@ -77,21 +79,25 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     onesvec=ones(T,gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     
-    f1::Vector{T}=[
-        (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂xᵀ*surf_elev_adjusted))
+    f1=[
+        (params.density_ice*params.g*gu.h[gu.mask_inner]).*(gu.samp_inner*(-gu.∂xᵀ*surf_elev_adjusted))
         ;
-        (params.density_ice*params.g*gv.h[gv.mask]).*(gv.samp*(-gv.∂yᵀ*surf_elev_adjusted))
+        (params.density_ice*params.g*gv.h[gv.mask_inner]).*(gv.samp_inner*(-gv.∂yᵀ*surf_elev_adjusted))
        ]
-    f2::Vector{T}=[
-        (0.5*params.density_ice*params.g*gu.h[gu.mask].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask],gu.h[gu.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gu.h[gu.mask].*gu.s[gu.mask]).*gu.samp*(-gu.∂xᵀ*(gh.crop*onesvec))
+    f2=[
+        (0.5*params.density_ice*params.g*gu.h[gu.mask_inner].^2
+        -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask_inner],gu.h[gu.mask_inner],params.sea_level_wrt_geoid)).^2
+        -params.density_ice*params.g*gu.h[gu.mask_inner].*gu.s[gu.mask_inner]).*gu.samp_inner*(-gu.∂xᵀ*(gh.crop*onesvec))
         ;
-        (0.5*params.density_ice*params.g*gv.h[gv.mask].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask],gv.h[gv.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gv.h[gv.mask].*gv.s[gv.mask]).*gv.samp*(-gv.∂yᵀ*(gh.crop*onesvec))
+        (0.5*params.density_ice*params.g*gv.h[gv.mask_inner].^2
+        -0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask_inner],gv.h[gv.mask_inner],params.sea_level_wrt_geoid)).^2
+        -params.density_ice*params.g*gv.h[gv.mask_inner].*gv.s[gv.mask_inner]).*gv.samp_inner*(-gv.∂yᵀ*(gh.crop*onesvec))
         ]
-    rhs=f1+f2
+    
+    f3 = get_rhs_dirichlet(model)
+
+    rhs=f1+f2+f3
+
     return rhs
 end
 
@@ -103,8 +109,8 @@ Set velocities to particular values. Input vector x represents stacked u and v c
 """
 function set_velocities!(model::AbstractModel,x)
     @unpack gh,gu,gv,gc=model.fields
-    @views gu.u[:] .= gu.spread*x[1:gu.n]
-    @views gv.v[:] .= gv.spread*x[(gu.n+1):(gu.n+gv.n)]
+    @views gu.u[gu.mask_inner] .= x[1:gu.ni]
+    @views gv.v[gv.mask_inner] .= x[(gu.ni+1):(gu.ni+gv.ni)]
     return model
 end
 
@@ -300,7 +306,33 @@ end
 """
 function get_op(model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
-    n = gu.n + gv.n
+    ni = gu.ni + gv.ni
     op_fun! = get_op_fun(model)
-    op=LinearMap{T}(op_fun!,n;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+    op=LinearMap{T}(op_fun!,ni;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+end
+
+
+"""
+    get_rhs_dirichlet(model::AbstractModel{T,N}) where {T,N}
+
+    Extra term of right hand side to implement non-homogenous Dirichlet conditions   
+
+"""
+function get_rhs_dirichlet(model::AbstractModel{T,N}) where {T,N}
+    @unpack gu,gv=model.fields
+
+    rhs_dirichlet=zeros(T,gu.ni+gv.ni)
+    
+    uvfixed=[
+    gu.u[:].*gu.u_isfixed[:]
+    ;
+    gv.v[:].*gv.v_isfixed[:]
+    ]
+
+    op_fun! = get_op_fun(model)
+    op_fun!(rhs_dirichlet,uvfixed,vecSampled=false)
+    
+    @. rhs_dirichlet = - rhs_dirichlet
+    
+    return rhs_dirichlet
 end

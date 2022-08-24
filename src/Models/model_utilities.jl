@@ -11,6 +11,16 @@ if all(isnan.(initial_conditions.initial_thickness))
     initial_conditions = @set initial_conditions.initial_thickness =  default_thickness*ones(grid.nx, grid.ny)
 end
 
+if all(isnan.(initial_conditions.initial_u))
+    #@info "Did not find a specified initial u velocity, reverting to default value of zero everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    initial_conditions = @set initial_conditions.initial_u =  zeros(grid.nx+1, grid.ny)
+end
+
+if all(isnan.(initial_conditions.initial_v))
+    #@info "Did not find a specified initial u velocity, reverting to default value of zero everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    initial_conditions = @set initial_conditions.initial_v =  zeros(grid.nx, grid.ny+1)
+end
+
 if all(isnan.(initial_conditions.initial_viscosity))
     default_viscosity = params.default_viscosity
     #@info "Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity Pa s everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
@@ -31,6 +41,8 @@ end
 
 #check sizes are compatible
 (size(initial_conditions.initial_thickness) == (grid.nx, grid.ny)) || throw(DimensionMismatch("Initial thickness field is not compatible with grid size. Input thickess field is has size $(size(initial_conditions.initial_thickness)), which must match horizontal grid size ($(grid.nx) x $(grid.ny))"))
+(size(initial_conditions.initial_u) == (grid.nx+1, grid.ny)) || throw(DimensionMismatch("Initial thickness field is not compatible with grid size. Input thickess field is has size $(size(initial_conditions.initial_thickness)), which must match horizontal grid size ($(grid.nx) x $(grid.ny))"))
+(size(initial_conditions.initial_v) == (grid.nx, grid.ny+1)) || throw(DimensionMismatch("Initial thickness field is not compatible with grid size. Input thickess field is has size $(size(initial_conditions.initial_thickness)), which must match horizontal grid size ($(grid.nx) x $(grid.ny))"))
 (size(initial_conditions.initial_temperature) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial temperature field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
 (size(initial_conditions.initial_viscosity) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial viscosity field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
 (size(initial_conditions.initial_damage) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial damage field is not compatible with grid size.Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))

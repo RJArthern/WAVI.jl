@@ -1,11 +1,16 @@
 struct VGrid{T <: Real, N <: Int}
-                   nxv :: N                                    # Number of frid cells in x-direction in UGrid
-                   nyv :: N                                    # Number of grid cells in y-direction in UGrid 
-                 mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
+                  nxv :: N                                     # Number of frid cells in x-direction in UGrid
+                  nyv :: N                                     # Number of grid cells in y-direction in UGrid 
+                 mask :: Array{Bool,2}                         # Mask specifying model domain wrt V grid 
+           mask_inner :: Array{Bool,2}                         # Mask specifying interior of model domain wrt V grid 
+            v_isfixed :: Array{Bool,2}                         # Mask specifying location of fixed v-velocity 
                     n :: N                                     # Total number of cells in model domain 
+                   ni :: N                                     # Total number of cells in interior of model domain 
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
+           samp_inner :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to interior of model domain 
                spread :: SparseMatrixCSC{T,N}                  # Spread matrix: take model domain to full domain
+         spread_inner :: SparseMatrixCSC{T,N}                  # Spread matrix: take interior of model domain to full domain
                  cent :: KronType{T,N}                         # Map from V grid to H grid 
                 centᵀ :: KronType{T,N}                         # Adjoint of map from V grid to H grid 
                    ∂x :: KronType{T,N}                         # Matrix representation of differentiation wrt x 
@@ -28,6 +33,7 @@ end
             nxv,
             nyv,
             mask = trues(nxv,nyv), 
+            v_isfixed = falses(nxv,nyv),
             levels,
             dx,
             dy)
@@ -42,6 +48,8 @@ Keyword arguments
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
     - 'nyv': (required) Number of grid cells in y-direction in VGrid (should be same as grid.ny + 1)
     - 'mask': Mask specifying the model domain with respect to V grid
+    - 'v_isfixed' Mask specifying where v velocities are fixed
+    - 'v' Values of v velocities (including fixed values).
     - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
@@ -50,18 +58,26 @@ function VGrid(;
         nxv,
         nyv,
         mask = trues(nxv,nyv),
+        v_isfixed = falses(nxv,nyv),
+        v = zeros(nxv,nyv),
         levels,
         dx,
         dy)
 
     #check the sizes of inputs
-    (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
+    (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to VGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
+    (size(v_isfixed) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to VGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
+    (size(v) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to VGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
 
     #construct operators
     n = count(mask)
+    mask_inner = mask .& .! v_isfixed
+    ni = count(mask_inner)
     crop = Diagonal(float(mask[:]))
     samp = crop[mask[:],:]
+    samp_inner = crop[mask_inner[:],:]
     spread = sparse(samp')
+    spread_inner = sparse(samp_inner')
     cent = c(nyv-1) ⊗ spI(nxv)
     centᵀ = sparse(c(nyv-1)') ⊗ sparse(spI(nxv)')
     ∂x = χ(nyv-2) ⊗ ∂1d(nxv-1,dx)
@@ -76,31 +92,39 @@ function VGrid(;
     grounded_fraction = ones(nxv,nyv)
     βeff = zeros(nxv,nyv)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-    v = zeros(nxv,nyv)
 
     #size assertions
-    @assert size(mask)==(nxv,nyv)
-    n == count(mask)
+    @assert n == count(mask)
+    @assert ni == count(mask_inner)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
+    @assert samp_inner == crop[mask_inner[:],:]
     @assert spread == sparse(samp')
+    @assert spread_inner == sparse(samp_inner')
     @assert size(s)==(nxv,nyv)
     @assert size(h)==(nxv,nyv)
     @assert size(grounded_fraction)==(nxv,nyv)
     @assert size(βeff)==(nxv,nyv)
-    @assert size(v)==(nxv,nyv)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
+    mask_inner = convert(Array{Bool,2}, mask_inner)
+    v_isfixed = convert(Array{Bool,2}, v_isfixed)
+
 
     return VGrid(
                 nxv,
                 nyv,
                 mask,
+                mask_inner,
+                v_isfixed,
                 n,
+                ni,
                 crop,
                 samp,
+                samp_inner,
                 spread,
+                spread_inner,
                 cent,
                 centᵀ,
                 ∂x,
