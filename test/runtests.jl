@@ -33,6 +33,10 @@ if group == "utils" || group == "all"
     include("test_utils.jl")
 end
 
+if group == "kronecker" || group == "all"
+    include("test_kronecker.jl")
+end
+
 if group == "verification" || group == "all"
     include("verification_tests.jl")
 end

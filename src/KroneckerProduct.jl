@@ -26,6 +26,8 @@ end
 
 function mul!(y::AbstractVecOrMat,K::KroneckerProduct,x::AbstractVector) 
     @unpack A, B, temp = K
+    (size(y,1)==size(K,1) && size(x,1)==size(K,2) && size(y,2) == size(x,2))||
+         throw(DimensionMismatch("Inconsistent dimensions of Kronecker product."))
     ma, na = size(A)
     mb, nb = size(B)
     X = Base.ReshapedArray(x, (nb, na),())
