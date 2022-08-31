@@ -223,8 +223,8 @@ function schwarzProlongVelocities!(model::AbstractModel,model_g::AbstractModel;i
     nx_g = i_stop_g - i_start_g + 1
     ny_g = j_stop_g - j_start_g + 1
 
-    upou = schwarzPartitionOfUnity(nx_g+1,ny_g,offset+1,offset)
-    vpou = schwarzPartitionOfUnity(nx_g,ny_g+1,offset,offset+1)
+    upou = schwarzPartitionOfUnity(nx_g+1,ny_g,igrid==1,igrid==ngridsx,jgrid==1,jgrid==ngridsy,offset+1,offset)
+    vpou = schwarzPartitionOfUnity(nx_g,ny_g+1,igrid==1,igrid==ngridsx,jgrid==1,jgrid==ngridsy,offset,offset+1)
 
     model.fields.gu.u[i_start_g:i_stop_g+1,j_start_g:j_stop_g] .+=  upou .* model_g.fields.gu.u
     model.fields.gv.v[i_start_g:i_stop_g,j_start_g:j_stop_g+1] .+=  vpou .* model_g.fields.gv.v
@@ -232,13 +232,13 @@ function schwarzProlongVelocities!(model::AbstractModel,model_g::AbstractModel;i
     return model
 end
 
-function schwarzPartitionOfUnity(m,n,offseti,offsetj)
+function schwarzPartitionOfUnity(m,n,leavei1,leaveim,leavej1,leavejn,offseti,offsetj)
     @assert m>2*offseti
     @assert n>2*offsetj 
     pou = [min(1.0, 
-        (i-1)./(offseti),
-        (m-i)./(offseti),
-        (j-1)./(offsetj),
-        (n-j)./(offsetj)) for i=1:m, j=1:n]
+        leavei1 ? Inf : (i-1)./(offseti),
+        leaveim ? Inf : (m-i)./(offseti),
+        leavej1 ? Inf : (j-1)./(offsetj),
+        leavejn ? Inf : (n-j)./(offsetj)) for i=1:m, j=1:n]
     return pou
 end
