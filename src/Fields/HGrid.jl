@@ -70,7 +70,7 @@ function HGrid(;
                 ηav = zeros(nxh,nyh))
 
     #check the sizes of inputs
-    (size(mask) == size(b) == size(h) == size(ηav) == (nxh,nyh)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxh x nyh (i.e. $nxh x $nyh)"))
+    (size(mask) == size(b) == size(h) == size(ηav) == (nxh,nyh)) || throw(DimensionMismatch("Sizes of inputs to HGrid must all be equal to nxh x nyh (i.e. $nxh x $nyh)"))
 
     #construct operators
     n = count(mask);
@@ -105,7 +105,7 @@ function HGrid(;
     quad_f2 = h./(3*ηav)
 
     #check sizes of everything
-    @assert size(mask)==(nxh,nyh); @assert mask == clip(mask)
+    @assert size(mask)==(nxh,nyh); #@assert mask == clip(mask)
     @assert n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]

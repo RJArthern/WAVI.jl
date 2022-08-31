@@ -108,7 +108,7 @@ size(v_isfixed)==(nx,ny+1) || throw(DimensionMismatch("v_isfixed size must be si
 #map bit arrays to boolean
 try
     h_mask = convert(Array{Bool,2}, h_mask)
-    @assert h_mask == clip(h_mask)
+    #@assert h_mask == clip(h_mask)
 catch 
     throw(ArgumentError("h_mask must be Boolean (or equivalent)"))
 end

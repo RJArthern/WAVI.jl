@@ -34,6 +34,7 @@ end
             nyv,
             mask = trues(nxv,nyv), 
             v_isfixed = falses(nxv,nyv),
+            v = zeros(nxv,nyv),
             levels,
             dx,
             dy)

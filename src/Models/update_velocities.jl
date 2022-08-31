@@ -7,19 +7,25 @@ Solve momentum equation to update the velocities, plus Picard iteration for non-
 function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 @unpack params,solver_params=model
 @unpack gu,gv,wu,wv = model.fields
-ni = gu.ni + gv.ni
 
-x=get_start_guess(model)
-
-resid=zeros(T,ni)
-rel_resid=zero(T)
 converged::Bool = false
 i_picard::Int64 = 0
 while !converged && (i_picard < solver_params.maxiter_picard)
 
     i_picard = i_picard + 1
 
-    set_velocities!(model,x)
+    inner_update!(model)
+    
+    converged=isconverged(model)
+    
+    converged || precondition!(model)
+
+end
+
+return model
+end
+
+function inner_update!(model::AbstractModel)
     update_shelf_strain_rate!(model)
     update_av_speed!(model)
     update_bed_speed!(model)
@@ -31,25 +37,51 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     update_βeff!(model)
     update_βeff_on_uv_grids!(model)
     update_rheological_operators!(model)
+    return model
+end
+
+
+
+
+function isconverged(model::AbstractModel)
+    @unpack solver_params=model
+
+    x=get_start_guess(model)
     
     op=get_op(model)
 
     b=get_rhs(model)
 
-    get_resid!(resid,x,op,b)
+    resid=get_resid(x,op,b)
 
     rel_resid = norm(resid)/norm(b)
+
     converged = rel_resid < solver_params.tol_picard
+
+    return converged
+end
+
+
+precondition!(model::AbstractModel) = precondition!(model,get_parallel_spec(model))
+
+function precondition!(model,::BasicParallelSpec)
     
+    x=get_start_guess(model)
+    
+    op=get_op(model)
+
+    b=get_rhs(model)
+
     p=get_preconditioner(model,op)
+
     precondition!(x, p, b)
     
     correction_coarse = get_correction_coarse(p)
     set_correction_coarse!(model,correction_coarse)
-end
-set_velocities!(model,x)
+    
+    set_velocities!(model,x)
 
-return model
+    return model
 end
 
 

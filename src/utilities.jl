@@ -540,4 +540,4 @@ function get_resid!(resid,x,op,b)
     mul!(resid,op,x)
     resid .= b .- resid
 end
-   
+

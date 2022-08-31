@@ -33,6 +33,7 @@ end
             nyu,
             mask = trues(nxu,nyu),
             u_isfixed = falses(nxu,nyu),
+            u = zeros(nxu,nyu),
             levels,
             dx,
             dy)

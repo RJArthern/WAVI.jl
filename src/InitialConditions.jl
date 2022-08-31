@@ -1,6 +1,8 @@
 """
 InitialConditions(; 
                     initial_thickness = fill!(Array{Float64}(undef,1,1),NaN),
+                    initial_u = fill!(Array{Float64}(undef,1,1),NaN)
+                    initial_v = fill!(Array{Float64}(undef,1,1),NaN)
                     initial_viscosity = fill!(Array{Float64}(undef,1,1),NaN),
                     initial_temperature = fill!(Array{Float64}(undef,1,1),NaN),
                     initial_damage = fill!(Array{Float64}(undef,1,1),NaN))

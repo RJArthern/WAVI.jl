@@ -90,14 +90,20 @@ viscosity=Array{Float64}(undef,nx,ny,nσ);
 read!(Downloads.download("https://github.com/alextbradley/WAVI_example_data/raw/main/WAIS/Inverse_3km_viscosity3D_clip_noNan.bin"),viscosity);
 viscosity.=ntoh.(viscosity);
 
+solver_params=SolverParams(maxiter_picard=5)
+
 initial_conditions = InitialConditions(initial_thickness = h,initial_viscosity = viscosity,initial_temperature = temp,initial_damage = damage);
+
+parallel_spec = SharedMemorySpec(ngridsx=4,ngridsy=5,niterations=5)
 
 # ## Ice Velocity
 # Now we're ready to make our model, which we can then use to determine the ice velocity. All physical and solver parameters take their default values
-model = Model(grid = grid, bed_elevation = bed,initial_conditions= initial_conditions);
+model = Model(grid = grid, bed_elevation = bed,initial_conditions= initial_conditions, parallel_spec = parallel_spec, solver_params=solver_params);
+
+saved_model=model;
 
 # We use the `update_state!` method to bring fields (including velocity) in line with the ice thickness:
-update_state!(model);
+update_state!(model)
 
 # Now we can visualize the ice velocity:
 plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, model.fields.gh.av_speed', 
