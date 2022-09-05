@@ -207,7 +207,9 @@ function update_av_viscosity!(model::AbstractModel)
     for k=1:g3d.nσs
        for j = 1:g3d.nys
           for i = 1:g3d.nxs
+             if gh.mask[i,j]
                 gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k]
+             end
           end
        end
     end
@@ -227,8 +229,10 @@ function update_quadrature_falpha!(model::AbstractModel)
     for k=1:g3d.nσs
        for j = 1:g3d.nys
           for i = 1:g3d.nxs
+              if gh.mask[i,j]
                 gh.quad_f1[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*g3d.ζ[k]/g3d.η[i,j,k]
                 gh.quad_f2[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*(g3d.ζ[k])^2/g3d.η[i,j,k]
+              end
           end
        end
     end
