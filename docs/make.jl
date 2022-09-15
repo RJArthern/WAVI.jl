@@ -26,10 +26,10 @@ examples = [
     #variable_slipperiness.jl
 ]
 
-for example in examples
-    example_filepath = joinpath(EXAMPLES_DIR, example)
-    Literate.markdown(example_filepath, OUT_DIR; flavor = Literate.DocumenterFlavor())
-end
+#for example in examples
+#    example_filepath = joinpath(EXAMPLES_DIR, example)
+#    Literate.markdown(example_filepath, OUT_DIR; flavor = Literate.DocumenterFlavor())
+#end
 
 
 #####
@@ -109,4 +109,11 @@ makedocs(bib,
  checkdocs = :none # Should fix our docstring so we can use checkdocs=:exports with strict=true.
 )
 #makedocs(sitename="My Documentation")
+
+deploydocs(;
+    repo="github.com/RJArthern/WAVI.jl",
+    devbranch="AlexDev",
+    versions = nothing
+)
+
 
