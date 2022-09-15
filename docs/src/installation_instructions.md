@@ -3,8 +3,8 @@
 You can install the latest version of WAVI using the built-in package manager (accessed by pressing `]` in the
 Julia command prompt) to add the package and instantiate/build all dependencies
 
-```julia
-julia>]
+#```julia
+#julia>]
 (v1.6) pkg> add https://github.com/RJArthern/WAVI.jl
 (v1.6) pkg> instantiate
 ```

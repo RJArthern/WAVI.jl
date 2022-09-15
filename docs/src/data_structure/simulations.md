@@ -3,8 +3,8 @@ The `Simulation` object is at the heart of WAVI.jl. (An instance of) a `Simulati
 ```julia
 simulation = Simulation(model = model, output_params = output_params, timestepping_params = timestepping_params)
 
- We perform simulations with the `run_simulation!` method:
- ```julia 
- run_simulation!(simulation)
- ```
+# We perform simulations with the `run_simulation!` method:
+# ```julia 
+# run_simulation!(simulation)
+# ```
  This will perform the number of timesteps specified in the `timestepping_params` and (if appropriate) output the solution at time points specified in the `output_parameters`.
