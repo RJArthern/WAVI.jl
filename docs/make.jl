@@ -117,7 +117,7 @@ makedocs(bib,
 
 deploydocs(;
     repo="github.com/RJArthern/WAVI.jl",
-    devbranch="main",
+    devbranch="build-docs",
     versions = nothing
 )
 
