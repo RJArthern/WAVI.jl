@@ -28,7 +28,7 @@ Physically, ice sheets do not stand alone, but are forced by other parts of the 
 WAVI.jl is designed to be usable by anyone interested in ice sheet modelling, from students with no programming experience to experienced researchers in the field and everyone in between. To facilitate detailed research, including simulations at high spatial and temporal resolution, `WAVI.jl` employs a number of tools to improve computational speed, including multithreading capabilities, an adaptive numerical grid and a wavelet-based preconditioner (to which the name WAVI.jl refers (see @Arthern2017 for details). To facilitate accessibility, `WAVI.jl` includes a simple, user friendly API, and is aided by Julia's convenient syntax. In addition, the Github repository in which the code is stored includes a number of well-documented examples, which demonstrate the software's capabilities in a wide variety of situations.
 
 
-![Caption for example figure.\label{fig:example}](schematic_lores.png)
+![Schematic diagram of a marine ice sheet-shelf system, whose flow may be simulated using WAVI.jl. Labels and text indicate features of the software.\label{fig:schematic}](schematic_lores.png){ width=95% }
 
 WAVI.jl is the successor to a similar code, written in the proprietary programming language MATLAB, but not publicly released. This code has been used extensively as research software [e.g. [@Arthern2017]], as well as having participated in the most recent ice sheet model intercomparison exercise [@Cornford2020], which acts as a benchmark for ice-flow models. WAVI.jl, has also been verified independently against these benchmark experiments.
 
