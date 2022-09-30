@@ -8,10 +8,10 @@ Manifest.toml
 *.nc
 #*.md
 *.bin
-*.png
+#*.png
 
 #useful things to ignore when testing driver scripts
-driver_updated.jl 
+driver_updated.jl
 *.box
 *.data
 **/Attribution_driver
