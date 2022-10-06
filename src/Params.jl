@@ -22,6 +22,9 @@ glen_a_activation_energy :: T
        minimum_thickness :: T 
            evolveShelves :: Bool
                 smallHAF :: T
+       tidal_lengthscale :: T 
+           tidal_melting :: Bool
+              tidal_drag :: Bool
 end
 
 
