@@ -80,7 +80,10 @@ function Params(; g = 9.81,
                   sea_level_wrt_geoid  = 0.0,
                   minimum_thickness = 50.0,
                   evolveShelves = true,
-                  smallHAF = 1.0)
+                  smallHAF = 1.0,
+                  tidal_lengthscale=1e4,
+                  tidal_melting = false,
+                  tidal_drag = false)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
@@ -108,6 +111,9 @@ function Params(; g = 9.81,
                   sea_level_wrt_geoid,
                   minimum_thickness,
                   evolveShelves,
-                  smallHAF
+                  smallHAF,
+                  tidal_lengthscale,
+                  tidal_melting,
+                  tidal_drag
                   )
 end

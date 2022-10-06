@@ -11,7 +11,7 @@ function update_state!(model, clock)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
     update_basal_melt!(model, clock)
-    update_weertman_c!(model)
+    update_weertman_c!(model,clock)
     update_dsdh!(model)
     update_model_velocities!(model)
     update_velocities_on_h_grid!(model)
@@ -32,7 +32,7 @@ function update_state!(model)
     update_grounded_fraction_on_huv_grids!(model)
     update_accumulation_rate!(model)
     update_basal_melt!(model, WAVI.Clock())
-    update_weertman_c!(model)
+    update_weertman_c!(model, WAVI.Clock())
     update_dsdh!(model)
     update_model_velocities!(model)
     update_velocities_on_h_grid!(model)
@@ -126,13 +126,54 @@ end
 
 Update coefficient used in the sliding law to account for migration of grounding line.
 """
-function update_weertman_c!(model::AbstractModel)
+function update_weertman_c!(model::AbstractModel,clock)
     @unpack gh=model.fields
-    @unpack params=model
+    @unpack params,grid=model
+    if ~(params.tidal_drag) #standard drag formulation
     gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
+    else
+        #get the tidal amplitude at the current time
+        A = get_normalized_tidal_amplitude(clock.time)
+        L = A*params.tidal_lengthscale
+        dgl = get_grounding_line_distance(gh.grounded_fraction,grid.xxh,grid.yyh)
+        tidal_modification = (1 .- exp.(-(dgl).^2 / 2 / L.^2));
+        gh.weertman_c .= params.weertman_c .* tidal_modification
+    end
+    
     return model
 end
 
+"""
+    get_normalized_tidal_amplitude(clock)
+
+Return the normalized tidal amplitude associated with the current time
+"""
+function get_normalized_tidal_amplitude(t)
+    tt = t/(365.25 * 24) #convert to hours
+    amp = cos(2*pi*tt / (14*24))*cos(2*pi*tt / 6.25);
+    return 1/2*(1 + amp) #between 0 and 1
+end
+
+"""
+    get_grounding_line_distance(grounded_fraction,xx,yy)
+
+Return an array of distance to the nearest fully floating point (i.e. zero for the shelf)
+"""
+
+function  get_grounding_line_distance(grounded_fraction,xx,yy)
+    (nx,ny) = size(grounded_fraction)
+    idx = (grounded_fraction .== 0)
+    M = zeros(nx,ny)
+    for ix = 1:nx
+        for iy = 1:ny
+                dp = sqrt.((xx .- xx[ix,iy]).^2 .+ (yy .- yy[ix,iy]).^2);
+                M[ix,iy] = minimum(dp[idx])
+
+        end
+    end
+    return M
+
+end
 """
     update_dsdh!(model::AbstractModel)
 
