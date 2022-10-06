@@ -31,8 +31,8 @@ maxiter_picard = 1
 solver_params = SolverParams(maxiter_picard = maxiter_picard)
 #
 ##Physical parameters
-tidal_lengthscale=5*1e3
-tidal_melting = false
+tidal_lengthscale=4*1e3
+tidal_melting = true
 tidal_drag = true
 default_thickness = 680.0 #set the initial condition this way
 accumulation_rate = 0.3
@@ -43,14 +43,16 @@ params = Params(default_thickness = default_thickness,
                tidal_melting = tidal_melting)
 
 #make the model
+melt_rate = UniformMeltRate(m = 30)
 model = Model(grid = grid,
                     bed_elevation = bed, 
                     params = params, 
-                    solver_params = solver_params)
+                    solver_params = solver_params,
+                    melt_rate = melt_rate)
 
                 
-dt = 0.5;
-end_time = 0.5;
+dt = 1/365;
+end_time = 28/365;
 timestepping_params = TimesteppingParams(dt = dt, 
                                          end_time = end_time)
 
@@ -59,6 +61,7 @@ simulation = Simulation(model = model,
                 
 run_simulation!(simulation)
 
-#plot the basal friction field
-heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.weertman_c')
+#plot the basal friction or melt field
+#heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.weertman_c')
+heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.basal_melt')
 contour!(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:], model.fields.gh.grounded_fraction', levels=[0.5,0.5], linecolor = :blue)

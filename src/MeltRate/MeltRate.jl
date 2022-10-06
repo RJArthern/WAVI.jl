@@ -44,8 +44,8 @@ Update the melt rate when for the UniformMeltRate type
 
 """
 function update_melt_rate!(melt_rate::UniformMeltRate, fields, grid, clock) 
-    @unpack basal_melt = fields.gh
-    basal_melt .= melt_rate.m
+    @unpack basal_melt,grounded_fraction = fields.gh
+    basal_melt .= melt_rate.m .* (1 .- grounded_fraction)
     return nothing
 end
 

@@ -117,7 +117,35 @@ end
 Update the basal melt rate.
 """
 function update_basal_melt!(model::AbstractModel, clock)
+    @unpack basal_melt,grounded_fraction=model.fields.gh
+    @unpack params,grid=model
     update_melt_rate!(model.melt_rate, model.fields, model.grid, clock)
+    #modify for tidal signal
+    if params.tidal_melting
+    (nx,ny) = size(model.grid.xxh)
+    for ix = 1:nx
+        for iy = 1:ny
+            if (model.fields.gh.grounded_fraction[ix,iy] > 0)
+                #get the tidal amplitude at the current time
+                A = get_normalized_tidal_amplitude(clock.time)
+                L = A*params.tidal_lengthscale
+                if (ix,iy) == (1,1)
+                    show(A)
+                    show("   ")
+                end
+
+                # find the distance to the closest fully floating point and the melt there
+                dp = sqrt.((grid.xxh .- grid.xxh[ix,iy]).^2 .+ (grid.yyh .- grid.yyh[ix,iy]).^2);
+                dp[grounded_fraction .> 0] .= 1e16; #set grounded ice and partially floatign to large, so we never pick this up
+                dgl = findmin(dp)[1]
+                mgl = basal_melt[findmin(dp)[2]]
+                # set the basal melt rate
+                basal_melt[ix,iy] = mgl * exp.(-(dgl).^2 / 2 / L.^2)
+            end
+
+        end
+    end
+    end
     return model
 end
 
@@ -149,7 +177,7 @@ end
 Return the normalized tidal amplitude associated with the current time
 """
 function get_normalized_tidal_amplitude(t)
-    tt = t/(365.25 * 24) #convert to hours
+    tt = t*365.25 * 24 #convert to hours
     amp = cos(2*pi*tt / (14*24))*cos(2*pi*tt / 6.25);
     return 1/2*(1 + amp) #between 0 and 1
 end
