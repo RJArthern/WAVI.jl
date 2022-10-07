@@ -10,7 +10,7 @@ function write_output(simulation)
 
     #put the grid co-ordinates and time into output.
     #Round time in output to some decimal places to make it prettier (machine precision can make this look nasty!)
-    if ~haskey(output_dict, :t); output_dict["t"] = round(clock.time, digits = 3); end
+    if ~haskey(output_dict, :t); output_dict["t"] = round(clock.time, digits = 6); end
     if ~haskey(output_dict, :x); output_dict["x"] = model.grid.xxh; end
     if ~haskey(output_dict, :y); output_dict["y"] = model.grid.yyh; end
 
