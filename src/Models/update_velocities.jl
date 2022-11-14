@@ -113,9 +113,9 @@ end
 """
 function get_rhs(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
-    @unpack params=model
+    @unpack params, solver_params = model
     onesvec=ones(T,gh.nxh*gh.nyh)
-    surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
+    surf_elev_adjusted = gh.crop*(gh.s[:] .+ solver_params.super_implicitness.*params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     
     f1=[
         (params.density_ice*params.g*gu.h[gu.mask_inner]).*(gu.samp_inner*(-gu.∂xᵀ*surf_elev_adjusted))
@@ -327,11 +327,11 @@ Precompute various diagonal matrices used in defining the momentum operator.
 """
 function update_rheological_operators!(model::AbstractModel)
     @unpack gh,gu,gv=model.fields
-    @unpack params=model
+    @unpack params, solver_params = model
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
-    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * params.dt * gh.dsdh[:])*gh.crop
+    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * solver_params.super_implictness .* params.dt * gh.dsdh[:])*gh.crop
     return model
 end
 
