@@ -45,3 +45,6 @@ if group == "version_update" || group == "all"
     include(joinpath("version_update_test_verification","test_version_updates.jl"))
 end
 
+if group == "shared_memory_parallelism" || group == "all"
+    include(joinpath("domain_decomposition_tests","test_domains_shared_memory.jl"))
+end

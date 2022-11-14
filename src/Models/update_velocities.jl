@@ -1,3 +1,7 @@
+
+#Traits for specifying how to perform parallel operations
+struct BasicParallelSpec <: AbstractParallelSpec end
+
 """
 update_velocities!(model::AbstractModel)
 
@@ -7,6 +11,8 @@ Solve momentum equation to update the velocities, plus Picard iteration for non-
 function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 @unpack params,solver_params=model
 @unpack gu,gv,wu,wv = model.fields
+
+update_preconditioner!(model)
 
 converged::Bool = false
 i_picard::Int64 = 0
@@ -64,7 +70,7 @@ end
 
 precondition!(model::AbstractModel) = precondition!(model,get_parallel_spec(model))
 
-function precondition!(model,::BasicParallelSpec)
+function precondition!(model::AbstractModel,::BasicParallelSpec)
     
     x=get_start_guess(model)
     

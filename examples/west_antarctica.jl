@@ -15,8 +15,9 @@
 
 #using Pkg
 #Pkg.add("https://github.com/RJArthern/WAVI.jl"), Pkg.add(Plots); Pkg.add("Downloads")
-using WAVI, Plots, Downloads
+using WAVI, Plots, Downloads, LinearAlgebra
 
+BLAS.set_num_threads(1)
 
 # ## Reading in data
 # First, let's define our grid sizes and origin. We have a 268 x 315 with, with 3km resolution.
@@ -90,27 +91,52 @@ viscosity=Array{Float64}(undef,nx,ny,nσ);
 read!(Downloads.download("https://github.com/alextbradley/WAVI_example_data/raw/main/WAIS/Inverse_3km_viscosity3D_clip_noNan.bin"),viscosity);
 viscosity.=ntoh.(viscosity);
 
-solver_params=SolverParams(maxiter_picard=5)
+solver_params=SolverParams(maxiter_picard=20)
 
 initial_conditions = InitialConditions(initial_thickness = h,initial_viscosity = viscosity,initial_temperature = temp,initial_damage = damage);
 
-parallel_spec = SharedMemorySpec(ngridsx=4,ngridsy=5,niterations=5)
+parallel_spec = BasicParallelSpec()
 
 # ## Ice Velocity
 # Now we're ready to make our model, which we can then use to determine the ice velocity. All physical and solver parameters take their default values
-model = Model(grid = grid, bed_elevation = bed,initial_conditions= initial_conditions, parallel_spec = parallel_spec, solver_params=solver_params);
-
-saved_model=model;
+serial_model = Model(grid = grid, bed_elevation = bed,initial_conditions= initial_conditions, parallel_spec = parallel_spec, solver_params=solver_params);
 
 # We use the `update_state!` method to bring fields (including velocity) in line with the ice thickness:
-update_state!(model)
+update_state!(serial_model)
 
 # Now we can visualize the ice velocity:
-plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, model.fields.gh.av_speed', 
+plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(serial_model.fields.gh.av_speed'), 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
                     colorbar_title = "ice speed (m/yr)",
                     title = "West Antarctica ice speed",
+             #       clims=(-0.02,0.02),
+             #       xlims=(-1400,-1300),
+             #       ylims=(-500,-400),
                     framestyle = "box")
 
+
+# Now try the same velocity solve with a shared memory parallel implementation                     
+saved_serial_model=deepcopy(serial_model);
+
+parallel_model = deepcopy(serial_model)
+parallel_model = @set parallel_model.solver_params = SolverParams(maxiter_picard=1)
+parallel_model = @set parallel_model.parallel_spec = SharedMemorySpec(ngridsx=4,ngridsy=5,overlap=2,niterations=1)
+
+nSchwarzIterations=20
+for iSchwarzIteration = 1:nSchwarzIterations
+   update_state!(parallel_model)
+end
+
+# Now we can visualize the ice velocity:
+plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(parallel_model.fields.gh.av_speed'), 
+                    xlabel = "x (km)", 
+                    ylabel = "y (km)",
+                    colorbar_title = "ice speed (m/yr)",
+                    title = "West Antarctica ice speed",
+             #       clims=(-0.02,0.02),
+             #       xlims=(-1400,-1300),
+             #       ylims=(-500,-400),
+                    framestyle = "box")
+        
 # Ice velocities reach a maximum of approx 5km/yr on ice shelves, but are much smaller inland.

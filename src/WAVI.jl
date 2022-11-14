@@ -14,7 +14,7 @@ import Setfield: @set
 export
     #Structures
     Model, Params, TimesteppingParams, Grid, SolverParams, InitialConditions, OutputParams, 
-    Simulation, SharedMemorySpec,
+    Simulation, BasicParallelSpec, SharedMemorySpec,
 
     #Simulation controls
     update_state!, timestep!, run_simulation!,
@@ -43,13 +43,8 @@ const MapOrMatrix{T} = Union{LinearMap{T}, AbstractMatrix{T}}
 
 #Concrete types
 
-#Traits for specifying how to perform parallel operations
-struct BasicParallelSpec <: AbstractParallelSpec end
-@with_kw struct SharedMemorySpec{N} <: AbstractParallelSpec
-     ngridsx::N = 1 
-     ngridsy::N = 1
-     niterations::N = 0
-end
+
+
 
 ##################################################################################
 #include all of the code
