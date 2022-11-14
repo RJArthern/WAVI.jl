@@ -331,7 +331,7 @@ function update_rheological_operators!(model::AbstractModel)
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
-    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * solver_params.super_implictness .* params.dt * gh.dsdh[:])*gh.crop
+    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * solver_params.super_implicitness .* params.dt * gh.dsdh[:])*gh.crop
     return model
 end
 
