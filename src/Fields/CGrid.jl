@@ -8,6 +8,7 @@ struct CGrid{T <: Real, N <: Integer}
     spread :: SparseMatrixCSC{T,N}
       cent :: KronType{T,N}
      centᵀ :: KronType{T,N}
+  dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}}    # Rheological operator (-h × ηav)
 end
 
 function CGrid(;
@@ -25,6 +26,7 @@ function CGrid(;
     spread = sparse(samp')
     cent = sparse(c(nyc)') ⊗ sparse(c(nxc)')
     centᵀ = c(nyc) ⊗ c(nxc)
+    dneghηav = Ref(crop*Diagonal(zeros(nxc*nyc))*crop)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
@@ -56,6 +58,7 @@ return CGrid(
             samp, 
             spread,
             cent,
-            centᵀ)
+            centᵀ,
+            dneghηav)
 end
     

@@ -32,8 +32,6 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     dvdx_c :: Vector{T} = zeros(nxnyc);                             @assert length(dvdx_c) == nxnyc
     r_xy_strain_rate_sum_c :: Vector{T} = zeros(nxnyc);             @assert length(r_xy_strain_rate_sum_c) == nxnyc
     r_xy_strain_rate_sum_crop_c :: Vector{T} = zeros(nxnyc);        @assert length(r_xy_strain_rate_sum_crop_c) == nxnyc
-    r_xy_strain_rate_sum :: Vector{T} = zeros(nxnyh);               @assert length(r_xy_strain_rate_sum) == nxnyh
-    r_xy :: Vector{T} = zeros(nxnyh);                               @assert length(r_xy) == nxnyh
     r_xy_c :: Vector{T} = zeros(nxnyc);                             @assert length(r_xy_c) == nxnyc
     r_xy_crop_c :: Vector{T} = zeros(nxnyc);                        @assert length(r_xy_crop_c) == nxnyc
     d_rxx_dx :: Vector{T} = zeros(nxnyu);                           @assert length(d_rxx_dx) == nxnyu
@@ -96,10 +94,8 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @!  dvdx_c = gv.∂x*vspread
         @.  r_xy_strain_rate_sum_c = dudy_c + dvdx_c
         @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
-        @!  r_xy_strain_rate_sum = gc.cent*r_xy_strain_rate_sum_crop_c
-        @!  r_xy = gh.dneghηav[]*r_xy_strain_rate_sum
-        @.  r_xy = -r_xy
-        @!  r_xy_c = gc.centᵀ*r_xy
+        @!  r_xy_c = gc.dneghηav[]*r_xy_strain_rate_sum_crop_c
+        @.  r_xy_c = -r_xy_c
         @!  r_xy_crop_c = gc.crop*r_xy_c
 
             #Gradients of resisitve stresses
