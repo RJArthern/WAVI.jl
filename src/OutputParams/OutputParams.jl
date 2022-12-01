@@ -38,7 +38,7 @@ function OutputParams(;
     Output_vel = false,
     Output_float = false,
     Output_dhdt = false,
-    Output_Hb = false)
+    Output_Hb = false,
     zip_format = "none",
     output_start = false)
 
