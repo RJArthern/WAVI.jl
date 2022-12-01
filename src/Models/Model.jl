@@ -1,14 +1,32 @@
-struct Model{T <: Real, N <: Integer,A,W} <: AbstractModel{T,N}
+struct Model{T <: Real, N <: Integer,A,W,G, M <:AbstractMeltRate} <: AbstractModel{T,N,M}
     grid::Grid{T,N}
-    params::Params{T,A,W}
+    params::Params{T,A,W,G}
     solver_params::SolverParams{T,N}
     initial_conditions::InitialConditions{T}
     fields::Fields{T,N}
-    extra_physics::Dict{String, Any}
+    melt_rate::M
 end
 
 """
- Model constructor
+    Model(;
+        grid = nothing, 
+        bed_elevation = nothing,
+        params = Params(),
+        solver_params = SolverParams(),
+        initial_conditions = InitialConditions(),
+        melt_rate = UniformMeltRate())
+
+Construct a WAVI.jl model object.
+
+Keyword arguments
+=================
+
+    - `grid`: (required) an instance of a `Grid` object, which defines the computational grid
+    - `bed_elevation`: (required) an array of size `grid.nx` x `grid.ny` which defines the bed elevation
+    - `params`: a `Params` object that defines physical parameters 
+    - `solver_params`: a `SolverParams` object that defines parameters relating to the numerical scheme
+    - `initial_conditions`: an `InitialConditions` object that (optionally) defines the initial ice thickness, temperature, viscosity, and damage
+    - `melt_rate`: a melt rate model, responsible for controlling/setting the basal melt rate
 """
 function Model(;
     grid = nothing, 
@@ -16,7 +34,7 @@ function Model(;
     params = Params(),
     solver_params = SolverParams(),
     initial_conditions = InitialConditions(),
-    extra_physics = Dict{String, Any}())
+    melt_rate = UniformMeltRate())
 
     #check that a grid and bed has been inputted
     ~(grid === nothing) || throw(ArgumentError("You must specify an input grid"))
@@ -48,14 +66,24 @@ function Model(;
     if isa(params.accumulation_rate, Number) 
         params = @set params.accumulation_rate = params.accumulation_rate*ones(grid.nx,grid.ny)
     end
-    #check size compatibility of resulting weertman C
-    (size(params.accumulation_rate)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input weertman c must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
+    #check size compatibility of resulting accumulation rate
+    (size(params.accumulation_rate)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input accumulation must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
+
+    #if accumulation is passed as a scalar, replace accumulation parameters with matrix of this value
+    if isa(params.glen_a_ref, Number) 
+        params = @set params.glen_a_ref = params.glen_a_ref*ones(grid.nx,grid.ny)
+    end
+    #check size compatibility of resulting glen a ref
+    (size(params.glen_a_ref)==(grid.nx,grid.ny)) || throw(DimensionMismatch("Size of input glen_a_ref must match grid size (i.e. $(grid.nx) x $(grid.ny))"))
+
+
+
 
     #Setup the fields 
     fields = setup_fields(grid, initial_conditions, solver_params, params, bed_array)
     
     #Use type constructor to build initial state with no extra physics
-    model=Model(grid,params,solver_params,initial_conditions,fields,extra_physics)
+    model=Model(grid,params,solver_params,initial_conditions,fields,melt_rate)
 
     return model
 end

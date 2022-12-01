@@ -7,44 +7,49 @@ Check whether initial conditions have been specified. Default them to standard v
 function check_initial_conditions(initial_conditions, params, grid)
 if all(isnan.(initial_conditions.initial_thickness))
     default_thickness = params.default_thickness
-    @info "Did not find a specified initial thickness, reverting to default value specified in params ($default_thickness m everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    #@info "Did not find a specified initial thickness, reverting to default value specified in params ($default_thickness m everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
     initial_conditions = @set initial_conditions.initial_thickness =  default_thickness*ones(grid.nx, grid.ny)
 end
 
 if all(isnan.(initial_conditions.initial_viscosity))
     default_viscosity = params.default_viscosity
-    @info "Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity Pa s everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    #@info "Did not find a specified initial viscosity, reverting to default value specified in params ($default_viscosity Pa s everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
     initial_conditions = @set initial_conditions.initial_viscosity =  default_viscosity*ones(grid.nx, grid.ny, grid.nσ)
 end
 
 if all(isnan.(initial_conditions.initial_temperature))
     default_temperature = params.default_temperature
-    @info "Did not find a specified initial temperature, reverting to default value specified in params ($default_temperature K everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    #@info "Did not find a specified initial temperature, reverting to default value specified in params ($default_temperature K everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
     initial_conditions = @set initial_conditions.initial_temperature =  default_temperature*ones(grid.nx, grid.ny, grid.nσ)
 end
 
 if all(isnan.(initial_conditions.initial_damage))
     default_damage = params.default_damage
-    @info "Did not find a specified initial damage field, reverting to default value specified in params ($default_damage everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
+    #@info "Did not find a specified initial damage field, reverting to default value specified in params ($default_damage everywhere)...\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
     initial_conditions = @set initial_conditions.initial_damage =  default_damage*ones(grid.nx, grid.ny, grid.nσ)
 end
-    
-if all(isnan.(initial_conditions.initial_u))
-    @info "Did not find a specified initial U vel guess, reverting to zero\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
-    initial_conditions = @set initial_conditions.initial_u =  zeros(grid.nx + 1, grid.ny)
+
+if all(isnan.(initial_conditions.initial_u_veloc))
+    default_damage = params.default_damage
+    #@info "Did not find a specified initial u velocit field, reverting to zero velocity everywhere
+    initial_conditions = @set initial_conditions.initial_u_veloc =  zeros(grid.nx +1, grid.ny)
 end
-    
-if all(isnan.(initial_conditions.initial_v))
-    @info "Did not find a specified initial V vel guess, reverting to zero\n...If you have set niter0 > 0 without invoking the update flag, you can ignore this message"
-    initial_conditions = @set initial_conditions.initial_v =  zeros(grid.nx, grid.ny + 1)
+
+if all(isnan.(initial_conditions.initial_v_veloc))
+    default_damage = params.default_damage
+    #@info "Did not find a specified initial u velocit field, reverting to zero velocity everywhere
+    initial_conditions = @set initial_conditions.initial_v_veloc =  zeros(grid.nx, grid.ny+1)
 end
+
 #check sizes are compatible
 (size(initial_conditions.initial_thickness) == (grid.nx, grid.ny)) || throw(DimensionMismatch("Initial thickness field is not compatible with grid size. Input thickess field is has size $(size(initial_conditions.initial_thickness)), which must match horizontal grid size ($(grid.nx) x $(grid.ny))"))
-(size(initial_conditions.initial_temperature) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial temperature field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
-(size(initial_conditions.initial_viscosity) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial viscosity field is not compatible with grid size. Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
-(size(initial_conditions.initial_damage) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial damage field is not compatible with grid size.Input temperature field is has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
-(size(initial_conditions.initial_u) == (grid.nx + 1, grid.ny)) || throw(DimensionMismatch("Initial U vel field is not compatible with grid size. Input U vel field has size $(size(initial_conditions.initial_u)), which must match horizontal grid size ($(grid.nx + 1) x $(grid.ny))"))
-(size(initial_conditions.initial_v) == (grid.nx, grid.ny + 1)) || throw(DimensionMismatch("Initial V vel field is not compatible with grid size. Input V vel field has size $(size(initial_conditions.initial_v)), which must match horizontal grid size ($(grid.nx) x $(grid.ny + 1))"))
+(size(initial_conditions.initial_temperature) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial temperature field is not compatible with grid size. Input temperature field has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
+(size(initial_conditions.initial_viscosity) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial viscosity field is not compatible with grid size. Input temperature field has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
+(size(initial_conditions.initial_damage) == (grid.nx, grid.ny, grid.nσ)) || throw(DimensionMismatch("Initial damage field is not compatible with grid size. Input damage field has size $(size(initial_conditions.initial_temperature)), which must match 3D grid size ($(grid.nx), $(grid.ny), $(grid.nσ))"))
+(size(initial_conditions.initial_u_veloc) == (grid.nx+1, grid.ny)) || throw(DimensionMismatch("Initial u-velocity field is not compatible with grid size. Input u-velocity field has size $(size(initial_conditions.initial_u_veloc)), which must match 2D grid size ($(grid.nx), $(grid.ny))"))
+(size(initial_conditions.initial_v_veloc) == (grid.nx, grid.ny+1)) || throw(DimensionMismatch("Initial v-velocity field is not compatible with grid size. Input v-velocity field has size $(size(initial_conditions.initial_v_veloc)), which must match 2D grid size ($(grid.nx), $(grid.ny))"))
+
+
 return initial_conditions
 end
 

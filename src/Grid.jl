@@ -61,7 +61,7 @@ Keyword arguments
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
 """
 
-#grid constructor Hello Alex
+#grid constructor
 function Grid(; 
     nx = 80,
     ny = 10,

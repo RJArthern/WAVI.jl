@@ -189,7 +189,7 @@ function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
 
         #Don't use any quadrant from an invalid cell of the h-grid.
         area_fraction_quadrant[.!mask].=0.0;
-    
+
         #Add areas for each quadrant together.
         #N.B. distance unit for x and y is half a grid cell.
         #Summing over quadrants gives the fraction of each grid cell above zero.
@@ -274,6 +274,14 @@ Compute height above floatation.
 
 """
 height_above_floatation(h,b,params) = h - (params.density_ocean/params.density_ice)*(params.sea_level_wrt_geoid - b)
+
+
+"""
+    volume_above_floatation(h,b,params)
+
+Compute the volume above floatation: integrated height above floatation for cells with positive height above floatation
+"""
+volume_above_floatation(h,b,params,grid) = sum(sum(height_above_floatation.(h,b,params)[height_above_floatation.(h,b, params) .> 0])) .* grid.dx .* grid.dy
 
 """
     glen_b(temperature,damage,params)

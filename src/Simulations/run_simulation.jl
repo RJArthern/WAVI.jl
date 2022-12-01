@@ -4,8 +4,12 @@
 Perform one timestep of the simulation
 """
 function timestep!(simulation)
-    @unpack model,timestepping_params = simulation
-    update_state!(model)
+    @unpack model,timestepping_params, output_params, clock = simulation
+    update_state!(model, clock)
+    #write solution if at the first timestep (hack for https://github.com/RJArthern/WAVI.jl/issues/46 until synchronicity is fixed)
+    if (output_params.output_start) && (simulation.clock.n_iter == 0)
+        write_output(simulation)
+    end
     if timestepping_params.step_thickness
         update_thickness!(simulation)
     end
@@ -15,25 +19,36 @@ end
 """
 update_thickness!(model::AbstractModel)
 
-Update thickness using rate of change of thickness and apply minimum thickness constraint.
+Update thickness using rate of change of thickness and apply minimum thickness constraint. Includes an option for not evolving shelf thickness.
 """
 function update_thickness!(simulation)
 @unpack model,timestepping_params=simulation
 onesvec=ones(model.grid.nx*model.grid.ny)
+hUpdate=zeros(model.grid.nx,model.grid.ny)
+aground=zeros(model.grid.nx,model.grid.ny)
     
 if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
  
  thick_nochild=model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]  
 
 end        
-    
-model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
+        
+hUpdate[model.fields.gh.mask]=max.(model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],timestepping_params.dt*model.fields.gh.dhdt[model.fields.gh.mask])
+#Specify whether to evolve the shelves:
+if !model.params.evolveShelves
+    hUpdate[model.fields.gh.mask]=max.(model.params.smallHAF.-(model.params.density_ocean./model.params.density_ice).*model.fields.gh.b[model.fields.gh.mask].-model.fields.gh.h[model.fields.gh.mask],hUpdate[model.fields.gh.mask])
+    aground=(model.fields.gh.haf.>=0)
+    wc=[1 1 1; 1 1 1; 1 1 1]
+    w=centered(wc)
+    nearfloat_mask=imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
+    nearfloat_mask=iszero.(iszero.(nearfloat_mask))
+    hUpdate[nearfloat_mask].=0
+  end
+model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ hUpdate[model.fields.gh.mask]
 
 if model.grid.Cxl > 1 || model.grid.Cxu <  model.grid.nx || model.grid.Cyl > 1 || model.grid.Cyu < model.grid.ny
 model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl:model.grid.Cyu]=thick_nochild[:,:]
 end
-
-        
 return simulation
 end
 
@@ -65,40 +80,7 @@ function run_simulation!(simulation)
     end
     for i = (simulation.clock.n_iter+1):timestepping_params.n_iter_total
         timestep!(simulation)
-        #if output_params.dump_vel
-        # if output_params.PC_west
-        #  if model.grid.Cxl > 1
-        #   h_out_line_w = h_out_line_w + model.fields.gh.h[model.grid.Cxl-1,model.grid.Cyl:model.grid.Cyu]
-        #    if (i == timestepping_params.n_iter_total)
-        #     h_out_line_w= h_out_line_w ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-        #    end
-        #  end
-        # end
-        # if output_params.PC_east
-        #  if model.grid.Cxu < model.grid.nx
-        #  h_out_line_e = h_out_line_e + model.fields.gh.h[model.grid.Cxu + 1,model.grid.Cyl:model.grid.Cyu]
-        #   if (i == timestepping_params.n_iter_total)
-        #    h_out_line_e= h_out_line_e ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-        #   end
-        #  end
-        # end
-        # if output_params.PC_south
-        #  if model.grid.Cyl > 1
-        #  h_out_line_s = h_out_line_s + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyl-1]
-        #   if (i == timestepping_params.n_iter_total)
-        #   h_out_line_s= h_out_line_s ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-        #   end
-        #  end
-        # end
-        # if output_params.PC_north
-        #  if model.grid.Cyu < model.grid.ny
-        #  h_out_line_n = h_out_line_n + model.fields.gh.h[model.grid.Cxl:model.grid.Cxu,model.grid.Cyu+1]
-        #   if (i == timestepping_params.n_iter_total)
-        #   h_out_line_n= h_out_line_n ./ (timestepping_params.n_iter_total- timestepping_params.niter0)
-        #   end
-        #  end
-        # end
-        #end
+        
         #check if we have hit a temporary checkpoint
         if mod(i,timestepping_params.n_iter_chkpt) == 0
             #output a temporary checkpoint
@@ -120,9 +102,6 @@ function run_simulation!(simulation)
         #check if we have hit an output timestep
         if mod(i,simulation.output_params.n_iter_out) == 0
             write_output(simulation)
-            println(simulation.clock.n_iter)
-            println("outputting at timestep number $(simulation.clock.n_iter)")
-
         end
 
         #check the dump velocity flag at the final timestep

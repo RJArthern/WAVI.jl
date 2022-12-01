@@ -16,7 +16,7 @@ struct VGrid{T <: Real, N <: Int}
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
                  βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
              dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
-                    v :: Array{T,2}
+                    v :: Array{T,2}                            # Ice velocity in the y-direction
 end
 
     
@@ -42,6 +42,7 @@ Keyword arguments
     - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
+    - v:  (required) initial guess of v in y direction
 """
 function VGrid(;
         nxv,
@@ -50,7 +51,7 @@ function VGrid(;
         levels,
         dx,
         dy,
-        v = zeros(nxv,nyv))
+        v)
 
     #check the sizes of inputs
     (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
@@ -71,7 +72,7 @@ function VGrid(;
     grounded_fraction = ones(nxv,nyv)
     βeff = zeros(nxv,nyv)
     dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
-   
+   # v = zeros(nxv,nyv)
 
     #size assertions
     @assert size(mask)==(nxv,nyv)
@@ -83,7 +84,7 @@ function VGrid(;
     @assert size(h)==(nxv,nyv)
     @assert size(grounded_fraction)==(nxv,nyv)
     @assert size(βeff)==(nxv,nyv)
-    @assert size(v)==(nxv,nyv)
+    #@assert size(v)==(nxv,nyv)
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
