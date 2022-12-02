@@ -12,12 +12,12 @@ struct OutputParams{T <: Real, R <: Real, O}
     PC_north::Bool     #toggle Parent child for northern boundary
     PC_west::Bool      #toggle Parent child for western boundary
     PC_south::Bool     #toggle Parent child for southern boundary
-    zip_format::String     #specify whether or not to zip the output, and the format
     dt_coup::T        #timestep of the ocean model, which is being coupled
     Output_vel::Bool      #toggle output Velocity for coupling
     Output_float::Bool     #toggle output grounded fraction field for coupling
     Output_dhdt::Bool     #toggle output dhdt field for coupling
     Output_Hb::Bool      #toggle output thickness at ocean/ice domain boundary for coupling
+    zip_format::String     #specify whether or not to zip the output, and the format
     output_start::Bool  #flag to specify whether to output the initial state or not 
 end
 
@@ -33,7 +33,6 @@ function OutputParams(;
     PC_north = false,
     PC_west = false,
     PC_south = false,
-    zip_format = "none",
     dt_coup = 1.0,
     Output_vel = false,
     Output_float = false,
@@ -68,7 +67,7 @@ function OutputParams(;
         zip_format = "none"
     end
 
-    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, PC_east, PC_north, PC_west, PC_south, zip_format, dt_coup, Output_vel, Output_float, Output_dhdt, Output_Hb, zip_format, output_start)
+    return OutputParams(outputs, output_freq, n_iter_out, output_format, prefix, output_path, dump_vel, PC_east, PC_north, PC_west, PC_south, dt_coup, Output_vel, Output_float, Output_dhdt, Output_Hb, zip_format, output_start)
 end
 
 include("output_writing.jl")
