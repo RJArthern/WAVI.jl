@@ -77,7 +77,7 @@ function Params(; g = 9.81,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
                   minimum_thickness = 50.0,
-                  step_haf = true)
+                  step_haf = true,
                   evolveShelves = true,
                   smallHAF = 1.0)
                       
