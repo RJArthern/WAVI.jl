@@ -5,3 +5,9 @@ Manifest.toml
 *.mat
 *.tif
 *.vscode
+
+#useful things to ignore when testing driver scripts
+driver_updated.jl 
+*.box
+*.data
+**/Attribution_driver
