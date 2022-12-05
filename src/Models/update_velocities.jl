@@ -41,6 +41,8 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     precondition!(x, p, b)
 
 end
+println("Converged: $(converged)")
+println("Residual: $(rel_resid)")   
 set_velocities!(model,x)
 
 return model
@@ -284,9 +286,10 @@ end
 Precompute various diagonal matrices used in defining the momentum operator.
 """
 function update_rheological_operators!(model::AbstractModel)
-    @unpack gh,gu,gv=model.fields
+    @unpack gh,gu,gv,gc=model.fields
     @unpack params=model
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
+    gc.dneghηav[] .= gc.crop*Diagonal(-gh.cent_xy*(gh.h[:].*gh.ηav[:]))*gc.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
     gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * params.dt * gh.dsdh[:])*gh.crop

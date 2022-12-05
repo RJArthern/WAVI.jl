@@ -6,6 +6,7 @@ struct HGrid{T <: Real, N  <: Integer}
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
+              cent_xy :: KronType{T,N}                         # Centering operator from H-grid to C-grid
                     b :: Array{T,2}                            # Bed elevation
                     h :: Array{T,2}                            # Ice thickness 
                     s :: Array{T,2}                            # Current surface elevation
@@ -77,6 +78,11 @@ function HGrid(;
     crop = Diagonal(float(mask[:]));
     samp = crop[mask[:],:]; 
     spread = sparse(samp');
+    n = count(mask)
+    crop = Diagonal(float(mask[:]))
+    samp = crop[mask[:],:] 
+    spread = sparse(samp')
+    cent_xy = c(nyh-1) ⊗ c(nxh-1)
     dneghηav = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
     dimplicit = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
      
@@ -111,6 +117,7 @@ function HGrid(;
     @assert crop == Diagonal(float(mask[:]))
     @assert samp == crop[mask[:],:]
     @assert spread == sparse(samp')
+    @assert size(cent_xy) == ((nxh-1)*(nyh-1),nxh*nyh)
     @assert size(b)==(nxh,nyh)
     @assert size(h)==(nxh,nyh)
     @assert size(s)==(nxh,nyh)
@@ -149,6 +156,7 @@ return HGrid(
             crop,
             samp, 
             spread,
+            cent_xy,
             b,
             h,
             s,

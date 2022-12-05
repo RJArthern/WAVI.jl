@@ -19,12 +19,12 @@ function opvec(model::AbstractModel,vec::AbstractVector)
     [
      #x-component
      gu.samp*(gu.∂x'*(2gh.dneghηav[]*(2gu.∂x*uspread .+ gv.∂y*vspread)) .+
-              gu.∂y'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gu.∂y*uspread .+ gv.∂x*vspread )))))) .+
+              gu.∂y'*(gc.crop*(gc.dneghηav[]*(gc.crop*(gu.∂y*uspread .+ gv.∂x*vspread )))) .+
               gu.dnegβeff[]*uspread .+ (gu.h[:].*(gu.∂x'*(extra))) )
         ;
      #y-component
      gv.samp*(gv.∂y'*(2gh.dneghηav[]*(2gv.∂y*vspread .+ gu.∂x*uspread)) .+
-              gv.∂x'*(gc.crop*(gc.cent'*(gh.dneghηav[]*(gc.cent*(gc.crop*( gv.∂x*vspread .+ gu.∂y*uspread )))))) .+
+              gv.∂x'*(gc.crop*(gc.dneghηav[]*(gc.crop*(gv.∂x*vspread .+ gu.∂y*uspread )))) .+
               gv.dnegβeff[]*vspread .+ (gv.h[:].*(gv.∂y'*(extra))) )
     ]
     return opvecprod

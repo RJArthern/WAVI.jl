@@ -20,6 +20,10 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
+                   Cxl :: N              #lower x extent value of coupled child domain
+                   Cxu :: N              #upper x extent value of coupled child domain
+                   Cyl :: N              #lower y extent value of coupled child domain
+                   Cyu :: N              #upper y extent value of coupled child domain
 end
 
 """
@@ -33,7 +37,11 @@ end
     y0 = -40000.0,
     h_mask = nothing,
     u_iszero = nothing,
-    v_iszero = nothing)
+    v_iszero = nothing,
+    Cxl = 1,
+    Cxu = Inf,
+    Cyl = 1,
+    Cyu = Inf)
 
 Construct a WAVI.jl grid.
 
@@ -66,7 +74,11 @@ function Grid(;
     u_iszero = nothing,
     v_iszero = nothing,
     quadrature_weights = nothing,
-    σ = nothing)
+    σ = nothing,
+    Cxl = 1,
+    Cxu = Inf,
+    Cyl = 1,
+    Cyu = Inf)
 
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
@@ -147,7 +159,11 @@ return Grid(nx,
             yyc,
             σ,
             ζ,
-            quadrature_weights)
+            quadrature_weights,
+            Cxl,
+            Cxu,
+            Cyl,
+            Cyu)
 end
 
 

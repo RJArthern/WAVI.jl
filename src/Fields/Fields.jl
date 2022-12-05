@@ -44,7 +44,7 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     mask=h_mask,
     b = bed_array,
     h = h,
-    ηav = ηav,
+    ηav = ηav
     )
 
     #u-grid
