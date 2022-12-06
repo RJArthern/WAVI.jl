@@ -10,4 +10,5 @@
     nsmooth::N = 5
     smoother_omega::T = 1.0
     stencil_margin::N = 3
+    no_update_shelves_mask_size::N = 3
 end
