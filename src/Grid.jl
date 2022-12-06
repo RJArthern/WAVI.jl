@@ -39,9 +39,9 @@ end
     u_iszero = nothing,
     v_iszero = nothing,
     Cxl = 1,
-    Cxu = Inf,
+    Cxu = nothing,
     Cyl = 1,
-    Cyu = Inf)
+    Cyu = nothing)
 
 Construct a WAVI.jl grid.
 
@@ -76,15 +76,18 @@ function Grid(;
     quadrature_weights = nothing,
     σ = nothing,
     Cxl = 1,
-    Cxu = Inf,
+    Cxu = nothing,
     Cyl = 1,
-    Cyu = Inf)
-
+    Cyu = nothing)
+  
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
 ((typeof(ny) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in y direction (ny)  must a positive integer larger than one")) 
 ((typeof(nσ) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in vertical (nσ)  must a positive integer larger than one")) 
 
+(~(Cxu === nothing)) || (Cxu = nx)) #if no Cxu passed, set the default to nx
+(~(Cyu === nothing)) || (Cyu = ny)) #if no Cyu passed, set the default to ny
+   
 #if boundary conditions passed as string array, assemble these matric
 ~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
 ~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(v_iszero,nx,ny+1))
