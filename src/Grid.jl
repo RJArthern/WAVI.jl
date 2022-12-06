@@ -85,8 +85,8 @@ function Grid(;
 ((typeof(ny) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in y direction (ny)  must a positive integer larger than one")) 
 ((typeof(nσ) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in vertical (nσ)  must a positive integer larger than one")) 
 
-(~(Cxu === nothing)) || (Cxu = nx)) #if no Cxu passed, set the default to nx
-(~(Cyu === nothing)) || (Cyu = ny)) #if no Cyu passed, set the default to ny
+(~(Cxu === nothing)) || (Cxu = nx) #if no Cxu passed, set the default to nx
+(~(Cyu === nothing)) || (Cyu = ny) #if no Cyu passed, set the default to ny
    
 #if boundary conditions passed as string array, assemble these matric
 ~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
