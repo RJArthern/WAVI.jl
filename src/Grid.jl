@@ -76,9 +76,9 @@ function Grid(;
     quadrature_weights = nothing,
     σ = nothing,
     Cxl = 1,
-    Cxu = Inf,
+    Cxu = 1e6,
     Cyl = 1,
-    Cyu = Inf)
+    Cyu = 1e6)
 
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
