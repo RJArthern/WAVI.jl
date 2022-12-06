@@ -15,8 +15,8 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     n = gu.n + gv.n
     n_coarse = wu.n[] + wv.n[]
 
-    restrict_fun = get_restrict_fun(model)
-    prolong_fun = get_prolong_fun(model)
+    restrict_fun(x) = restrictvec(model,x)
+    prolong_fun(x) = prolongvec(model,x)
 
     restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
     prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
@@ -86,8 +86,9 @@ function get_op_diag(model::AbstractModel,op::LinearMap)
            [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask] ]
     e=zeros(Bool,n)
     for i = unique(sweep)
-        e .= sweep .== i
+        e[sweep .== i] .= true
         op_diag[e] .= (op*e)[e]
+        e[sweep .== i] .= false
     end
     return op_diag
 end
@@ -121,11 +122,9 @@ function gauss_seidel_smoother!(x, op, b;
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
     resid=b-op*x
-    
-    idx = zeros(Bool,size(sweep))
     for i = 1:iters
         for j = sweep_order
-              idx .= sweep .== j
+              idx = sweep .== j
               x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
               resid .= b .- op*x
         end
