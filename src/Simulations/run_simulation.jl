@@ -38,7 +38,7 @@ hUpdate[model.fields.gh.mask]=max.(model.params.minimum_thickness .- model.field
 if !model.params.evolveShelves
     hUpdate[model.fields.gh.mask]=max.(model.params.smallHAF.-(model.params.density_ocean./model.params.density_ice).*model.fields.gh.b[model.fields.gh.mask].-model.fields.gh.h[model.fields.gh.mask],hUpdate[model.fields.gh.mask])
     #aground=(model.fields.gh.haf.>=0)
-    floating=(model.fields.gh.grounded_fraction .<= 0)
+    floating=(model.fields.gh.grounded_fraction .<= model.solver_params.no_update_shelves_mask_threshold)
     aground = .!(floating)
     wc=map(Int, ones(model.solver_params.no_update_shelves_mask_size,model.solver_params.no_update_shelves_mask_size)) # N x N matrix of ones, which specifies the mask size
     w=centered(wc) #centre the mask
