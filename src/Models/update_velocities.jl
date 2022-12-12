@@ -117,24 +117,74 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     onesvec=ones(T,gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ solver_params.super_implicitness.*params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     
-    f1=[
-        (params.density_ice*params.g*gu.h[gu.mask_inner]).*(gu.samp_inner*(-gu.∂xᵀ*surf_elev_adjusted))
-        ;
-        (params.density_ice*params.g*gv.h[gv.mask_inner]).*(gv.samp_inner*(-gv.∂yᵀ*surf_elev_adjusted))
-       ]
-    f2=[
-        (0.5*params.density_ice*params.g*gu.h[gu.mask_inner].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask_inner],gu.h[gu.mask_inner],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gu.h[gu.mask_inner].*gu.s[gu.mask_inner]).*gu.samp_inner*(-gu.∂xᵀ*(gh.crop*onesvec))
-        ;
-        (0.5*params.density_ice*params.g*gv.h[gv.mask_inner].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask_inner],gv.h[gv.mask_inner],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gv.h[gv.mask_inner].*gv.s[gv.mask_inner]).*gv.samp_inner*(-gv.∂yᵀ*(gh.crop*onesvec))
-        ]
-    
-    f3 = get_rhs_dirichlet(model)
+    rhs = zeros(gu.ni+gv.ni)
+    f1 = zeros(gu.ni+gv.ni)
+    f2 = zeros(gu.ni+gv.ni)
+    f3 = zeros(gu.ni+gv.ni)
+    tmph = zeros(gh.nxh*gh.nyh)
+    tmpu = zeros(gu.nxu*gu.nyu)
+    tmpui = zeros(gu.ni)
+    tmpv = zeros(gv.nxv*gv.nyv)
+    tmpvi = zeros(gv.ni)
+    sui = zeros(gu.ni)
+    hui = zeros(gu.ni)
+    dui = zeros(gu.ni)
+    svi = zeros(gv.ni)
+    hvi = zeros(gv.ni)
+    dvi = zeros(gv.ni)
 
-    rhs=f1+f2+f3
+
+@!  tmpu = gu.∂xᵀ*surf_elev_adjusted
+@.  tmpu = -tmpu
+@!  tmpui = gu.samp_inner*tmpu
+@.  tmpui = (params.density_ice*params.g*gu.h[gu.mask_inner]).* tmpui
+
+@!  tmpv = gv.∂yᵀ*surf_elev_adjusted
+@.  tmpv = -tmpv
+@!  tmpvi = gv.samp_inner*tmpv
+@.  tmpvi = (params.density_ice*params.g*gv.h[gv.mask_inner]).*tmpvi
+              
+    f1[1:gu.ni] .= tmpui
+    f1[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
+
+    sui .= gu.s[gu.mask_inner]
+    hui .= gu.h[gu.mask_inner]
+    dui .= icedraft.(sui,hui,params.sea_level_wrt_geoid)
+@!  tmph = gh.crop*onesvec
+@!  tmpu = gu.∂xᵀ*tmph
+@.  tmpu = -tmpu
+@!  tmpui = gu.samp_inner*tmpu
+@.  tmpui = tmpui * params.g*(0.5*params.density_ice*hui^2
+                            - 0.5*params.density_ocean*dui^2
+                            - params.density_ice*hui*sui)
+
+    svi .= gv.s[gv.mask_inner]
+    hvi .= gv.h[gv.mask_inner]
+    dvi .= icedraft.(svi,hvi,params.sea_level_wrt_geoid)
+@!  tmph = gh.crop*onesvec
+@!  tmpv = gv.∂yᵀ*tmph
+@.  tmpv = -tmpv
+@!  tmpvi = gv.samp_inner*tmpv
+@.  tmpvi = tmpvi * params.g*(0.5*params.density_ice*hvi^2
+                            - 0.5*params.density_ocean*dvi^2
+                            - params.density_ice*hvi*svi)
+
+    f2[1:gu.ni] .= tmpui
+    f2[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
+
+ #   f2=[
+ #       (0.5*params.density_ice*params.g*gu.h[gu.mask_inner].^2
+ #       .- 0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask_inner],gu.h[gu.mask_inner],params.sea_level_wrt_geoid)).^2
+ #       .- params.density_ice*params.g*gu.h[gu.mask_inner].*gu.s[gu.mask_inner]).*gu.samp_inner*(-gu.∂xᵀ*(gh.crop*onesvec))
+ #       ;
+ #       (0.5*params.density_ice*params.g*gv.h[gv.mask_inner].^2
+ #       .- 0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask_inner],gv.h[gv.mask_inner],params.sea_level_wrt_geoid)).^2
+ #       .- params.density_ice*params.g*gv.h[gv.mask_inner].*gv.s[gv.mask_inner]).*gv.samp_inner*(-gv.∂yᵀ*(gh.crop*onesvec))
+ #       ]
+    
+    get_rhs_dirichlet!(f3,model)
+
+    rhs .= f1 .+ f2 .+ f3
 
     return rhs
 end
@@ -357,11 +407,9 @@ end
     Extra term of right hand side to implement non-homogenous Dirichlet conditions   
 
 """
-function get_rhs_dirichlet(model::AbstractModel{T,N}) where {T,N}
+function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
 
-    rhs_dirichlet=zeros(T,gu.ni+gv.ni)
-    
     uvfixed=[
     gu.u[:].*gu.u_isfixed[:]
     ;

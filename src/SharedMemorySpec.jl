@@ -11,8 +11,6 @@ end
 
 get_parallel_spec(model::AbstractModel) = model.parallel_spec
 
-
-
 update_preconditioner!(model::AbstractModel) = update_preconditioner!(model::AbstractModel,get_parallel_spec(model::AbstractModel))
 
 function update_preconditioner!(model::AbstractModel,::BasicParallelSpec)

@@ -30,7 +30,7 @@ function MISMIP_PLUS()
     solver_params = SolverParams(maxiter_picard = maxiter_picard)
 
     parallel_spec = BasicParallelSpec()
-    #parallel_spec = SharedMemorySpec(ngridsx = 16,ngridsy=2,overlap=2,niterations=1)
+    #parallel_spec = SharedMemorySpec(ngridsx = 16,ngridsy=2,overlap=3,niterations=1)
 
     #Physical parameters
     default_thickness = 100.0 #set the initial condition this way
@@ -61,4 +61,5 @@ function MISMIP_PLUS()
     return simulation
 end
 
-@time simulation = MISMIP_PLUS();
+
+@profview @time simulation = MISMIP_PLUS()
