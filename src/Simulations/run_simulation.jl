@@ -43,9 +43,9 @@ if !model.params.evolveShelves
     wc=map(Int, ones(model.solver_params.no_update_shelves_mask_size,model.solver_params.no_update_shelves_mask_size)) # N x N matrix of ones, which specifies the mask size
     w=centered(wc) #centre the mask
     nearfloat_mask=imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
-    nearfloat_mask=imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
-    nearfloat_mask=iszero.(iszero.(nearfloat_mask))
-    hUpdate[nearfloat_mask].=0
+    #nearfloat_mask=iszero.(iszero.(nearfloat_mask))
+    nearfloat_mask=map(Bool, nearfloat_mask)
+    hUpdate[nearfloat_mask].=0.
   end
 model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ hUpdate[model.fields.gh.mask]
 
