@@ -32,7 +32,7 @@ solver_params = SolverParams(maxiter_picard = maxiter_picard)
 #
 ##Physical parameters
 tidal_lengthscale=4*1e3
-tidal_melting = true
+tidal_melting = false
 tidal_drag = true
 default_thickness = 680.0 #set the initial condition this way
 accumulation_rate = 0.3
@@ -43,7 +43,7 @@ params = Params(default_thickness = default_thickness,
                tidal_melting = tidal_melting)
 
 #make the model
-melt_rate = UniformMeltRate(m = 30)
+melt_rate = UniformMeltRate(m = 30, partial_cell_melting = false)
 model = Model(grid = grid,
                     bed_elevation = bed, 
                     params = params, 
@@ -51,8 +51,8 @@ model = Model(grid = grid,
                     melt_rate = melt_rate)
 
                 
-dt = 1/365;
-end_time = 28/365;
+dt = 1/(365*24);
+end_time = 100/(365*24);
 timestepping_params = TimesteppingParams(dt = dt, 
                                          end_time = end_time)
 

@@ -33,9 +33,10 @@ isomip_warm0_temp(z) = two_layer_function(z, v_low =1.2, v_hi = -1.0, d_low = -7
 
 struct UniformMeltRate{T <: Real} <: AbstractMeltRate 
     m :: T #uniform melt rate applied everywhere
+    partial_cell_melting :: Bool 
 end
 
-UniformMeltRate(; m = 0.0) = UniformMeltRate(m) 
+UniformMeltRate(; m = 0.0, partial_cell_melting = true) = UniformMeltRate(m,partial_cell_melting) 
 
 """
     update_melt_rate(melt_rate::UniformMeltRate, fields, grid) 
@@ -45,7 +46,14 @@ Update the melt rate when for the UniformMeltRate type
 """
 function update_melt_rate!(melt_rate::UniformMeltRate, fields, grid, clock) 
     @unpack basal_melt,grounded_fraction = fields.gh
-    basal_melt .= melt_rate.m .* (1 .- grounded_fraction)
+    if melt_rate.partial_cell_melting
+        basal_melt .= melt_rate.m .* (1 .- grounded_fraction)
+    else
+        grf = deepcopy(grounded_fraction)
+        grf[grf .> 0] .= 1      #set anything partially floating to grounded 
+        basal_melt .= melt_rate.m .* (1 .- grf)
+    end
+
     return nothing
 end
 
