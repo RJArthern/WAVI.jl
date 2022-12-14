@@ -75,8 +75,8 @@ function VGrid(;
     mask_inner = mask .& .! v_isfixed
     ni = count(mask_inner)
     crop = Diagonal(float(mask[:]))
-    samp = crop[mask[:],:]
-    samp_inner = crop[mask_inner[:],:]
+    samp = sparse(1:n,(1:(nxv*nyv))[mask[:]],ones(n),n,nxv*nyv)
+    samp_inner = sparse(1:ni,(1:(nxv*nyv))[mask_inner[:]],ones(ni),ni,nxv*nyv)
     spread = sparse(samp')
     spread_inner = sparse(samp_inner')
     cent = c(nyv-1) ⊗ spI(nxv)
@@ -98,8 +98,8 @@ function VGrid(;
     @assert n == count(mask)
     @assert ni == count(mask_inner)
     @assert crop == Diagonal(float(mask[:]))
-    @assert samp == crop[mask[:],:]
-    @assert samp_inner == crop[mask_inner[:],:]
+    @assert samp == sparse(1:n,(1:(nxv*nyv))[mask[:]],ones(n),n,nxv*nyv)
+    @assert samp_inner == sparse(1:ni,(1:(nxv*nyv))[mask_inner[:]],ones(ni),ni,nxv*nyv)
     @assert spread == sparse(samp')
     @assert spread_inner == sparse(samp_inner')
     @assert size(s)==(nxv,nyv)

@@ -76,7 +76,7 @@ function HGrid(;
     #construct operators
     n = count(mask)
     crop = Diagonal(float(mask[:]))
-    samp = crop[mask[:],:] 
+    samp = sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
     spread = sparse(samp')
     cent_xy = c(nyh-1) ⊗ c(nxh-1)
     dneghηav = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
@@ -110,7 +110,7 @@ function HGrid(;
     @assert size(mask)==(nxh,nyh); #@assert mask == clip(mask)
     @assert n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
-    @assert samp == crop[mask[:],:]
+    @assert samp == sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
     @assert spread == sparse(samp')
     @assert size(cent_xy) == ((nxh-1)*(nyh-1),nxh*nyh)
     @assert size(b)==(nxh,nyh)

@@ -43,7 +43,7 @@ function UWavelets(;
     #compute non-inputs 
     n = Ref(count(mask));  @assert n[] == count(mask)
     crop = Ref(Diagonal(float(mask[:]))); @assert crop[] == Diagonal(float(mask[:]));
-    samp  = Ref(crop[][mask[:],:]); @assert samp[] == crop[][mask[:],:]
+    samp  = Ref(sparse(1:n[],(1:(nxuw*nyuw))[mask[:]],ones(n[]),n[],nxuw*nyuw)); @assert samp[] == sparse(1:n[],(1:(nxuw*nyuw))[mask[:]],ones(n[]),n[],nxuw*nyuw)
     spread = Ref(sparse(samp[]')); @assert spread[] == sparse(samp[]')
     idwt =  wavelet_matrix(nyuw,levels,"reverse" ) ⊗ wavelet_matrix(nxuw,levels,"reverse")
     idwtᵀ =  sparse(wavelet_matrix(nyuw,levels,"reverse" )') ⊗ sparse(wavelet_matrix(nxuw,levels,"reverse")')

@@ -22,7 +22,7 @@ function CGrid(;
     #construct operators
     n = count(mask)
     crop = Diagonal(float(mask[:]))
-    samp = crop[mask[:],:]
+    samp = sparse(1:n,(1:(nxc*nyc))[mask[:]],ones(n),n,nxc*nyc)
     spread = sparse(samp')
     cent = sparse(c(nyc)') ⊗ sparse(c(nxc)')
     centᵀ = c(nyc) ⊗ c(nxc)
