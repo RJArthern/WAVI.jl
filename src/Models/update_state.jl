@@ -127,7 +127,8 @@ function update_basal_melt!(model::AbstractModel, clock)
         for iy = 1:ny
             if (model.fields.gh.grounded_fraction[ix,iy] > 0)
                 #get the tidal amplitude at the current time
-                A = get_normalized_tidal_amplitude(clock.time)
+                A = get_normalized_tidal_amplitude(clock.time, params.tidal_daily_timescale, params.tidal_hourly_timescale)
+
                 L = A*params.tidal_lengthscale
                 if (ix,iy) == (1,1)
                     show(A)
@@ -168,7 +169,7 @@ function update_weertman_c!(model::AbstractModel,clock)
 
     else # tidal melting formultation 
         #get the tidal amplitude at the current time
-        A = get_normalized_tidal_amplitude(clock.time)
+        A = get_normalized_tidal_amplitude(clock.time, params.tidal_daily_timescale, params.tidal_hourly_timescale)
         L = A*params.tidal_lengthscale
         dgl = get_grounding_line_distance(gh.grounded_fraction,grid.xxh,grid.yyh)
         tidal_modification = (1 .- exp.(-(dgl).^2 / 2 / L.^2));
@@ -183,9 +184,10 @@ end
 
 Return the normalized tidal amplitude associated with the current time
 """
-function get_normalized_tidal_amplitude(t)
+function get_normalized_tidal_amplitude(t, tidal_daily_timescale, tidal_hourly_timescale)
     tt = t*365.25 * 24 #convert to hours
-    amp = cos(2*pi*tt / (14*24))*cos(2*pi*tt / 6.25);
+    amp = cos(2*pi*tt / (14*24))*cos(2*pi*tt / 6.25); 
+    amp = cos(2*pi*tt / (tidal_daily_timescale*24))*cos(2*pi*tt / tidal_hourly_timescale); 
     return 1/2*(1 + amp) #between 0 and 1
 end
 

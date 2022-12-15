@@ -26,6 +26,9 @@ glen_a_activation_energy :: T
            tidal_melting :: Bool
               tidal_drag :: Bool
        partial_cell_drag :: Bool
+   tidal_daily_timescale :: T
+  tidal_hourly_timescale :: T
+       
 end
 
 
@@ -85,7 +88,9 @@ function Params(; g = 9.81,
                   tidal_lengthscale=1e4,
                   tidal_melting = false,
                   tidal_drag = false,
-                  partial_cell_drag = true)
+                  partial_cell_drag = true,
+                  tidal_daily_timescale = 14.0, 
+                  tidal_hourly_timescale = 6.25)
                       
   #defualt the timestep to 1.0 (will be updated when the model is embedded in a simulation)
   dt = 1.0
@@ -117,6 +122,8 @@ function Params(; g = 9.81,
                   tidal_lengthscale,
                   tidal_melting,
                   tidal_drag,
-                  partial_cell_drag
+                  partial_cell_drag,
+                  tidal_daily_timescale,
+                  tidal_hourly_timescale
                   )
 end

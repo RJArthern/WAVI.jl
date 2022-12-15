@@ -33,14 +33,24 @@ solver_params = SolverParams(maxiter_picard = maxiter_picard)
 ##Physical parameters
 tidal_lengthscale=4*1e3
 tidal_melting = false
-tidal_drag = true
+tidal_drag = false
+partial_cell_drag = true #only relevant if tidal drag = false
+tidal_daily_timescale = 14.0; 
+tidal_hourly_timescale = 6.25; 
+#to avoid any oscillations
+tidal_daily_timescale = 1.0e15; 
+tidal_hourly_timescale = 1.0e15; 
+
 default_thickness = 680.0 #set the initial condition this way
 accumulation_rate = 0.3
 params = Params(default_thickness = default_thickness, 
                accumulation_rate = accumulation_rate,
                tidal_drag = tidal_drag,
                tidal_lengthscale = tidal_lengthscale,
-               tidal_melting = tidal_melting)
+               tidal_melting = tidal_melting,
+               partial_cell_drag = partial_cell_drag, 
+               tidal_daily_timescale = tidal_daily_timescale, 
+               tidal_hourly_timescale = tidal_hourly_timescale)
 
 #make the model
 melt_rate = UniformMeltRate(m = 30, partial_cell_melting = false)
@@ -52,7 +62,7 @@ model = Model(grid = grid,
 
                 
 dt = 1/(365*24);
-end_time = 100/(365*24);
+end_time = 100*dt
 timestepping_params = TimesteppingParams(dt = dt, 
                                          end_time = end_time)
 
@@ -62,6 +72,6 @@ simulation = Simulation(model = model,
 run_simulation!(simulation)
 
 #plot the basal friction or melt field
-#heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.weertman_c')
-heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.basal_melt')
+heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.weertman_c')
+#heatmap(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:],model.fields.gh.basal_melt')
 contour!(simulation.model.grid.xxh[:,1],simulation.model.grid.yyh[1,:], model.fields.gh.grounded_fraction', levels=[0.5,0.5], linecolor = :blue)
