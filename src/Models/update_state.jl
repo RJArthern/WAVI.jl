@@ -157,9 +157,16 @@ Update coefficient used in the sliding law to account for migration of grounding
 function update_weertman_c!(model::AbstractModel,clock)
     @unpack gh=model.fields
     @unpack params,grid=model
-    if ~(params.tidal_drag) #standard drag formulation
-    gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
-    else
+    if ~(params.tidal_drag) #standard drag formulation 
+        if params.partial_cell_drag 
+            gh.weertman_c .= params.weertman_c .* gh.grounded_fraction
+        else #no partial cell drag
+            grf = deepcopy(gh.grounded_fraction)
+            grf[grf .> 0] .= 1      #set anything partially floating to grounded 
+            gh.weertman_c  .=  params.weertman_c .* grf
+        end
+
+    else # tidal melting formultation 
         #get the tidal amplitude at the current time
         A = get_normalized_tidal_amplitude(clock.time)
         L = A*params.tidal_lengthscale
