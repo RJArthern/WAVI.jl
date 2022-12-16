@@ -19,8 +19,8 @@ function update_wavelets!(model::AbstractModel{T,N}) where {T,N}
     wu.crop[] .= Diagonal(float(wu.mask[:]))
     wv.crop[] .= Diagonal(float(wv.mask[:]))
 
-    wu.samp[] = wu.crop[][wu.mask[:],:]
-    wv.samp[] = wv.crop[][wv.mask[:],:]
+    wu.samp[]  = sparse(1:wu.n[],(1:(wu.nxuw*wu.nyuw))[wu.mask[:]],ones(wu.n[]),wu.n[],wu.nxuw*wu.nyuw)
+    wv.samp[]  = sparse(1:wv.n[],(1:(wv.nxvw*wv.nyvw))[wv.mask[:]],ones(wv.n[]),wv.n[],wv.nxvw*wv.nyvw)
 
     wu.spread[] = sparse(wu.samp[]')
     wv.spread[] = sparse(wv.samp[]')
