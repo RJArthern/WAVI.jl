@@ -1,4 +1,4 @@
-struct QuadraticMeltRateExponentVariation{T <: Real} <: AbstractMeltRate
+struct MeltRateExponentVariation{T <: Real} <: AbstractMeltRate
     γT :: T                       #(calibrated) heat exchange velocity
     λ1 :: T                       #liquidus slope 
     λ2 :: T                       #liquidus intercept 
@@ -15,9 +15,9 @@ struct QuadraticMeltRateExponentVariation{T <: Real} <: AbstractMeltRate
 end
 
 """
-QuadraticMeltRateExponentVariation(; ,kwargs)
+MeltRateExponentVariation(; ,kwargs)
 
-Construct a QuadraticMeltRateExponentVariation object to prescribe the melt rate in WAVI
+Construct a MeltRateExponentVariation object to prescribe the melt rate in WAVI
 
 Keyword arguments 
 =================
@@ -31,12 +31,12 @@ Keyword arguments
 - c: specific heat capacity of water (units J/kg/K)
 - Ta: ambient temperature function, defaults to the ISOMIP warm0 scenario. Ta must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
 - Sa: ambient salnity function, defaults to the ISOMIP warm0 scenario.  Sa must be a function of a single variable (depth) [time dependence not yet implemented in WAVI.jl]
-- flocal: flag for local or non-local temperature dependence. Set to true for local dependence (eqn 4 in Favier 2019 GMD) or false for non-local dependence (eqn 5)
+- flocal: flag for local or non-local temperature dependence. In this version of the function, only local dependence is allowed  (eqn 4 in Favier 2019 GMD) 
 - melt_partial_cell: flag for specify whether to apply melt on partially floating cells (true) or not (false)
 - melt_exp: exponent in the melt rate function
 """
 
-function QuadraticMeltRateExponentVariation(;
+function MeltRateExponentVariation(;
                             γT = 1.e-3,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
@@ -61,21 +61,25 @@ function QuadraticMeltRateExponentVariation(;
         ArgumentError("Ambient salinity function Sa must accept a single argument")
     end
 
-    return QuadraticMeltRateExponentVariation(γT, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell, melt_exp)
+ #this function is only value for flocal = true:
+ @assert flocal "This function is only for a local temperature dependece (flocal=true)"
+
+
+    return MeltRateExponentVariation(γT, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell, melt_exp)
 end
 
 """
-    update_melt_rate!(quad_melt_rate::QuadraticMeltRateExponentVariation, fields, grid)
+    update_melt_rate!(quad_melt_rate::MeltRateExponentVariation, fields, grid)
 
-Wrapper script to update the melt rate for a QuadraticMeltRateExponentVariation.
+Wrapper script to update the melt rate for a MeltRateExponentVariation.
 """
-function update_melt_rate!(quad_melt_rate::QuadraticMeltRateExponentVariation, fields, grid)
+function update_melt_rate!(quad_melt_rate::MeltRateExponentVariation, fields, grid)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft
     zb = fields.gh.b .* (grounded_fraction .== 1) + - quad_melt_rate.ρi / quad_melt_rate.ρw .* fields.gh.h .* (grounded_fraction .< 1)
 
-    set_quadratic_melt_rate_exponent_variation!(basal_melt,
+    set_melt_rate_exponent_variation!(basal_melt,
                             quad_melt_rate,
                             zb, 
                             grounded_fraction)
@@ -83,7 +87,7 @@ function update_melt_rate!(quad_melt_rate::QuadraticMeltRateExponentVariation, f
 end
 
 
-function set_quadratic_melt_rate_exponent_variation!(basal_melt,
+function set_melt_rate_exponent_variation!(basal_melt,
                                 qmr,
                                 zb, 
                                 grounded_fraction)
@@ -97,20 +101,10 @@ function set_quadratic_melt_rate_exponent_variation!(basal_melt,
 
     #set melt rate
     if (qmr.melt_partial_cell) && (qmr.flocal) #partial cell melting and local 
-     #   basal_melt[:] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[:].^(qmr.melt_exp) .* (1 .- grounded_fraction[:])
-     # basal_melt[grounded_fraction .< 1] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .< 1].^(qmr.melt_exp) .* (1 .- grounded_fraction[grounded_fraction .< 1])
      basal_melt[grounded_fraction .< 1] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .< 1].^(qmr.melt_exp)
      basal_melt[:] .=  basal_melt[:] .* (1 .- grounded_fraction[:])
-
     elseif ~(qmr.melt_partial_cell) && (qmr.flocal) #no partial cell melting and local
         basal_melt[grounded_fraction .== 0] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[grounded_fraction .== 0].^(qmr.melt_exp)
-        basal_melt[.~(grounded_fraction .== 0)] .= 0 
-
-    elseif (qmr.melt_partial_cell) && ~(qmr.flocal) #partial cell melting and non-local 
-        basal_melt[:] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[:].^(qmr.melt_exp) .* (1 .- grounded_fraction[:])
-
-    elseif ~(qmr.melt_partial_cell) && ~(qmr.flocal) #no partial cell and non-local
-        basal_melt[grounded_fraction .== 0] .=  qmr.γT .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[grounded_fraction .== 0] .* Tstar_shelf_mean
         basal_melt[.~(grounded_fraction .== 0)] .= 0 
     end
     basal_melt[:] .= basal_melt[:].* 365.25*24*60*60

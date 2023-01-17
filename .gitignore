@@ -11,3 +11,4 @@ driver_updated.jl
 *.box
 *.data
 **/Attribution_driver
+quadratic_melt_rate_exponent_variation_basins.jl
