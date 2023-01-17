@@ -1,6 +1,8 @@
 struct MeltRateExponentVariationBasins{T <: Real} <: AbstractMeltRate
     γT1 :: T                       #(calibrated) heat exchange velocity in basin 1
     γT2 :: T                       #(calibrated) heat exchange velocity in basin 2
+    basinID_1 :: T                 # basin ID value for basin 1
+    basinID_2 :: T                 # basin ID value for basin 2
     λ1 :: T                       #liquidus slope 
     λ2 :: T                       #liquidus intercept 
     λ3 :: T                       #liquidus pressure coefficient
@@ -18,12 +20,14 @@ end
 """
 MeltRateExponentVariationBasins(; ,kwargs)
 
-Construct a MeltRateExponentVariationBasins object to prescribe the melt rate in WAVI
+Construct a MeltRateExponentVariationBasins object to prescribe the melt rate in WAVI when the domain is split into two basins
 
 Keyword arguments 
 =================
 - γT1: calibrated heat exchange velocity in basin 1 (units m/s).
 - γT2: calibrated heat exchange velocity in basin 2 (units m/s).
+- basinID_1: ID number of basin 1 
+- basinID_2: ID number of basin 2 
 - λ1: liquidus slope (units ∘C)
 - λ2: liquidus intercept (units ∘C)
 - λ3: liquidus pressure coefficient (units K/m)
@@ -41,6 +45,8 @@ Keyword arguments
 function MeltRateExponentVariationBasins(;
                             γT1 = 1.e-3,
                             γT2 = 1.e-3,
+                            basinID_1=1.0,
+                            basinID_2=2.0,
                             λ1 = -5.73e-2,
                             λ2 = 8.32e-4,
                             λ3 = 7.61e-4,
@@ -65,9 +71,9 @@ function MeltRateExponentVariationBasins(;
     end
 
     #this function is only value for flocal = true:
- #   @assert flocal "This function is only for a local temperature dependece (flocal=true)"
+    @assert flocal "This function is only valid for a local temperature dependece (flocal=true)"
 
-    return MeltRateExponentVariationBasins(γT1, γT2, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell, melt_exp)
+    return MeltRateExponentVariationBasins(γT1, γT2, basinID_1, basinID_2, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell, melt_exp)
 end
 
 """
@@ -75,7 +81,7 @@ end
 
 Wrapper script to update the melt rate for a MeltRateExponentVariationBasins.
 """
-function update_melt_rate!(quad_melt_rate::MeltRateExponentVariationBasins, fields, grid)
+function update_melt_rate!(quad_melt_rate::MeltRateExponentVariationBasins, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft
@@ -108,13 +114,13 @@ function set_melt_rate_exponent_variation_basins!(basal_melt,
 
     #set melt rate
     if (qmr.melt_partial_cell) && (qmr.flocal) #partial cell melting and local 
-        basal_melt[basinIDs .==21.0].=  qmr.γT1 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[basinIDs .==21.0].^(qmr.melt_exp) 
-        basal_melt[basinIDs .==22.0].=  qmr.γT2 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[basinIDs .==22.0].^(qmr.melt_exp) 
+        basal_melt[basinIDs .==qmr.basinID_1].=  qmr.γT1 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[basinIDs .==qmr.basinID_1].^(qmr.melt_exp) 
+        basal_melt[basinIDs .==qmr.basinID_2].=  qmr.γT2 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp) .* Tstar[basinIDs .==qmr.basinID_2].^(qmr.melt_exp) 
         basal_melt[:] .=  basal_melt[:] .* (1 .- grounded_fraction[:])
 
     elseif ~(qmr.melt_partial_cell) && (qmr.flocal) #no partial cell melting and local
-        basal_melt[basinIDs .==21.0] .=  qmr.γT1 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[basinIDs .==21.0].^(qmr.melt_exp)
-        basal_melt[basinIDs .==22.0] .=  qmr.γT2 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[basinIDs .==22.0].^(qmr.melt_exp)
+        basal_melt[basinIDs .==qmr.basinID_1] .=  qmr.γT1 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[basinIDs .==qmr.basinID_1].^(qmr.melt_exp)
+        basal_melt[basinIDs .==qmr.basinID_2] .=  qmr.γT2 .* (qmr.ρw * qmr.c / qmr.ρi /qmr.L)^(qmr.melt_exp).* Tstar[basinIDs .==qmr.basinID_2].^(qmr.melt_exp)
         basal_melt[.~(grounded_fraction .== 0)] .= 0 
     end
     basal_melt[:] .= basal_melt[:].* 365.25*24*60*60

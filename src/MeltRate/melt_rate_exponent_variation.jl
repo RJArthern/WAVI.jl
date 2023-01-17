@@ -62,7 +62,7 @@ function MeltRateExponentVariation(;
     end
 
  #this function is only value for flocal = true:
- @assert flocal "This function is only for a local temperature dependece (flocal=true)"
+ @assert flocal "This function is only valid for a local temperature dependece (flocal=true)"
 
 
     return MeltRateExponentVariation(γT, λ1, λ2, λ3, ρi, ρw, L, c, Ta, Sa, flocal, melt_partial_cell, melt_exp)
@@ -73,7 +73,7 @@ end
 
 Wrapper script to update the melt rate for a MeltRateExponentVariation.
 """
-function update_melt_rate!(quad_melt_rate::MeltRateExponentVariation, fields, grid)
+function update_melt_rate!(quad_melt_rate::MeltRateExponentVariation, fields, grid, clock)
     @unpack basal_melt, h, b, grounded_fraction = fields.gh #get the ice thickness and grounded fraction
  
     #compute the ice draft
