@@ -1,4 +1,4 @@
-struct UniformMeltUnderShelvesBasinSpecific{T <: Real} <: AbstractMeltRate 
+struct UniformMeltUnderShelvesBasins{T <: Real} <: AbstractMeltRate 
     melt_constant_basin_1  :: T
     melt_constant_basin_2  :: T
     basinID_1 :: T                 # basin ID value for basin 1
@@ -9,7 +9,7 @@ struct UniformMeltUnderShelvesBasinSpecific{T <: Real} <: AbstractMeltRate
 end
 
 """
-    function UniformMeltUnderShelvesBasinSpecific(; <kwargs>)
+    function UniformMeltUnderShelvesBasins(; <kwargs>)
 
 Construct a melt rate to specify the melt rate as a constant under floating ice and zero elsewhere
 
@@ -23,14 +23,14 @@ Keyword arguments
 - ρi : Ice density
 - ρw : Water density
 """
-UniformMeltUnderShelvesBasinSpecific(; melt_constant_basin_1 = 0.0, melt_constant_basin_2 = 0.0,  basinID_1=1.0, basinID_2=2.0, melt_partial_cell= false, ρi = 918.0, ρw = 1028.0) = UniformMeltUnderShelvesBasinSpecific(melt_constant_basin_2,melt_constant_basin_2, basinID_1, basinID_2, melt_partial_cell,ρi, ρw)
+UniformMeltUnderShelvesBasins(; melt_constant_basin_1 = 0.0, melt_constant_basin_2 = 0.0,  basinID_1=1.0, basinID_2=2.0, melt_partial_cell= false, ρi = 918.0, ρw = 1028.0) = UniformMeltUnderShelvesBasins(melt_constant_basin_2,melt_constant_basin_2, basinID_1, basinID_2, melt_partial_cell,ρi, ρw)
 
 """
-    update_melt_rate(melt_rate::UniformMeltUnderShelvesBasinSpecific, fields, grid) 
+    update_melt_rate(melt_rate::UniformMeltUnderShelvesBasins, fields, grid) 
 
-Update the melt rate when for the UniformMeltUnderShelvesBasinSpecific type
+Update the melt rate when for the UniformMeltUnderShelvesBasins type
 """
-function update_melt_rate!(melt_rate::UniformMeltUnderShelvesBasinSpecific, fields, grid, clock) 
+function update_melt_rate!(melt_rate::UniformMeltUnderShelvesBasins, fields, grid, clock) 
 
   m = zeros(grid.nx,grid.ny);
 

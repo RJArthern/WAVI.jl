@@ -6,7 +6,7 @@ struct UniformMeltFloatOnly{T <: Real} <: AbstractMeltRate
 end
 
 """
-    function UniformMeltFloatOnly(; <kwargs>)
+     UniformMeltFloatOnly(; <kwargs>)
 
 Construct a melt rate to specify the melt rate as a constant under floating ice and zero elsewhere
 
@@ -17,7 +17,15 @@ Keyword arguments
 - ρi : Ice density
 - ρw : Water density
 """
-UniformMeltFloatOnly(; melt_constant = 0.0, melt_partial_cell= false, ρi = 918.0, ρw = 1028.0) = UniformMeltFloatOnly(melt_constant,melt_partial_cell,ρi, ρw)
+function UniformMeltFloatOnly(; 
+    melt_constant = 0.0, 
+    melt_partial_cell= false, 
+    ρi = 918.0, 
+    ρw = 1028.0) 
+    
+    
+    return UniformMeltFloatOnly(melt_constant,melt_partial_cell,ρi, ρw)
+end
 
 """
     update_melt_rate(melt_rate::UniformMeltFloatOnly, fields, grid) 
