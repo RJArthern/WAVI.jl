@@ -108,9 +108,7 @@ function set_melt_rate_exponent_variation_basins!(basal_melt,
     Ta_shelf = qmr.Ta.(zb)
 #    Tstar = qmr.λ1 .* Sa_shelf .+ qmr.λ2 .+ qmr.λ3 .* zb .- Ta_shelf
     Tstar =  Ta_shelf .- (qmr.λ1 .* Sa_shelf .+ qmr.λ2 .+ qmr.λ3 .* zb)
-    Tstar_shelf_mean = sum(Tstar[grounded_fraction .== 0])/length(Tstar[grounded_fraction .== 0])
-
-    #basal_melt = zeros(size(grounded_fraction));
+    #Tstar_shelf_mean = sum(Tstar[grounded_fraction .== 0])/length(Tstar[grounded_fraction .== 0])
 
     #set melt rate
     if (qmr.melt_partial_cell) && (qmr.flocal) #partial cell melting and local 
