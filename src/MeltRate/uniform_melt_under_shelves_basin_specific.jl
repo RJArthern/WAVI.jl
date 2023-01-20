@@ -23,7 +23,7 @@ Keyword arguments
 - ρi : Ice density
 - ρw : Water density
 """
-UniformMeltUnderShelvesBasins(; melt_constant_basin_1 = 0.0, melt_constant_basin_2 = 0.0,  basinID_1=1.0, basinID_2=2.0, melt_partial_cell= false, ρi = 918.0, ρw = 1028.0) = UniformMeltUnderShelvesBasins(melt_constant_basin_2,melt_constant_basin_2, basinID_1, basinID_2, melt_partial_cell,ρi, ρw)
+UniformMeltUnderShelvesBasins(; melt_constant_basin_1 = 0.0, melt_constant_basin_2 = 0.0,  basinID_1=1.0, basinID_2=2.0, melt_partial_cell= false, ρi = 918.0, ρw = 1028.0) = UniformMeltUnderShelvesBasins(melt_constant_basin_1,melt_constant_basin_2, basinID_1, basinID_2, melt_partial_cell,ρi, ρw)
 
 """
     update_melt_rate(melt_rate::UniformMeltUnderShelvesBasins, fields, grid) 
@@ -42,7 +42,7 @@ function update_melt_rate!(melt_rate::UniformMeltUnderShelvesBasins, fields, gri
         m[(grid.basin_ID .==melt_rate.basinID_2)] .=  melt_rate.melt_constant_basin_2.* (1 .- fields.gh.grounded_fraction[(grid.basin_ID .==melt_rate.basinID_2)])
         m[.~(fields.gh.grounded_fraction .== 0)] .= 0 
     end
-    
+
     fields.gh.basal_melt[:] .= m[:]
 end
 

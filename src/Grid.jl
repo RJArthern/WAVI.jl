@@ -53,7 +53,7 @@ Keyword arguments
     - 'u_iszero': Locations of zero u velocity points
     - 'v_iszero': Locations of zero v velocity points
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
-    - 'basin_ID' : grid of basin IDs (from Zwalley)
+    - 'basin_ID' : grid of basin IDs 
 """
 
 #grid constructor
@@ -86,7 +86,8 @@ function Grid(;
 (~(u_iszero === nothing))|| (u_iszero = falses(nx+1,ny))
 (~(v_iszero === nothing)) || (v_iszero = falses(nx, ny+1))
 (~(quadrature_weights === nothing) || (quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1)))
- 
+(~(basin_ID === nothing)) || (basin_ID = ones(nx,ny))
+
 #check the sizes of inputs
 size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) (i.e. $nx x $ny)"))
 size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
