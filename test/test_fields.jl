@@ -5,18 +5,22 @@ using Test, WAVI
 
     @testset "Testing HGrid" begin 
     @info "Testing HGrid construction..."
-    hgrid = WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10))
+    hgrid = WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
     @test hgrid isa WAVI.HGrid
     end
 
     @testset "Testing HGrid errors" begin 
         @info "Testing HGrid size input errors..."
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 11, nyh = 10, mask = trues(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10))
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 11, mask = trues(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10))
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(11,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10))
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), b = ones(11,10), h = ones(10,10), ηav = ones(10,10))
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), b = ones(10,10), h = ones(11,10), ηav = ones(10,10))
-        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(11,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 11, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 11, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(11,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(11,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(11,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(11,10), ηav = ones(10,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(11,10), grounded_fraction = ones(10,10))
+        @test_throws DimensionMismatch WAVI.HGrid(nxh = 10, nyh = 10, mask = trues(10,10), h_isfixed = falses(10,10), b = ones(10,10), h = ones(10,10), ηav = ones(10,10), grounded_fraction = ones(11,10))
+
+
     end
 
     @testset "Testing UGrid" begin 

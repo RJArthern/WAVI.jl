@@ -7,6 +7,7 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                     x0 :: T             # X co-ordinate of grid origin
                     y0 :: T             # Y co-ordinate of grid origin
                 h_mask :: Array{Bool,2} # Mask defining domain points within grid
+             h_isfixed :: Array{Bool,2} # Mask defining locations of fixed thickness within grid
               u_iszero :: Array{Bool,2} # Locations of zero u velocity points 
               v_iszero :: Array{Bool,2} # Locations of zero v velocity points
              u_isfixed :: Array{Bool,2} # Locations of fixed u velocity points 
@@ -34,6 +35,7 @@ end
     x0 = 0.0,
     y0 = -40000.0,
     h_mask = nothing,
+    h_isfixed = nothing,
     u_iszero = nothing,
     v_iszero = nothing,
     u_isfixed = nothing,
@@ -52,6 +54,7 @@ Keyword arguments
     - 'x0': grid origin x co-ordinate 
     - 'y0': grid origin y co-ordinate
     - 'h_mask': Mask defining domain points within grid
+    - 'h_isfixed': Mask defining locations of fixed thickness within grid
     - 'u_iszero': Locations of zero u velocity points
     - 'v_iszero': Locations of zero v velocity points
     - 'u_isfixed': Locations of fixed u velocity points
@@ -69,6 +72,7 @@ function Grid(;
     x0 = 0.0,
     y0 = -40000.0,
     h_mask = nothing,
+    h_isfixed = nothing,
     u_iszero = nothing,
     v_iszero = nothing,
     u_isfixed = nothing,
@@ -84,12 +88,14 @@ function Grid(;
 #if boundary conditions passed as string array, assemble these matric
 ~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
 ~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(deepcopy(v_iszero),nx,ny+1))
+~(typeof(h_isfixed) == Vector{String}) || (h_isfixed = orientations2bc(deepcopy(h_isfixed),nx,ny))
 ~(typeof(u_isfixed) == Vector{String}) || (u_isfixed = orientations2bc(deepcopy(u_isfixed),nx+1,ny))
 ~(typeof(v_isfixed) == Vector{String}) || (v_isfixed = orientations2bc(deepcopy(v_isfixed),nx,ny+1))
 
 
 #assemble h_mask, u_iszero, v_iszero (if not passed as string)
 (~(h_mask === nothing)) || (h_mask = trues(nx,ny))
+(~(h_isfixed === nothing)) || (h_isfixed = falses(nx,ny))
 (~(u_iszero === nothing))|| (u_iszero = falses(nx+1,ny))
 (~(v_iszero === nothing)) || (v_iszero = falses(nx, ny+1))
 (~(u_isfixed === nothing))|| (u_isfixed = falses(nx+1,ny))
@@ -98,6 +104,7 @@ function Grid(;
  
 #check the sizes of inputs
 size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) (i.e. $nx x $ny)"))
+size(h_isfixed)==(nx,ny) || throw(DimensionMismatch("h_isfixed size must be (nx x ny) (i.e. $nx x $ny)"))
 size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
 size(u_iszero)==(nx+1,ny) || throw(DimensionMismatch("u_iszero size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_iszero)==(nx,ny+1) || throw(DimensionMismatch("v_iszero size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
@@ -111,6 +118,12 @@ try
     #@assert h_mask == clip(h_mask)
 catch 
     throw(ArgumentError("h_mask must be Boolean (or equivalent)"))
+end
+
+try
+    h_isfixed = convert(Array{Bool,2}, h_isfixed)
+catch 
+    throw(ArgumentError("h_isfixed must be Boolean (or equivalent)"))
 end
 
 try 
@@ -163,6 +176,7 @@ return Grid(nx,
             x0,
             y0,
             h_mask,
+            h_isfixed,
             u_iszero,
             v_iszero,
             u_isfixed,

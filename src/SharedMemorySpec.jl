@@ -39,70 +39,88 @@ end
 function precondition!(model::AbstractModel,::SharedMemorySpec)
 
 @unpack ngridsx, ngridsy, overlap, niterations, schwarzModelArray, damping = model.parallel_spec
+@unpack solver_params = model
 
-for iteration = 1:niterations
-
-
-    @sync for igrid = 1:ngridsx
-        for jgrid = 1:ngridsy
-            Threads.@spawn begin
-        
-                model_g = schwarzModelArray[igrid,jgrid]
-
-                schwarzRestrictVelocities!(model_g::AbstractModel,
-                                        model::AbstractModel;
-                                        igrid=igrid,
-                                        jgrid=jgrid,
-                                        ngridsx=ngridsx,
-                                        ngridsy=ngridsy,
-                                        overlap=overlap)
-            end
-        end
-    end
+x=get_start_guess(model)
     
-    @sync for igrid = 1:ngridsx
-        for jgrid = 1:ngridsy
-            Threads.@spawn begin
-                model_g = schwarzModelArray[igrid,jgrid]
-                update_state!(model_g)
-            end
-        end
-    end
+op=get_op(model)
 
-    model.fields.gu.u[:,:] .= damping .* model.fields.gu.u
-    model.fields.gv.v[:,:] .= damping .* model.fields.gv.v
-    
-    threadLock=ReentrantLock()
-    @sync for igrid = 1:ngridsx
+b=get_rhs(model)
+
+resid=get_resid(x,op,b)
+
+set_residual!(model,resid)
+
+rel_resid = norm(resid)/norm(b)
+
+converged = rel_resid < solver_params.tol_picard
+
+if ! converged
+
+    for iteration = 1:niterations
+        println("")
+        @sync for igrid = 1:ngridsx
             for jgrid = 1:ngridsy
-                    Threads.@spawn begin
+                Threads.@spawn begin
+            
+                    model_g = schwarzModelArray[igrid,jgrid]
 
-                            model_g = schwarzModelArray[igrid,jgrid]
-
-                            lock(threadLock)
-                            try
-                                schwarzProlongVelocities!(model::AbstractModel,
-                                                        model_g::AbstractModel;
-                                                        igrid=igrid,
-                                                        jgrid=jgrid,
-                                                        ngridsx=ngridsx,
-                                                        ngridsy=ngridsy,
-                                                        overlap=overlap,
-                                                        damping=damping)
-                            finally
-                                unlock(threadLock)
-                            end
-                    end                    
+                    schwarzRestrictVelocities!(model_g::AbstractModel,
+                                            model::AbstractModel;
+                                            igrid=igrid,
+                                            jgrid=jgrid,
+                                            ngridsx=ngridsx,
+                                            ngridsy=ngridsy,
+                                            overlap=overlap)
+                end
             end
-    end
-end
+        end
+        
+        @sync for igrid = 1:ngridsx
+            for jgrid = 1:ngridsy
+                Threads.@spawn begin
+                    model_g = schwarzModelArray[igrid,jgrid]
+                    update_state!(model_g)
+                end
+            end
+        end
 
-return model
+        model.fields.gu.u[:,:] .= damping .* model.fields.gu.u
+        model.fields.gv.v[:,:] .= damping .* model.fields.gv.v
+        
+        threadLock=ReentrantLock()
+        @sync for igrid = 1:ngridsx
+                for jgrid = 1:ngridsy
+                        Threads.@spawn begin
+
+                                model_g = schwarzModelArray[igrid,jgrid]
+
+                                lock(threadLock)
+                                try
+                                    schwarzProlongVelocities!(model::AbstractModel,
+                                                            model_g::AbstractModel;
+                                                            igrid=igrid,
+                                                            jgrid=jgrid,
+                                                            ngridsx=ngridsx,
+                                                            ngridsy=ngridsy,
+                                                            overlap=overlap,
+                                                            damping=damping)
+                                finally
+                                    unlock(threadLock)
+                                end
+                        end                    
+                end
+        end
+        println("")
+    end
+
+end
+return converged, rel_resid
 end
 
 
 function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1)
-    @unpack nx,ny,dx,dy,nσ,x0,y0,h_mask,u_iszero,v_iszero,u_isfixed,v_isfixed,quadrature_weights,σ = model.grid
+    @unpack nx,ny,dx,dy,nσ,x0,y0,h_mask,h_isfixed,u_iszero,v_iszero,u_isfixed,v_isfixed,quadrature_weights,σ = model.grid
     @unpack gh,gu,gv,g3d = model.fields
     
     @assert rem(nx,ngridsx)==0 "Model domain is not an integer number of subdomains in x-direction"
@@ -130,6 +148,8 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
     x0_g = x0 + (i_start_g-1)*dx
     y0_g = y0 + (j_start_g-1)*dy
     h_mask_g = h_mask[i_start_g:i_stop_g,j_start_g:j_stop_g]
+    h_isfixed_g = h_isfixed[i_start_g:i_stop_g,j_start_g:j_stop_g]
+
     u_iszero_g = u_iszero[i_start_g:i_stop_g+1,j_start_g:j_stop_g]
     v_iszero_g = v_iszero[i_start_g:i_stop_g,j_start_g:j_stop_g+1]
 
@@ -139,8 +159,12 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
     #Set halo points as fixed velocity points
     (igrid==1) || (u_isfixed_g[1,:] .= true)
     (igrid==ngridsx) || (u_isfixed_g[nx_g+1,:] .= true)
+    (igrid==1) || (v_isfixed_g[1,:] .= true)
+    (igrid==ngridsx) || (v_isfixed_g[nx_g,:] .= true)
     (jgrid==1) || (v_isfixed_g[:,1] .= true)
     (jgrid==ngridsy) || (v_isfixed_g[:,ny_g+1] .= true)
+    (jgrid==1) || (u_isfixed_g[:,1] .= true)
+    (jgrid==ngridsy) || (u_isfixed_g[:,ny_g] .= true)
 
     quadrature_weights_g = quadrature_weights 
     σ_g = σ 
@@ -154,6 +178,7 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
     x0=x0_g,
     y0=y0_g,
     h_mask = h_mask_g,
+    h_isfixed = h_isfixed_g,
     u_iszero = u_iszero_g,
     v_iszero = v_iszero_g,
     u_isfixed = u_isfixed_g,
@@ -170,6 +195,7 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
     solver_params_g=model.solver_params
 
     initial_thickness_g = gh.h[i_start_g:i_stop_g,j_start_g:j_stop_g]
+    initial_grounded_fraction_g = gh.grounded_fraction[i_start_g:i_stop_g,j_start_g:j_stop_g]
     initial_u_g = gu.u[i_start_g:i_stop_g+1,j_start_g:j_stop_g]
     initial_v_g = gv.v[i_start_g:i_stop_g,j_start_g:j_stop_g+1]
     initial_viscosity_g = g3d.η[i_start_g:i_stop_g,j_start_g:j_stop_g,:]
@@ -178,6 +204,7 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
 
     initial_conditions_g=InitialConditions(
         initial_thickness = initial_thickness_g,
+        initial_grounded_fraction = initial_grounded_fraction_g,
         initial_u = initial_u_g,
         initial_v = initial_v_g,
         initial_viscosity = initial_viscosity_g,

@@ -35,7 +35,8 @@ if !model.params.evolveShelves
     nearfloat_mask=imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
     nearfloat_mask=iszero.(iszero.(nearfloat_mask))
     hUpdate[nearfloat_mask].=0
-  end
+end
+hUpdate[model.fields.gh.h_isfixed] .= 0
 model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ hUpdate[model.fields.gh.mask]
 return simulation
 end

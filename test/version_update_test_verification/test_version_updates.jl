@@ -69,7 +69,10 @@ using WAVI, Test
 
     simulation = version_update_test();
 
-    if  VERSION == v"1.6.2"
+    if  VERSION == v"1.8.3"
+        filename = joinpath(dirname(@__FILE__), "v1_8_3_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
+    elseif  VERSION == v"1.6.2"
         filename = joinpath(dirname(@__FILE__), "v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif VERSION == v"1.6.1"

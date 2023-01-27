@@ -142,7 +142,7 @@ function gauss_seidel_smoother!(x, op, b;
     for i = 1:iters
         for j = sweep_order
               idx .= sweep .== j
-              x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
+@views        x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
               get_resid!(resid,x,op,b)
         end
     end

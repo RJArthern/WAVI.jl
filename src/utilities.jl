@@ -58,13 +58,13 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     fy_sampi :: Vector{T} = zeros(gv.ni);                           @assert length(fy_sampi) == gv.ni
     opvecprod :: Vector{T} = zeros(gu.ni+gv.ni);                    @assert length(opvecprod) == gu.ni + gv.ni
 
-    function op_fun!(opvecprod::AbstractVector,vec::AbstractVector;vecSampled::Bool=true)
+    function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
-            @assert length(vec)==(gu.ni+gv.ni)
+            @assert length(inputVector)==(gu.ni+gv.ni)
 
             #Split vector into u- and v- components
-            usampi .= @view vec[1:gu.ni]
-            vsampi .= @view vec[(gu.ni+1):(gu.ni+gv.ni)]
+            usampi .= @view inputVector[1:gu.ni]
+            vsampi .= @view inputVector[(gu.ni+1):(gu.ni+gv.ni)]
 
             #Spread to vectors that include all grid points within rectangular domain.
             @!  uspread = gu.spread_inner*usampi
@@ -72,10 +72,10 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
 
         else
             #Vector already includes all grid points within rectangular domain.
-            @assert length(vec)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
+            @assert length(inputVector)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
             
-            uspread .= @view vec[1:gu.nxu*gu.nyu]
-            vspread .= @view vec[(gu.nxu*gu.nyu+1):(gu.nxu*gu.nyu+gv.nxv*gv.nyv)]
+            uspread .= @view inputVector[1:gu.nxu*gu.nyu]
+            vspread .= @view inputVector[(gu.nxu*gu.nyu+1):(gu.nxu*gu.nyu+gv.nxv*gv.nyv)]
 
         end
 
@@ -115,10 +115,10 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @.  tauby = -tauby
             
             #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-            qx .= @view(gu.h[:]).*uspread
+            qx .= vec(gu.h).*uspread
         @!  qx_crop = gu.crop*qx
         @!  dqxdx = gu.∂x*qx_crop
-            qy .=  @view(gv.h[:]).*vspread
+            qy .=  vec(gv.h).* vspread
         @!  qy_crop = gv.crop*qy
         @!  dqydy = gv.∂y*qy_crop
             divq .= dqxdx .+ dqydy
@@ -127,8 +127,8 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         @.  d_extra_dx = -d_extra_dx
         @!  d_extra_dy = gv.∂yᵀ*extra
         @.  d_extra_dy = -d_extra_dy
-            h_d_extra_dx .= @view(gu.h[:]).*d_extra_dx
-            h_d_extra_dy .= @view(gv.h[:]).*d_extra_dy
+            h_d_extra_dx .= vec(gu.h).*d_extra_dx
+            h_d_extra_dy .= vec(gv.h).*d_extra_dy
 
             #Resistive forces resolved in x anf y directions
             fx .= d_rxx_dx .+ d_rxy_dy .- taubx .- h_d_extra_dx

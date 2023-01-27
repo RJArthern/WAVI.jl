@@ -16,20 +16,22 @@ update_preconditioner!(model)
 
 converged::Bool = false
 i_picard::Int64 = 0
+rel_resid = Inf
 while !converged && (i_picard < solver_params.maxiter_picard)
 
-    i_picard = i_picard + 1
+   i_picard = i_picard + 1
 
-    inner_update!(model)
-    
-    converged=isconverged(model)
-    
-    converged || precondition!(model)
+   inner_update!(model)
+   
+   converged, rel_resid = precondition!(model)
 
 end
+println("Solved momentum equation on thread ",Threads.threadid()," with residual ", 
+      round(rel_resid,sigdigits=3)," at iteration ",i_picard)
 
 return model
 end
+
 
 function inner_update!(model::AbstractModel)
     update_shelf_strain_rate!(model)
@@ -47,9 +49,9 @@ function inner_update!(model::AbstractModel)
 end
 
 
+precondition!(model::AbstractModel) = precondition!(model,get_parallel_spec(model))
 
-
-function isconverged(model::AbstractModel)
+function precondition!(model::AbstractModel,::BasicParallelSpec)
     @unpack solver_params=model
 
     x=get_start_guess(model)
@@ -60,34 +62,28 @@ function isconverged(model::AbstractModel)
 
     resid=get_resid(x,op,b)
 
+    set_residual!(model,resid)
+
     rel_resid = norm(resid)/norm(b)
 
     converged = rel_resid < solver_params.tol_picard
 
-    return converged
-end
+    correction = zero(x)
 
+    if ! converged
 
-precondition!(model::AbstractModel) = precondition!(model,get_parallel_spec(model))
+      p=get_preconditioner(model,op)
 
-function precondition!(model::AbstractModel,::BasicParallelSpec)
+      precondition!(correction, p, resid)
     
-    x=get_start_guess(model)
+      correction_coarse = get_correction_coarse(p)
+      set_correction_coarse!(model,correction_coarse)
     
-    op=get_op(model)
-
-    b=get_rhs(model)
-
-    p=get_preconditioner(model,op)
-
-    precondition!(x, p, b)
-    
-    correction_coarse = get_correction_coarse(p)
-    set_correction_coarse!(model,correction_coarse)
-    
+    end
+    x .= x .+ correction
     set_velocities!(model,x)
 
-    return model
+    return converged, rel_resid
 end
 
 
@@ -117,21 +113,21 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     onesvec=ones(T,gh.nxh*gh.nyh)
     surf_elev_adjusted = gh.crop*(gh.s[:] .+ solver_params.super_implicitness.*params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
     
-    rhs = zeros(gu.ni+gv.ni)
-    f1 = zeros(gu.ni+gv.ni)
-    f2 = zeros(gu.ni+gv.ni)
-    f3 = zeros(gu.ni+gv.ni)
-    tmph = zeros(gh.nxh*gh.nyh)
-    tmpu = zeros(gu.nxu*gu.nyu)
-    tmpui = zeros(gu.ni)
-    tmpv = zeros(gv.nxv*gv.nyv)
-    tmpvi = zeros(gv.ni)
-    sui = zeros(gu.ni)
-    hui = zeros(gu.ni)
-    dui = zeros(gu.ni)
-    svi = zeros(gv.ni)
-    hvi = zeros(gv.ni)
-    dvi = zeros(gv.ni)
+    rhs = zeros(T,gu.ni+gv.ni)
+    f1 = zeros(T,gu.ni+gv.ni)
+    f2 = zeros(T,gu.ni+gv.ni)
+    f3 = zeros(T,gu.ni+gv.ni)
+    tmph = zeros(T,gh.nxh*gh.nyh)
+    tmpu = zeros(T,gu.nxu*gu.nyu)
+    tmpui = zeros(T,gu.ni)
+    tmpv = zeros(T,gv.nxv*gv.nyv)
+    tmpvi = zeros(T,gv.ni)
+    sui = zeros(T,gu.ni)
+    hui = zeros(T,gu.ni)
+    dui = zeros(T,gu.ni)
+    svi = zeros(T,gv.ni)
+    hvi = zeros(T,gv.ni)
+    dvi = zeros(T,gv.ni)
 
 
 @!  tmpu = gu.∂xᵀ*surf_elev_adjusted
@@ -426,4 +422,16 @@ function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
     @. rhs_dirichlet = - rhs_dirichlet
     
     return rhs_dirichlet
+end
+
+"""
+    set_residual!(model::AbstractModel,residual)
+
+Set residuals to particular values. Input vector residual represents stacked u and v components at valid grid points.
+"""
+function set_residual!(model::AbstractModel,residual)
+    @unpack gu,gv=model.fields
+    @views gu.residual[gu.mask_inner] .= residual[1:gu.ni]
+    @views gv.residual[gv.mask_inner] .= residual[(gu.ni+1):(gu.ni+gv.ni)]
+    return model
 end

@@ -43,7 +43,7 @@ using WAVI, Test, LinearAlgebra
         params = Params(default_thickness = default_thickness, 
                         accumulation_rate = accumulation_rate)
 
-        parallel_spec = SharedMemorySpec(ngridsx = 16,ngridsy=2,overlap=2,niterations=100)
+        parallel_spec = SharedMemorySpec(ngridsx = 16,ngridsy=2,overlap=2,niterations=1)
 
         #make the model
         model = Model(grid = grid,
@@ -75,7 +75,10 @@ using WAVI, Test, LinearAlgebra
 
     simulation = shared_memory_test();
 
-    if  VERSION == v"1.6.2"
+    if  VERSION == v"1.8.3"
+        filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_8_3_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
+    elseif  VERSION == v"1.6.2"
         filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif VERSION == v"1.6.1"
@@ -88,9 +91,9 @@ using WAVI, Test, LinearAlgebra
     example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
 
-    println(norm(simulation.model.fields.gh.h - example_output["h"])./norm(example_output["h"]))
-    println(norm(simulation.model.fields.gu.u - example_output["u"])./norm(example_output["u"]))
-    println(norm(simulation.model.fields.gv.v - example_output["v"])./norm(example_output["v"]))
+    println(norm(simulation.model.fields.gh.h .- example_output["h"])./norm(example_output["h"]))
+    println(norm(simulation.model.fields.gu.u .- example_output["u"])./norm(example_output["u"]))
+    println(norm(simulation.model.fields.gv.v .- example_output["v"])./norm(example_output["v"]))
 
     rtol=0.01
     @test isapprox(simulation.model.fields.gh.h, example_output["h"]; rtol=rtol)

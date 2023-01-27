@@ -25,6 +25,7 @@ struct UGrid{T <: Real, N <: Integer}
                  βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
              dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
                     u :: Array{T,2}                            # Ice velocities in x direction
+             residual :: Array{T,2}                            # Residuals in x direction
 end
     
 """
@@ -60,6 +61,7 @@ function UGrid(;
                 mask = trues(nxu,nyu),
                 u_isfixed = falses(nxu,nyu),
                 u = zeros(nxu,nyu),
+                residual = zeros(nxu,nyu),
                 levels,
                 dx,
                 dy)
@@ -138,5 +140,6 @@ function UGrid(;
                 grounded_fraction,
                 βeff,
                 dnegβeff,
-                u)
+                u,
+                residual)
 end

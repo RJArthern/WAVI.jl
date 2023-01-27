@@ -104,7 +104,7 @@ serial_model = Model(grid = grid, bed_elevation = bed,initial_conditions= initia
 # We use the `update_state!` method to bring fields (including velocity) in line with the ice thickness:
 update_state!(serial_model)
 
-# Now we can visualize the ice velocity:
+# Now we can visualize the ice velocity:plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(serial_model.fields.gh.av_speed'), 
 plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(serial_model.fields.gh.av_speed'), 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
@@ -120,23 +120,77 @@ plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(serial_model.fi
 saved_serial_model=deepcopy(serial_model);
 
 parallel_model = deepcopy(serial_model)
-parallel_model = @set parallel_model.solver_params = SolverParams(maxiter_picard=1)
-parallel_model = @set parallel_model.parallel_spec = SharedMemorySpec(ngridsx=4,ngridsy=5,overlap=2,niterations=1)
+parallel_model = @set parallel_model.solver_params = SolverParams(maxiter_picard=5)
+parallel_model = @set parallel_model.parallel_spec = SharedMemorySpec(ngridsx=2,ngridsy=3,overlap=1,damping=0.0,niterations=1)
 
-nSchwarzIterations=20
+cols=cgrad(:roma,rev=true);
+nSchwarzIterations=1
 for iSchwarzIteration = 1:nSchwarzIterations
-   update_state!(parallel_model)
-end
+       update_state!(parallel_model)
 
-# Now we can visualize the ice velocity:
-plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(parallel_model.fields.gh.av_speed'), 
-                    xlabel = "x (km)", 
-                    ylabel = "y (km)",
-                    colorbar_title = "ice speed (m/yr)",
-                    title = "West Antarctica ice speed",
-             #       clims=(-0.02,0.02),
-             #       xlims=(-1400,-1300),
-             #       ylims=(-500,-400),
-                    framestyle = "box")
-        
+
+       # Now we can visualize the ice velocity:
+       plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(parallel_model.fields.gh.av_speed'), 
+                     c = cols, 
+                     xlabel = "x (km)", 
+                     ylabel = "y (km)",
+                     colorbar_title = "ice speed (m/yr)",
+                     title = "West Antarctica ice speed",
+              #       clims=(-0.2,0.2),
+              #       xlims=(-1600,-1500),
+              #       ylims=(-700,-600),
+                     framestyle = "box")
+       display(plt)
+
+       plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(parallel_model.fields.gh.ηav'), 
+       c = cols,
+       xlabel = "x (km)", 
+       ylabel = "y (km)",
+       colorbar_title = "ice speed (m/yr)",
+       title = "West Antarctica ice speed",
+#       clims=(-0.2,0.2),
+#       xlims=(-1600,-1500),
+#       ylims=(-700,-600),
+       framestyle = "box")
+       display(plt)
+
+       plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, log10.(parallel_model.fields.gh.av_speed'./serial_model.fields.gh.av_speed'), 
+       c = cols,
+       xlabel = "x (km)", 
+       ylabel = "y (km)",
+       colorbar_title = "ice speed (m/yr)",
+       title = "West Antarctica ice speed",
+#       clims=(-0.2,0.2),
+#       xlims=(-1600,-1500),
+#       ylims=(-700,-600),
+       framestyle = "box")
+       display(plt)
+
 # Ice velocities reach a maximum of approx 5km/yr on ice shelves, but are much smaller inland.
+
+       plt = Plots.heatmap(grid.xxu[:,1]/1e3, grid.yyu[1,:]/1e3, log10.(abs.(parallel_model.fields.gu.residual')), 
+                     c = cols,
+                     xlabel = "x (km)", 
+                     ylabel = "y (km)",
+                     colorbar_title = "ice speed (m/yr)",
+                     title = "West Antarctica ice speed",
+              #       clims=(-0.02,0.02),
+              #       xlims=(-1400,-1300),
+              #       ylims=(-500,-400),
+                     framestyle = "box")
+       display(plt)
+
+       plt = Plots.heatmap(grid.xxv[:,1]/1e3, grid.yyv[1,:]/1e3, log10.(abs.(parallel_model.fields.gv.residual')), 
+                     c=cols,
+                     xlabel = "x (km)", 
+                     ylabel = "y (km)",
+                     colorbar_title = "ice speed (m/yr)",
+                     title = "West Antarctica ice speed",
+              #       clims=(-0.02,0.02),
+              #       xlims=(-1400,-1300),
+              #       ylims=(-500,-400),
+                     framestyle = "box")
+       display(plt)
+
+ end
+
