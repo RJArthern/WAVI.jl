@@ -1,10 +1,12 @@
-#Struct to hold model state
 include("HGrid.jl")
 include("CGrid.jl")
 include("VGrid.jl")
 include("UGrid.jl")
 include("SigmaGrid.jl")
 
+"""
+    Structure to hold all field variables in WAVI.jl
+"""
 struct Fields{T <: Real, N <: Real}
     gh::HGrid{T,N}
     gu::UGrid{T,N}
@@ -49,7 +51,6 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     )
 
     #u-grid
-    u =  deepcopy(initial_conditions.initial_u)
     gu=UGrid(
     nxu=grid.nx+1,
     nyu=grid.ny,
@@ -57,12 +58,11 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dy=grid.dy,
     mask=u_mask,
     u_isfixed=grid.u_isfixed,
-    u=u,
+    u=deepcopy(initial_conditions.initial_u_veloc),
     levels=solver_params.levels
     )
 
     #v-grid
-    v = deepcopy(initial_conditions.initial_v)
     gv=VGrid(
     nxv=grid.nx,
     nyv=grid.ny+1,
@@ -70,7 +70,7 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     dy=grid.dy,
     mask=v_mask,
     v_isfixed=grid.v_isfixed,
-    v=v,
+    v=deepcopy(initial_conditions.initial_v_veloc),
     levels=solver_params.levels
     )
 
@@ -85,6 +85,15 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     η = deepcopy(initial_conditions.initial_viscosity)
     θ = deepcopy(initial_conditions.initial_temperature)
     Φ = deepcopy(initial_conditions.initial_damage)
+    g3_glen_b = zeros(size(η))
+    for i = 1:grid.nx
+        for j = 1:grid.ny
+            for k = 1:grid.nσ
+                g3_glen_b[i,j,k] = glen_b.(θ[i,j,k],Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
+            end
+        end
+    end
+        
     g3d=SigmaGrid(
     nxs=grid.nx,
     nys=grid.ny,
@@ -93,7 +102,7 @@ function setup_fields(grid, initial_conditions, solver_params, params, bed_array
     η = η,
     θ = θ,
     Φ = Φ,
-    glen_b = glen_b.(θ,Φ,params.glen_a_ref, params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const),
+    glen_b = g3_glen_b,
     quadrature_weights = grid.quadrature_weights
     )
 

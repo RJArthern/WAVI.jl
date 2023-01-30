@@ -58,8 +58,8 @@ u_bc[u_isfixed] .= solid_body_u[u_isfixed]
 v_bc[v_isfixed] .= solid_body_v[v_isfixed]
 
 initial_conditions = InitialConditions(initial_thickness = starting_thickness, 
-                                       initial_u = u_bc,
-                                       initial_v = v_bc)
+                                       initial_u_veloc = u_bc,
+                                       initial_v_veloc = v_bc)
 
 accumulation_rate=0.3
 params = Params(accumulation_rate = accumulation_rate)

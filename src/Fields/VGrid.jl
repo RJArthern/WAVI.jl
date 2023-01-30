@@ -55,6 +55,7 @@ Keyword arguments
     - levels: (required) Number of levels in the preconditioner 
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
+    - v:  (required) initial guess of v in y direction
 """
 function VGrid(;
         nxv,
@@ -65,7 +66,8 @@ function VGrid(;
         residual = zeros(nxv,nyv),
         levels,
         dx,
-        dy)
+        dy,
+        v)
 
     #check the sizes of inputs
     (size(mask) == (nxv,nyv)) || throw(DimensionMismatch("Sizes of inputs to VGrid must all be equal to nxv x nyv (i.e. $nxv x $nyv)"))
