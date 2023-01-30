@@ -54,7 +54,6 @@ Keyword arguments
     - levels: (required) Number of levels in the preconditioner
     - dx: (required) Grid spacing in the x direction
     - dy: (required) Grid spacing in the y direction
-    - u : (required) first guess of u in x direction
 """
 function UGrid(;
                 nxu,
@@ -65,8 +64,7 @@ function UGrid(;
                 residual = zeros(nxu,nyu),
                 levels,
                 dx,
-                dy,
-                u)
+                dy)
 
     #check the sizes of inputs
     (size(mask) == (nxu,nyu)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxu x nyu (i.e. $nxu x $nyu)"))
