@@ -1,4 +1,4 @@
-struct Model{T <: Real, N <: Integer,A,W, G, M <:AbstractMeltRate, PS <: AbstractParallelSpec} <: AbstractModel{T,N,M}
+struct Model{T <: Real, N <: Integer,A,W, G, M <:AbstractMeltRate, PS <: AbstractParallelSpec} <: AbstractModel{T,N,M,PS}
     grid::Grid{T,N}
     params::Params{T,A,W,G}
     solver_params::SolverParams{T,N}
