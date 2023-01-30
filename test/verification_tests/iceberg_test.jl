@@ -62,7 +62,8 @@ initial_conditions = InitialConditions(initial_thickness = starting_thickness,
                                        initial_v_veloc = v_bc)
 
 accumulation_rate=0.3
-params = Params(accumulation_rate = accumulation_rate)
+default_temperature=265.700709
+params = Params(accumulation_rate = accumulation_rate, default_temperature = default_temperature)
 
 bed_elevation=-500.0.*ones(nx,ny)
 

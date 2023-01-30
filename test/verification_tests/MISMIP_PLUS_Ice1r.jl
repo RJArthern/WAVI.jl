@@ -31,8 +31,10 @@ function MISMIP_PLUS_Ice1r(initial_thickness)
 
     #Physical parameters
     accumulation_rate = 0.3
+    default_temperature=265.700709
     params = Params(default_thickness = default_thickness, 
-                    accumulation_rate = accumulation_rate)
+                    accumulation_rate = accumulation_rate,
+                    default_temperature = default_temperature)
 
     #initial conditions
     initial_conditions = InitialConditions(initial_thickness = initial_thickness)
