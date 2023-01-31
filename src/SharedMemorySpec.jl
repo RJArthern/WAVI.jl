@@ -1,5 +1,8 @@
 
+"""
+Struct to represent the shared memory parallel specification of a model.
 
+"""
 @with_kw struct SharedMemorySpec{T,N} <: AbstractParallelSpec
     ngridsx::N = 1 
     ngridsy::N = 1
@@ -9,14 +12,44 @@
     schwarzModelArray::Array{Model,2} = Array{Model,2}(undef,ngridsx,ngridsy)
 end
 
+
+"""
+get_parallel_spec(model::AbstractModel)
+
+Function to return the parallel specification of a model.
+
+"""
 get_parallel_spec(model::AbstractModel) = model.parallel_spec
 
+
+"""
+update_preconditioner!(model)
+
+Update the preconditioner for Basic Parallel Specification or Shared Memory Parallel Specification as appropriate.
+
+"""
 update_preconditioner!(model::AbstractModel) = update_preconditioner!(model::AbstractModel,get_parallel_spec(model::AbstractModel))
 
+
+
+"""
+update_preconditioner!(model::AbstractModel,::BasicParallelSpec)
+
+Update the preconditioner. For Basic Parallel Specification no action is needed. 
+
+"""
 function update_preconditioner!(model::AbstractModel,::BasicParallelSpec)
     return model
 end
 
+
+"""
+update_preconditioner!(model::AbstractModel,::SharedMemorySpec)
+
+Update the preconditioner. 
+For shared memory parallelism, update the subdomain models used by restricted additive Schwarz preconditioner (RAS).
+
+"""
 function update_preconditioner!(model::AbstractModel,::SharedMemorySpec)
     @unpack ngridsx, ngridsy, overlap = model.parallel_spec
 
@@ -36,6 +69,12 @@ function update_preconditioner!(model::AbstractModel,::SharedMemorySpec)
 end
 
 
+"""
+precondition!(model::AbstractModel,::SharedMemorySpec)
+
+Apply restricted additive Schwarz preconditioner (RAS) using shared memory parallelism.
+
+"""
 function precondition!(model::AbstractModel,::SharedMemorySpec)
 
 @unpack ngridsx, ngridsy, overlap, niterations, schwarzModelArray, damping = model.parallel_spec
@@ -119,6 +158,25 @@ return converged, rel_resid
 end
 
 
+
+"""
+schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1)
+
+Creates a subdomain model (model_g) used for parallel Schwarz iterations.
+The necessary quantities are transferred from the full domain model.
+
+Inputs:
+model:        Full domain model
+igrid:        Cartesian index of subdomain in x-direction.
+jgrid:        Cartesian index of subdomain in y-direction.
+ngridsx:      Number of subdomains in x-direction.
+ngridsy:      Number of subdomains in y-direction.
+overlap:      Overlap of subdomains on h-grid.
+
+Output:
+model_g:      Subdomain model
+
+"""
 function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1)
     @unpack nx,ny,dx,dy,nσ,x0,y0,h_mask,h_isfixed,u_iszero,v_iszero,u_isfixed,v_isfixed,quadrature_weights,σ = model.grid
     @unpack gh,gu,gv,g3d = model.fields
@@ -229,6 +287,22 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
 end
 
 
+
+
+
+"""
+schwarzRestrictVelocities!(model_g::AbstractModel,model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1)
+
+Schwarz restriction. Transfers velocities from the full domain (model) to the subdomain (model_g).
+model_g:      Subdomain model
+model:        Full domain model
+igrid:        Cartesian index of subdomain in x-direction.
+jgrid:        Cartesian index of subdomain in y-direction.
+ngridsx:      Number of subdomains in x-direction.
+ngridsy:      Number of subdomains in y-direction.
+overlap:      Overlap of subdomains on h-grid.
+
+"""
 function schwarzRestrictVelocities!(model_g::AbstractModel,model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1)
     @unpack nx,ny = model.grid
     
@@ -255,6 +329,24 @@ function schwarzRestrictVelocities!(model_g::AbstractModel,model::AbstractModel;
     return model_g
 end
 
+
+
+
+
+"""
+schwarzProlongVelocities!(model::AbstractModel,model_g::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1,damping=0.0)
+
+Schwarz prolongation. Transfers velocities from the subdomain (model_g) to the full domain (model)
+model:        Full domain model
+model_g:      Subdomain model
+igrid:        Cartesian index of subdomain in x-direction.
+jgrid:        Cartesian index of subdomain in y-direction.
+ngridsx:      Number of subdomains in x-direction.
+ngridsy:      Number of subdomains in y-direction.
+overlap:      Overlap of subdomains on h-grid.
+damping:      Damping factor.
+
+"""
 function schwarzProlongVelocities!(model::AbstractModel,model_g::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,overlap=1,damping=0.0)
     @unpack nx,ny = model.grid
     
@@ -287,6 +379,22 @@ function schwarzProlongVelocities!(model::AbstractModel,model_g::AbstractModel;i
     return model
 end
 
+
+
+
+
+"""
+schwarzPartitionOfUnity(m,n,leavei1,leaveim,leavej1,leavejn,overlapi,overlapj)
+
+Returns a partition of unity array pou(i,j) of size m x n. The partition of unity ramps from 1 in interior to zero at edges.
+leavei1(Bool):  Flag. If set, we leave the partition of unity as one towards the edge i=1
+leaveim(Bool):  Flag. If set, we leave the partition of unity as one towards the edge i=m
+leavej1(Bool):  Flag. If set, we leave the partition of unity as one towards the edge j=1 
+leavejn(Bool):  Flag. If set, we leave the partition of unity as one towards the edge j=m  
+overlapi:       The ramp is applied over overlapi cells in direction i.
+overlapj:       The ramp is applied over overlapj cells in direction j.
+
+"""
 function schwarzPartitionOfUnity(m,n,leavei1,leaveim,leavej1,leavejn,overlapi,overlapj)
     @assert m > (~leavei1 && overlapi) + (~leaveim && overlapi)
     @assert n > (~leavej1 && overlapj) + (~leavejn && overlapj)

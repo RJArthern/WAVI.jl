@@ -527,11 +527,25 @@ function clip(trial_mask)
     return mask
 end
 
+
+"""
+     get_resid(x,op,b)
+
+Function to return residual b - op x
+
+"""
 function get_resid(x,op,b)
     resid=similar(b)
     get_resid!(resid,x,op,b)
 end
 
+
+"""
+     get_resid!(resid,x,op,b)
+
+In-place function to return residual b - op x
+
+"""
 function get_resid!(resid,x,op,b)
     mul!(resid,op,x)
     resid .= b .- resid
