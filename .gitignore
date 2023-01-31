@@ -4,11 +4,7 @@ Manifest.toml
 .ipynb_checkpoints
 *.mat
 *.tif
-*.jld2
-*.nc
-#*.md
-*.bin
-*.png
+*.vscode
 
 #useful things to ignore when testing driver scripts
 driver_updated.jl 

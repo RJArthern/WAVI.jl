@@ -23,6 +23,7 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
+              basin_ID :: Array{T,2}    # grid of IDs for different basins
 end
 
 """
@@ -38,6 +39,7 @@ end
     h_isfixed = nothing,
     u_iszero = nothing,
     v_iszero = nothing,
+    basin_ID = nothing,
     u_isfixed = nothing,
     v_isfixed = nothing)
 
@@ -60,6 +62,7 @@ Keyword arguments
     - 'u_isfixed': Locations of fixed u velocity points
     - 'v_isfixed': Locations of fixed v velocity points
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
+    - 'basin_ID' : grid of basin IDs 
 """
 
 #grid constructor
@@ -78,7 +81,8 @@ function Grid(;
     u_isfixed = nothing,
     v_isfixed = nothing,
     quadrature_weights = nothing,
-    σ = nothing)
+    σ = nothing,
+    basin_ID = nothing)
 
 #check integer inputs
 ((typeof(nx) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in x direction (nx) must a positive integer larger than one")) 
@@ -101,13 +105,15 @@ function Grid(;
 (~(u_isfixed === nothing))|| (u_isfixed = falses(nx+1,ny))
 (~(v_isfixed === nothing)) || (v_isfixed = falses(nx, ny+1))
 (~(quadrature_weights === nothing) || (quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1)))
- 
+(~(basin_ID === nothing)) || (basin_ID = ones(nx,ny))
+
 #check the sizes of inputs
 size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) (i.e. $nx x $ny)"))
 size(h_isfixed)==(nx,ny) || throw(DimensionMismatch("h_isfixed size must be (nx x ny) (i.e. $nx x $ny)"))
 size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
 size(u_iszero)==(nx+1,ny) || throw(DimensionMismatch("u_iszero size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_iszero)==(nx,ny+1) || throw(DimensionMismatch("v_iszero size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
+size(basin_ID)==(nx,ny) || throw(DimensionMismatch("Basin_ID size must be (nx x ny) (i.e. $nx x $ny)"))
 size(u_isfixed)==(nx+1,ny) || throw(DimensionMismatch("u_isfixed size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_isfixed)==(nx,ny+1) || throw(DimensionMismatch("v_isfixed size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
 
@@ -191,7 +197,8 @@ return Grid(nx,
             yyc,
             σ,
             ζ,
-            quadrature_weights)
+            quadrature_weights,
+            basin_ID)
 end
 
 

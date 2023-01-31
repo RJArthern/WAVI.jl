@@ -191,6 +191,7 @@ function schwarzModel(model::AbstractModel;igrid=1,jgrid=1,ngridsx=1,ngridsy=1,o
     params_g = model.params
     params_g = @set params_g.weertman_c = params_g.weertman_c[i_start_g:i_stop_g,j_start_g:j_stop_g]
     params_g = @set params_g.accumulation_rate = params_g.accumulation_rate[i_start_g:i_stop_g,j_start_g:j_stop_g]
+    params_g = @set params_g.glen_a_ref = params_g.glen_a_ref[i_start_g:i_stop_g,j_start_g:j_stop_g]
 
     solver_params_g=model.solver_params
 
