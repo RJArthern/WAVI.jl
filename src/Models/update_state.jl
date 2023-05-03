@@ -123,12 +123,13 @@ function update_basal_melt!(model::AbstractModel, clock)
     #modify for tidal signal
     if params.tidal_melting
     (nx,ny) = size(model.grid.xxh)
+    #A = get_normalized_tidal_amplitude(clock.time, params.tidal_daily_timescale, params.tidal_hourly_timescale)
+    #println(A)
     for ix = 1:nx
         for iy = 1:ny
             if (model.fields.gh.grounded_fraction[ix,iy] > 0)
                 #get the tidal amplitude at the current time
                 A = get_normalized_tidal_amplitude(clock.time, params.tidal_daily_timescale, params.tidal_hourly_timescale)
-
                 L = A*params.tidal_lengthscale
                 if (ix,iy) == (1,1)
                     show(A)

@@ -32,14 +32,14 @@ solver_params = SolverParams(maxiter_picard = maxiter_picard)
 #
 ##Physical parameters
 tidal_lengthscale=4*1e3
-tidal_melting = false
-tidal_drag = false
-partial_cell_drag = true #only relevant if tidal drag = false
+tidal_melting = true
+tidal_drag = true
+partial_cell_drag = false #only relevant if tidal drag = false
 tidal_daily_timescale = 14.0; 
 tidal_hourly_timescale = 6.25; 
 #to avoid any oscillations
-tidal_daily_timescale = 1.0e15; 
-tidal_hourly_timescale = 1.0e15; 
+tidal_daily_timescale = 1.0e35; 
+tidal_hourly_timescale = 1.0e35; 
 
 default_thickness = 680.0 #set the initial condition this way
 accumulation_rate = 0.3
@@ -62,7 +62,7 @@ model = Model(grid = grid,
 
                 
 dt = 1/(365*24);
-end_time = 100*dt
+end_time = 20*dt
 timestepping_params = TimesteppingParams(dt = dt, 
                                          end_time = end_time)
 
