@@ -19,7 +19,7 @@ ENV["GKSwstype"] = "100"
 ##### Generate examples
 #####
 
-const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
+#const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
 const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 
 #examples = [
@@ -115,10 +115,10 @@ makedocs(bib,
 )
 #makedocs(sitename="My Documentation")
 
-deploydocs(;
-    repo="github.com/RJArthern/WAVI.jl",
-    devbranch="build-docs",
-    versions = nothing
-)
+#deploydocs(;
+#    repo="github.com/RJArthern/WAVI.jl",
+#    devbranch="build-docs",
+#    versions = nothing
+#)
 
 
