@@ -129,6 +129,9 @@ for (key, melt) in melt_rates
                         framestyle = "box")
     xlims!((420, 640))
     plot!(size = (500,300))
+
+    # save the figure
+    savefig
     display(plt) #uncomment to show in (e.g.) VSCode
 end
 ```
@@ -152,36 +155,40 @@ end
 As a sanity check, the binary file melt rate has the same (10m/a)melt rate over the whole shelf. The PICO parametrization, which divides the shelf up into discrete chunks, has a corresponding banded structure, with highest melt rates at the grounding line (note the different colourbar limits on the various plots!). The quadratic melt rate parametrizations similarly has the highest melt rate near the grounding line, but drops off with distance from the grounding line much quicker than the PICO parametrization. These plots can be compared to corresponding results for the NEMO ocean model  (Favier et al. 2019 doi:10.5194/gmd-12-2255-2019)
 
 ## Defining A New Melt Rate Model
- In this section, we show how to specify a new melt rate model. NB: This is experimental and still in development. There are four steps:
-# * Create a file to store code
-# * Define the appropriate structure, which stores information required to prescribe the melt rate
-# * Define a constructor of this structure
-# * Write a function to update the melt rate appropriately, and export this
-# This is quite abstract, so let's do an example. We'll create a melt rate model which sets the melt rate as it is specified in the MISMIP+ experiment: 
-# the melt rate on floating cells is $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$, where $z_d$ is the ice shelf draft and $z_d - z_b$ is the cavity thickness. 
-# We'll follow the steps above: first, we create a file to store the code. For this example, we've already create the file, you can see it at it at "src/MeltRate/mismip_melt_rate.jl".
+In this section, we show how to specify a new melt rate model. NB: This is experimental and still in development. It is also a bit tricky and requires knowledge of constructors and julia's type system. We're more than happy to help: please get in touch!
 
-# Next we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
-""" 
+There are four steps to creating a new melt rate model:
+ * Create a file to store code
+ * Define the appropriate structure, which stores information required to prescribe the melt rate
+ * Define a constructor of this structure
+ * Write a function to update the melt rate appropriately, and export this
+
+This is quite abstract, so let's do an example. We'll create a melt rate model which sets the melt rate as it is specified in the MISMIP+ experiment, where the melt rate on floating cells is $0.2 \tanh((z_d - z_b)/75) \max(-100 - z_d,0)$, where $z_d$ is the ice shelf draft and $z_d - z_b$ is the cavity thickness. 
+We'll follow the steps above: first, we create a file to store the code. For this example, we've already create the file, you can see it at it at "./src/MeltRate/mismip_melt_rate.jl".
+
+Next we define a structure, which stores parameters related to the melt rate model. Note that the melt rate model does not "own" the melt rate, the `model` does (and stores it in model.fields.gh.basal_melt, see below)
+
+```julia 
 struct MISMIPMeltRateOne{T <: Real} <: AbstractMeltRate 
     α  :: T
     ρi :: T
     ρw :: T
 end
-"""
-# In this case, a normalization coefficient $\alpha$, and the denisities of ice and ocean, $\rho_i$ and $\rho_w$, respectively. 
+```
+In this case, the parameters are: a normalization coefficient $\alpha$, and the denisities of ice and ocean, $\rho_i$ and $\rho_w$, respectively. 
 
-# Now we define our "constructor", a function that defines how to create one of these structures:
-""" 
+Now we define our "constructor", a function that defines how to create one of these structures:
+```julia
 MISMIPMeltRateOne(; α = 1.0, ρi = 918.0, ρw = 1028.0) = MISMIPMeltRateOne(α,ρi, ρw)
-""" 
-# In this case, the constructor simply sets the default values for the parameters $\alpha$, $\rho_i$, and $\rho_w$. 
-# For more complicated melt rate models, constructors might be more elaborate!
+```
 
-# The final step is to define a function `update_melt_rate!(melt_rate::TYPE, fields, grid)` which tells WAVI how to update the melt rate in this example.
-# here, TYPE is the name of the structure we just made. 
-# Note that the arguments of this function must be as mentioned here, so that the multiple dispatch capability can be leveraged! This procedure defines another method named `update_melt_rate!`, which sets the melt rate according to this function when the input melt rate is of type "TYPE". One of these function is defined for each of the melt rate models mentioned above.
-""" 
+In this case, the constructor simply sets the default values for the parameters $\alpha$, $\rho_i$, and $\rho_w$. NB: for more complicated melt rate models, constructors might be more elaborate! You can see constructors for the various models considered above by diving into the "./src/MeltRate" folder.
+
+The final step is to define a function `update_melt_rate!(melt_rate::TYPE, fields, grid)` which tells WAVI how to update the melt rate in this example. Here, TYPE is the name of the structure we just made (e.g. `update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid)`).
+
+Note that the arguments of this function must be as mentioned here, so that the multiple dispatch capability of julia can be leveraged!  Effectively, what we're doing is defining another method (think: function) named `update_melt_rate!`, which sets the melt rate according to this function when the input melt rate is of type "TYPE". Each of the melt rate models listed above has one of these functions. 
+
+```julia
 function update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid) 
     draft = -(melt_rate.ρi / melt_rate.ρw) .* fields.gh.h
     cavity_thickness = draft .- fields.gh.b
@@ -189,11 +196,12 @@ function update_melt_rate!(melt_rate::MISMIPMeltRateOne, fields, grid)
     m =  melt_rate.α .* 0.2*tanh.(cavity_thickness./75).*max.((-100 .- draft), 0)
     fields.gh.basal_melt[:] .= m[:]
 end
-""" 
+```
 
-# Finally, we tell point WAVI to this code by adding `include("mismip_melt_rate.jl")` to the file "src/MeltRate/MeltRate.jl", and add this structure to the export section in "src/WAVI.jl" file. 
+Finally, we tell point WAVI to this code by adding `include("mismip_melt_rate.jl")` to the file "src/MeltRate/MeltRate.jl", and add this structure to the export section in "src/WAVI.jl" file. (We already did this for this MISMIP melt rate!)
 
-# Now we can create a model which takes this melt rate andplot the result:
+Now we can create a model which takes this melt rate and plot the result:
+```julia
 model = Model(grid = grid,
             bed_elevation = bed, 
             initial_conditions = initial_conditions,
@@ -215,8 +223,10 @@ plt = Plots.heatmap(model.grid.xxh[:,1]/1e3, model.grid.yyh[1,:]/1e3, msat',
 xlims!((420, 640))
 plot!(size = (500,300))
 #display(plt)
+```
 
-# Hopefully this example demonstrates clearly the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)
+Hopefully this example demonstrates the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)
 
-# Finally, let's clean up the files we just made
-rm(joinpath(@__DIR__, "melt_rate_parametrizations"), force = true, recursive = true);
+```@raw html
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//mismip.png" alt="" title="" width="600" height="600" /></center>
+```
