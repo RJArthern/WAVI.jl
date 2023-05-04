@@ -225,8 +225,7 @@ plot!(size = (500,300))
 #display(plt)
 ```
 
-Hopefully this example demonstrates the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)
-
 ```@raw html
 <center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//mismip.png" alt="" title="" width="600" height="600" /></center>
 ```
+Hopefully this example demonstrates the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)
