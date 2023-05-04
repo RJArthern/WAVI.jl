@@ -43,6 +43,8 @@ const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 #use these examples if you aren't generating on the fly
 example_pages = [
     "First example: one-dimensional planar flow"    => "examples/planar_1D_flow.md"
+    "MISMIP+ part one: grounding lines on overdeepened bed" => "examples/mismip_plus.md"
+    "MISMIP+ part two: retreat experiments"         => "examples/mismip_plus_retreat.md"                              
     "Real world: West Antarctic Ice Sheet"          => "examples/WAIS.md"
 #    "Two-dimensional flow with overdeepened bed" => "generated/overdeepened_bed.md" ,
 #    "Melt rate parametrizations" => "generated/melt_rate_parametrizations.md" 

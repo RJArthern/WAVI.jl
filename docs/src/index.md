@@ -7,4 +7,7 @@ WAVI.jl is a software package to simulate the flow of ice sheets. At it's heart,
 ## Getting Help
 Our accessible and friendly mantra extends to reaching out: please do not hesistate to [get in touch](contact.md). We welcome any conversation, whether you're interested in using WAVI.jl, are trying to figure out how get started, are stuck with a thorny problem, or interested in collaboration.
 
+## News
+Coming soon!
+
 

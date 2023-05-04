@@ -1,4 +1,4 @@
-# MISMIP+ example 
+# MISMIP+ example (part 1)
 This example shows how to recreate the Marine Ice Sheet Model Intercomparison (MISMIP) (doi: 10.5194/tc-14-2283-2020) experiments. In this intercomparison exercise, a two-dimensional ice sheet is considered, with a grounding line that can stabilize on a section of bed which has a locally positive slope in the flow direction (commonly called retrograde). This is interesting because grounding lines on retrograde bedslopes are theoretically unstable in one horizontal dimension (see doi: 10.1029/2006JF000664), demonstrating the importance of variations in the second dimension for buttressing ice sheets. Note that here we use a very coarse (8km) resolution for computational speed. In this example, we demonstrate the MISMIP+ ice0 experiment, where the simulation is run to steady state with no melting; the other MISMIP+ experiments are shown in other examples.
 
 This example demonstrates how to 
@@ -191,7 +191,6 @@ The volume above floatation reaches a plateau, suggesting that we have indeed re
 ```@raw html
 <center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/MISMIP/mismip_vaf_evolution.png" alt="" title="" width="600" height="600" /></center>
 ```
-
 
 Finally, we clear up the files we just outputted
 ```julia
