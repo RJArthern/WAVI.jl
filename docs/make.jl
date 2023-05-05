@@ -20,7 +20,7 @@ ENV["GKSwstype"] = "100"
 #####
 
 #const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
-const OUT_DIR   = joinpath(@__DIR__, "src","generated")
+#const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 
 #examples = [# "planar_1D_flow.jl"
 #    "bumpy_bed.jl"
