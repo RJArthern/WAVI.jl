@@ -6,7 +6,7 @@ WAVI.jl includes a number of community melt rate parametrizations of melt rate:
 - [PICO parametrization](#PICO-Melt-Rate-Parametrization)
 - [PICOP parametrization](#PICOp-Melt-Rate-Parametrization)
 
-Further details of these parametrizations can be found on this page. Much of these descriptions is taken from [Favier2019(@cite), which describes a thorough assessment of different melt rate parametrizations. For details of the use of melt rate parametrizations in WAVI.jl, see the [melt rate models](../data_structure/melt_rate_models.md) section. We strongly encourage those who have developed melt rate parametrizations to consider implementing them in WAVI.jl; if you are interested in doing so, see the [melt rate models](../data_structure/melt_rate_models.md) and contributors guide(../contributing.md), or [get in touch](mailto:aleey@bas.ac.uk).
+Further details of these parametrizations can be found on this page. Much of these descriptions is taken from [[Favier2019](@cite)], which describes a thorough assessment of different melt rate parametrizations. For details of the use of melt rate parametrizations in WAVI.jl, see the [melt rate models](../data_structure/melt_rate_models.md) section. We strongly encourage those who have developed melt rate parametrizations to consider implementing them in WAVI.jl; if you are interested in doing so, see the [melt rate models](../data_structure/melt_rate_models.md) and contributors guide(../contributing.md), or [get in touch](mailto:aleey@bas.ac.uk).
 
 WAVI.jl also supports coupling to the ocean model MITgcm. Please [get in touch](mailto:aleey@bas.ac.uk), or see the [MITgcm coupling](../mitgcm_coupling.md) tab if you are interested in running coupled WAVI.jl-MITgcm simulations.
 

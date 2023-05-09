@@ -19,17 +19,16 @@ ENV["GKSwstype"] = "100"
 ##### Generate examples
 #####
 
-const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
-const OUT_DIR   = joinpath(@__DIR__, "src","generated")
+#const EXAMPLES_DIR = joinpath(@__DIR__, "..", "examples")
+#const OUT_DIR   = joinpath(@__DIR__, "src","generated")
 
-examples = [
-    "planar_one_dimensional_flow.jl"
-    "bumpy_bed.jl"
-    "overdeepened_bed.jl"
-    "melt_rate_parametrizations.jl"
-    "west_antarctica.jl"
+#examples = [# "planar_1D_flow.jl"
+#    "bumpy_bed.jl"
+#    "overdeepened_bed.jl"
+#    "melt_rate_parametrizations.jl"
+#    "west_antarctica.jl"
     #variable_slipperiness.jl
-]
+#]
 
 #for example in examples
 #    example_filepath = joinpath(EXAMPLES_DIR, example)
@@ -41,11 +40,17 @@ examples = [
 #### Organize page hierarchies
 #####
 
+#use these examples if you aren't generating on the fly
 example_pages = [
-    "One-dimensional planar flow"    => "generated/planar_one_dimensional_flow.md",
-    "Flow over a bumpy bed"          => "generated/bumpy_bed.md",
-    "Two-dimensional flow with overdeepened bed" => "generated/overdeepened_bed.md" ,
-    "Melt rate parametrizations" => "generated/melt_rate_parametrizations.md" 
+    "First example: one-dimensional planar flow"    => "examples/planar_1D_flow.md"
+    "MISMIP+ part one: grounding lines on overdeepened bed" => "examples/mismip_plus.md"
+    "MISMIP+ part two: retreat experiments"         => "examples/mismip_plus_retreat.md"
+    "Two-dimensional flow on a bumpy bed"           => "examples/bumpy_bed.md"  
+    "Melt rate parametrizations"                    => "examples/melt_parametrizations.md" 
+    "Ice sheet retreat under stochastic forcing"    => "examples/stochastic_forcing.md"                       
+    "Real world: West Antarctic Ice Sheet"          => "examples/WAIS.md"
+#    "Two-dimensional flow with overdeepened bed" => "generated/overdeepened_bed.md" ,
+#    "Melt rate parametrizations" => "generated/melt_rate_parametrizations.md" 
 ]
 
 
@@ -113,11 +118,10 @@ makedocs(bib,
      clean = false,
  checkdocs = :none # Should fix our docstring so we can use checkdocs=:exports with strict=true.
 )
-#makedocs(sitename="My Documentation")
 
 deploydocs(;
     repo="github.com/RJArthern/WAVI.jl",
-    devbranch="AlexDev",
+    devbranch="build-docs",
     versions = nothing
 )
 
