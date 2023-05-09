@@ -9,6 +9,7 @@ Manifest.toml
 #*.md
 *.bin
 #*.png
+*.DS_Store
 
 #useful things to ignore when testing driver scripts
 driver_updated.jl
