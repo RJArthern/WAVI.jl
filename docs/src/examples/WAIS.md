@@ -20,7 +20,7 @@ using WAVI, Plots, Downloads
 ```
 
 ## Reading in data
-First, let's define our grid sizes and origin. We have a 268 x 315 with, with 3km resolution. We're going to use 12 levels in the vertical: even though WAVI.jl is designed for the solution of depth integrated equations, it retains some information about the vertical direction e.g. in the calculation of the ice viscosity; the keyword argument `nσ`, which is passed to a `Grid` object, specifies the number of levels in the vertical. We refer to the extension of the 2D (horizontal) grid to n$\sigma$ levels in the vertical as the 3D grid, which has size nx $\times$ ny $\times$ n$\sigma$.
+First, let's define our grid sizes and origin. We have a grid with 164 cells in the x direction and 192 in the y direction, with 5km resolution. We're going to use 12 levels in the vertical: even though WAVI.jl is designed for the solution of depth integrated equations, it retains some information about the vertical direction e.g. in the calculation of the ice viscosity; the keyword argument `nσ`, which is passed to a `Grid` object, specifies the number of levels in the vertical. We refer to the extension of the 2D (horizontal) grid to n$\sigma$ levels in the vertical as the 3D grid, which has size nx $\times$ ny $\times$ n$\sigma$.
 
 ```julia
 nx = 164        #number of x grid points
