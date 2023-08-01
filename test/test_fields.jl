@@ -1,4 +1,4 @@
-using Test, WAVI
+using Test, WAVI, LinearAlgebra
 
 @testset "Fields" begin
     @info "Testing Fields...."
@@ -23,7 +23,7 @@ using Test, WAVI
         @info "Testing UGrid construction..."
         ugrid = WAVI.UGrid(nxu = 10, nyu = 10, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
         @test ugrid isa WAVI.UGrid
-        end
+    end
 
     @testset "Testing UGrid errors" begin 
         @info "Testing UGrid size input errors..."
@@ -36,7 +36,7 @@ using Test, WAVI
         @info "Testing VGrid construction..."
         vgrid = WAVI.VGrid(nxv = 10, nyv = 10, mask = trues(10,10), levels = 5, dx = 10., dy = 10.)
         @test vgrid isa WAVI.VGrid
-        end
+    end
 
     @testset "Testing UGrid errors" begin 
         @info "Testing UGrid size input errors..."
@@ -49,7 +49,7 @@ using Test, WAVI
         @info "Testing CGrid construction..."
         cgrid = WAVI.CGrid(nxc = 10, nyc = 10, mask = trues(10,10))
         @test cgrid isa WAVI.CGrid
-        end
+    end
 
     @testset "Testing CGrid errors" begin 
         @info "Testing CGrid size input errors..."
@@ -64,6 +64,12 @@ using Test, WAVI
         grid = Grid()
         sigmagrid = WAVI.SigmaGrid(nxs = 10, nys = 10, nσs = 10, σ = collect(range(0., 1., length = 10)), η = ones(10,10,10), θ = ones(10,10,10), Φ = ones(10,10,10), glen_b = fill(WAVI.glen_b(params.default_temperature,params.default_damage,params.glen_a_ref,params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const),10,10,10))
         @test sigmagrid isa WAVI.SigmaGrid
-        end
+        @test dot(sigmagrid.quadrature_weights,ones(eltype(sigmagrid.quadrature_weights),size(sigmagrid.quadrature_weights))) ≈ 1.0
+        @test dot(sigmagrid.quadrature_weights,sigmagrid.σ) ≈ 0.5
+        sigmagridirregular = WAVI.SigmaGrid(nxs = 10, nys = 10, nσs = 10, σ = collect(range(0., 1., length = 10)).^2, η = ones(10,10,10), θ = ones(10,10,10), Φ = ones(10,10,10), glen_b = fill(WAVI.glen_b(params.default_temperature,params.default_damage,params.glen_a_ref,params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const),10,10,10))
+        @test sigmagridirregular isa WAVI.SigmaGrid
+        @test dot(sigmagridirregular.quadrature_weights,ones(eltype(sigmagridirregular.quadrature_weights),size(sigmagridirregular.quadrature_weights))) ≈ 1.0
+        @test dot(sigmagridirregular.quadrature_weights,sigmagridirregular.σ) ≈ 0.5
+    end
 
 end

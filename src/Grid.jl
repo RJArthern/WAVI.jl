@@ -81,11 +81,9 @@ function Grid(;
 (~(h_mask === nothing)) || (h_mask = trues(nx,ny))
 (~(u_iszero === nothing))|| (u_iszero = falses(nx+1,ny))
 (~(v_iszero === nothing)) || (v_iszero = falses(nx, ny+1))
-(~(quadrature_weights === nothing) || (quadrature_weights = [0.5;ones(nσ-2);0.5]/(nσ-1)))
  
 #check the sizes of inputs
 size(h_mask)==(nx,ny) || throw(DimensionMismatch("h_mask size must be (nx x ny) (i.e. $nx x $ny)"))
-size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
 size(u_iszero)==(nx+1,ny) || throw(DimensionMismatch("u_iszero size must be size of U grid (nx+1 x ny) (i.e. $(nx+1) x $ny)"))
 size(v_iszero)==(nx,ny+1) || throw(DimensionMismatch("v_iszero size must be size of V grid (nx x ny+1) (i.e. $nx x $(ny+1)"))
 
@@ -126,6 +124,11 @@ yyc=[y0+j*dy for i=1:(nx-1), j=1:(ny-1)]; @assert size(yyc)==(nx-1,ny-1)
 ~(σ === nothing) ||  (σ = collect(range(0.0,length=nσ,stop=1.0))) #default sigma
 length(σ) == nσ || throw(DimensionMismatch("number of sigma levels (= $(length(σ))) must match number of σ grid points (=$(nσ))"))
 ζ = one(eltype(σ)) .- σ ; @assert length(ζ) == nσ
+
+@assert σ[1] == zero(eltype(σ)) && σ[end] == one(eltype(σ))
+(~(quadrature_weights === nothing) || (quadrature_weights = 0.5*[ σ[2] .- σ[1] ; σ[3:end] .- σ[1:end-2] ; σ[end] .- σ[end-1] ]))
+size(quadrature_weights) == (nσ,) || throw(DimensionMismatch("Input quadrate weighs are size $size(quadrature_weights). quadrature weights must have size (nσ,) (i.e. ($nσ,))"))
+
 
 return Grid(nx,
             ny,

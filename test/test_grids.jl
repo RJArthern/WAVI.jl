@@ -16,7 +16,8 @@ using Test, WAVI
     @test grid.h_mask == trues(nx,ny)
     @test grid.u_iszero == falses(nx+1,ny)
     @test grid.v_iszero == falses(nx,ny+1)
-    @test grid.quadrature_weights ==  [0.5;ones(grid.nσ-2);0.5]/(grid.nσ-1)
+    @test grid.quadrature_weights == 0.5*[ grid.σ[2] .- grid.σ[1] ; grid.σ[3:end] .- grid.σ[1:end-2] ; grid.σ[end] .- grid.σ[end-1] ] 
+    @test grid.quadrature_weights ≈ [0.5;ones(grid.nσ-2);0.5]/(grid.nσ-1)
 
     #test the string boundary conditions method
     grid = Grid(nx = nx, ny = ny, u_iszero = ["north"])
