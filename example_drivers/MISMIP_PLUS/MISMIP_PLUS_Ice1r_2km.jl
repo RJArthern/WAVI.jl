@@ -37,7 +37,9 @@ function MISMIP_PLUS_Ice1r_2km()
 
     #Physical parameters
     accumulation_rate = 0.3
-    params = Params(accumulation_rate = accumulation_rate)
+    default_temperature=265.700709
+    params = Params(accumulation_rate = accumulation_rate,
+                    default_temperature = default_temperature)
 
     #make the model
     model = Model(grid = grid,

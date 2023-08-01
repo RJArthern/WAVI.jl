@@ -4,6 +4,7 @@ Manifest.toml
 .ipynb_checkpoints
 *.mat
 *.tif
+*.vscode
 *.jld2
 *.nc
 #*.md
@@ -16,3 +17,4 @@ driver_updated.jl
 *.box
 *.data
 **/Attribution_driver
+

@@ -1,4 +1,4 @@
-group = "all"
+group = "all" 
 
 if group == "fields" || group == "all"
     println(1)
@@ -33,11 +33,18 @@ if group == "utils" || group == "all"
     include("test_utils.jl")
 end
 
-if group == "verification" || group == "all"
-    include("verification_tests.jl")
+if group == "kronecker" || group == "all"
+    include("test_kronecker.jl")
 end
 
 if group == "version_update" || group == "all"
     include(joinpath("version_update_test_verification","test_version_updates.jl"))
 end
 
+if group == "shared_memory_parallelism" || group == "all"
+    include(joinpath("domain_decomposition_tests","test_domains_shared_memory.jl"))
+end
+
+if group == "verification" || group == "all"
+    include("verification_tests.jl")
+end
