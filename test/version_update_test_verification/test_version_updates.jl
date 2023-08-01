@@ -86,12 +86,24 @@ using WAVI, Test
     else
     example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
+
+    
+    @test simulation.model.fields.gh.h ≈ example_output["h"]
+    @test simulation.model.fields.gu.u ≈ example_output["u"]
+    @test simulation.model.fields.gv.v ≈ example_output["v"]
+    @test simulation.model.fields.gh.ηav ≈ example_output["viscosity"]
+    @test simulation.model.fields.gh.grounded_fraction ≈ example_output["grounded_fraction"]
+    @test simulation.model.fields.gh.bed_speed ≈ example_output["bed_speed"]
+
+
     @test simulation.model.fields.gh.h == example_output["h"]
     @test simulation.model.fields.gu.u == example_output["u"]
     @test simulation.model.fields.gv.v == example_output["v"]
     @test simulation.model.fields.gh.ηav == example_output["viscosity"]
     @test simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
     @test simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
+
+
 end
 
 
