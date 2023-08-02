@@ -22,6 +22,7 @@ if true
         @test (glxtest[4]-glxtest[1])/(glxtest[4]+glxtest[1]) < 1e-4
         @test (glxtest[2]-glxtest[3])/(glxtest[2]+glxtest[3]) < 1e-4
         @testset "Tight Tolerance" begin
+            # For quick testing at low resolutions (e.g. 8 km) these may be broken
             @test_broken 480000<glxtest[1]<540000
             @test_broken 480000<glxtest[4]<540000
             @test_broken 430000<glxtest[2]<460000

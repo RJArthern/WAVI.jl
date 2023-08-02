@@ -97,6 +97,7 @@ using WAVI, Test
     end
 
     @testset "Exact comparison" begin 
+        # If floating point rounding has changed since reference runs these will be broken.
         @test_broken simulation.model.fields.gh.h == example_output["h"]
         @test_broken simulation.model.fields.gu.u == example_output["u"]
         @test_broken simulation.model.fields.gv.v == example_output["v"]
