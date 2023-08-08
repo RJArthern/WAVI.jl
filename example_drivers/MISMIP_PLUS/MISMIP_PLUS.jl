@@ -32,8 +32,10 @@ function MISMIP_PLUS()
     #Physical parameters
     default_thickness = 100.0 #set the initial condition this way
     accumulation_rate = 0.3
+    default_temperature=265.700709
     params = Params(default_thickness = default_thickness, 
-                    accumulation_rate = accumulation_rate)
+                    accumulation_rate = accumulation_rate,
+                    default_temperature = default_temperature)
 
     #make the model
     model = Model(grid = grid,

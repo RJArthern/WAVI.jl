@@ -10,4 +10,5 @@
     nsmooth::N = 5
     smoother_omega::T = 1.0
     stencil_margin::N = 3
+    super_implicitness::T = 1.0
 end

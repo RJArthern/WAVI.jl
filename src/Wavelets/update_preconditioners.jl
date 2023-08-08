@@ -9,29 +9,41 @@ function get_preconditioner(model::AbstractModel{T,N},op::LinearMap{T}) where {T
     @unpack gu,gv,wu,wv=model.fields
     @unpack params,solver_params=model
 
-    m,n=size(op)
-    @assert m == n == gu.n + gv.n
+    mi,ni = size(op)
+    @assert mi == ni == gu.ni + gv.ni
 
-    n = gu.n + gv.n
+    ni = gu.ni + gv.ni
     n_coarse = wu.n[] + wv.n[]
 
-    restrict_fun(x) = restrictvec(model,x)
-    prolong_fun(x) = prolongvec(model,x)
+    #starting guess for the multigrid coarse correction is cached by the model
+    correction_coarse=get_correction_coarse(model)
 
-    restrict=LinearMap{T}(restrict_fun,n_coarse,n;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
-    prolong=LinearMap{T}(prolong_fun,n,n_coarse;issymmetric=false,ismutating=false,ishermitian=false,isposdef=false)
+    restrict,prolong,op_coarse = get_multigrid_ops(model,op)
 
     op_diag=get_op_diag(model,op)
 
     #Four colour Jacobi preconditioner. Red-Black checkerboard Jacobi for each velocity component.
-    sweep=[[1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];[3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask]]
+    sweep=[
+    [1 .+ mod(i-j,2) for i=1:gu.nxu, j=1:gu.nyu][gu.mask_inner]
+    ;
+    [3 .+ mod(i-j,2) for i=1:gv.nxv, j=1:gv.nyv][gv.mask_inner]
+    ]
+
     sweep_order=[1,3,2,4]
 
-    p=Preconditioner{T,N}(op=op, restrict=restrict, prolong=prolong,sweep=sweep, sweep_order=sweep_order,
-            op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse,
+    O=typeof(op)
+    C=typeof(op_coarse)
+    R=typeof(restrict)
+    P=typeof(prolong)
+    p=Preconditioner{T,N,O,C,R,P}(op=op, restrict=restrict, prolong=prolong, op_coarse = op_coarse, sweep=sweep, sweep_order=sweep_order,
+            op_diag=op_diag, nsmooth=solver_params.nsmooth, tol_coarse = solver_params.tol_coarse, correction_coarse = correction_coarse,
             maxiter_coarse = solver_params.maxiter_coarse, smoother_omega=solver_params.smoother_omega)
 
     return p
+end
+
+function get_correction_coarse(p::AbstractPreconditioner)
+    return p.correction_coarse
 end
 
 """
@@ -50,13 +62,15 @@ function precondition!(x, p, b)
     x .= gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                                 sweep=sweep, sweep_order=sweep_order, smoother_omega = smoother_omega)
 
-    resid=b-op*x;
+    resid=get_resid(x,op,b)
 
     # Multigrid restriction
     b_coarse=restrict*resid
 
+    abstol = tol_coarse*norm(b_coarse)
+
     # Multigrid solve for correction
-    cg!(correction_coarse, op_coarse, b_coarse; reltol = tol_coarse, maxiter = maxiter_coarse)
+    cg!(correction_coarse, op_coarse, b_coarse; abstol = abstol, maxiter = maxiter_coarse)
 
     # Multigrid prolongation
     x .= x .+ prolong*correction_coarse
@@ -78,17 +92,18 @@ end
 function get_op_diag(model::AbstractModel,op::LinearMap)
     @unpack gu,gv=model.fields
     @unpack params,solver_params=model
-    m,n=size(op)
-    @assert m == n == gu.n + gv.n
-    op_diag=zeros(eltype(op),n)
+    mi,ni = size(op)
+    @assert mi == ni == gu.ni + gv.ni
+    op_diag=zeros(eltype(op),ni)
+    ope_tmp=zeros(eltype(op),ni)
     sm=solver_params.stencil_margin
-    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nxu, j=1:gu.nyu][gu.mask];
-           [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask] ]
-    e=zeros(Bool,n)
+    sweep=[[1+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gu.nxu, j=1:gu.nyu][gu.mask_inner];
+           [1+sm^2+mod((i-1),sm)+sm*mod((j-1),sm) for i=1:gv.nxv, j=1:gv.nyv][gv.mask_inner] ]
+    e=zeros(Bool,ni)
     for i = unique(sweep)
-        e[sweep .== i] .= true
-        op_diag[e] .= (op*e)[e]
-        e[sweep .== i] .= false
+        e .= sweep .== i
+        mul!(ope_tmp,op,e)
+        op_diag[e] .= ope_tmp[e]
     end
     return op_diag
 end
@@ -121,13 +136,82 @@ function gauss_seidel_smoother!(x, op, b;
                                 sweep=(1:size(op,1)),
                                 sweep_order=unique(sweep),
                                 smoother_omega=1.0)
-    resid=b-op*x
+    resid=get_resid(x,op,b)
+    
+    idx = zeros(Bool,size(sweep))
     for i = 1:iters
         for j = sweep_order
-              idx = sweep .== j
-              x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
-              resid .= b .- op*x
+              idx .= sweep .== j
+@views        x[idx] .= x[idx] .+ smoother_omega .* resid[idx]./op_diag[idx]
+              get_resid!(resid,x,op,b)
         end
     end
     return x
 end
+
+
+function get_multigrid_ops(model::AbstractModel{T,N},op::LinearMap{T}) where {T, N}
+    @unpack gu,gv,wu,wv=model.fields
+
+    m,n=size(op)
+    @assert m == n == gu.ni + gv.ni
+
+    ni = gu.ni + gv.ni
+    n_coarse = wu.n[] + wv.n[]
+
+    restrict_fun! = get_restrict_fun(model)
+    prolong_fun! = get_prolong_fun(model)
+
+    restrict=LinearMap{T}(restrict_fun!,n_coarse,ni;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+    prolong=LinearMap{T}(prolong_fun!,ni,n_coarse;issymmetric=false,ismutating=true,ishermitian=false,isposdef=false)
+
+    op_coarse_fun! = get_op_coarse_fun(op,restrict,prolong)
+
+    op_coarse=LinearMap{T}(op_coarse_fun!,n_coarse,n_coarse;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+
+    return restrict,prolong,op_coarse
+
+end
+
+function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::LinearMap{T}) where {T}
+
+     mi,ni = size(op)
+     @assert mi == ni 
+
+     n_coarse = size(restrict,1)
+
+     tmp1 :: Vector{T} = zeros(ni)
+     tmp2 :: Vector{T} = zeros(ni)
+     out :: Vector{T} = zeros(n_coarse)
+     function op_coarse_fun!(out,in)
+@!        tmp1 = prolong * in
+@!        tmp2 = op * tmp1
+@!        out = restrict * tmp2
+          return out
+     end
+     return op_coarse_fun!
+end
+
+function get_correction_coarse(model::AbstractModel{T,N}) where {T,N}
+    @unpack wu,wv = model.fields
+
+    n_coarse = wu.n[] + wv.n[]
+
+    correction_coarse=zeros(T,n_coarse)
+    correction_coarse[1:wu.n[]] .= wu.correction_coarse[]
+    correction_coarse[wu.n[]+1:n_coarse] .= wv.correction_coarse[]
+
+    return correction_coarse
+end
+
+function set_correction_coarse!(model::AbstractModel{T,N},correction_coarse::AbstractVector{T}) where {T,N}
+    @unpack wu,wv = model.fields
+
+    n_coarse = wu.n[] + wv.n[]
+
+    wu.correction_coarse[] .= correction_coarse[ 1 : wu.n[] ]  
+    wv.correction_coarse[] .= correction_coarse[ (wu.n[]+1) : n_coarse]
+
+    return nothing
+end
+

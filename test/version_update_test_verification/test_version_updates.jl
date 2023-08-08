@@ -40,8 +40,10 @@ using WAVI, Test
         #Physical parameters
         default_thickness = 100.0 #set the initial condition this way
         accumulation_rate = 0.3
+        default_temperature=265.700709
         params = Params(default_thickness = default_thickness, 
-                        accumulation_rate = accumulation_rate)
+                        accumulation_rate = accumulation_rate,
+                        default_temperature = default_temperature)
 
         #make the model
         model = Model(grid = grid,
@@ -69,7 +71,10 @@ using WAVI, Test
 
     simulation = version_update_test();
 
-    if  VERSION == v"1.6.2"
+    if  VERSION == v"1.8.3"
+        filename = joinpath(dirname(@__FILE__), "v1_8_3_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        example_output = load(filename)
+    elseif  VERSION == v"1.6.2"
         filename = joinpath(dirname(@__FILE__), "v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif VERSION == v"1.6.1"
@@ -81,12 +86,26 @@ using WAVI, Test
     else
     example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
-    @test simulation.model.fields.gh.h == example_output["h"]
-    @test simulation.model.fields.gu.u == example_output["u"]
-    @test simulation.model.fields.gv.v == example_output["v"]
-    @test simulation.model.fields.gh.ηav == example_output["viscosity"]
-    @test simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
-    @test simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
+
+    @testset "Approximate comparison" begin
+        @test simulation.model.fields.gh.h ≈ example_output["h"]
+        @test simulation.model.fields.gu.u ≈ example_output["u"]
+        @test simulation.model.fields.gv.v ≈ example_output["v"]
+        @test simulation.model.fields.gh.ηav ≈ example_output["viscosity"]
+        @test simulation.model.fields.gh.grounded_fraction ≈ example_output["grounded_fraction"]
+        @test simulation.model.fields.gh.bed_speed ≈ example_output["bed_speed"]
+    end
+
+    @testset "Exact comparison" begin 
+        # If floating point rounding has changed since reference runs these will be broken.
+        @test_broken simulation.model.fields.gh.h == example_output["h"]
+        @test_broken simulation.model.fields.gu.u == example_output["u"]
+        @test_broken simulation.model.fields.gv.v == example_output["v"]
+        @test_broken simulation.model.fields.gh.ηav == example_output["viscosity"]
+        @test_broken simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
+        @test_broken simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
+    end
+
 end
 
 

@@ -37,7 +37,7 @@ nys :: N
 nσs :: N
 σ :: Vector{T} 
 ζ :: Vector{T} = one(eltype(σ)) .- σ ; @assert length(ζ) == nσs
-quadrature_weights :: Vector{T} = [0.5;ones(nσs-2);0.5]/(nσs-1); @assert length(quadrature_weights) == nσs
+quadrature_weights :: Vector{T} = 0.5*[ σ[2] .- σ[1] ; σ[3:end] .- σ[1:end-2] ; σ[end] .- σ[end-1] ] ; @assert length(quadrature_weights) == nσs
 η :: Array{T,3}; @assert size(η)==(nxs,nys,nσs)
 θ :: Array{T,3}; @assert size(θ)==(nxs,nys,nσs)
 Φ :: Array{T,3}; @assert size(Φ)==(nxs,nys,nσs)
