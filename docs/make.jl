@@ -72,7 +72,7 @@ data_structure_pages = [
 physics_pages = [
     "Overview" => "physics/overview.md"
     "Governing Equations" => "physics/governing_equations.md"
-    "Melt Rates" => "physics/melting.md"
+    "Basal Melt Rate Parametrizations" => "physics/melting.md"
     #"Calving" => "physics/calving.md"
     #"Damage" => "physics/damage.md"
 ]
