@@ -3,8 +3,9 @@
   ☃️🏔️❄️ WAVI.jl ❄️🏔️☃️
 </h1>
 
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/logo.png" alt="" title="" width="400" height="400" /></center>
-
+<p align="center">
+  <img width="400" height="400" src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/logo.png">
+</p>
 
 WAVI (Wavelet-based Adaptive-grid Vertically-integrated Ice-model) is a fast and friendly ice sheet model, written in Julia. WAVI documentation can be found [here](https://rjarthern.github.io/WAVI.jl/).
 
