@@ -16,7 +16,7 @@ end
 
 
 """
-TimesteppingParams(;
+            TimesteppingParams(;
                     niter0 = 0,
                     dt = 1.0,
                     end_time = 1.0,
@@ -31,14 +31,14 @@ TimesteppingParams stores information relating to timestepping.
 
 Keyword arguments
 =================
-- 'niter0': Iteration number of the first timestep. niter0 = 0 corresponds to a new simulation, while niter0 > 0 (positive integer) corresponds to a pickup.
-- 'dt': Model timestep
-- 'end_time': Simulation termination time
-- 't0': Starting time of the simulation
-- 'chkpt_freq': Frequency of outputting temporary checkpoints
-- 'pchkpt_freq': Frequecy with which permanent checkpoints are pass
-- 'chkpt_path' : Path to location checkpoint output
-- 'step_thickness': Toggle whether to update the ice thickness (true) or not (false) at each timestep
+            - 'niter0': Iteration number of the first timestep. niter0 = 0 corresponds to a new simulation, while niter0 > 0 (positive integer) corresponds to a pickup.
+            - 'dt': Model timestep
+            - 'end_time': Simulation termination time
+            - 't0': Starting time of the simulation
+            - 'chkpt_freq': Frequency of outputting temporary checkpoints
+            - 'pchkpt_freq': Frequecy with which permanent checkpoints are pass
+            - 'chkpt_path' : Path to location checkpoint output
+            - 'step_thickness': Toggle whether to update the ice thickness (true) or not (false) at each timestep
 """
 function TimesteppingParams(;
                         niter0 = 0,
