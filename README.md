@@ -3,7 +3,7 @@
   ☃️🏔️❄️ WAVI.jl ❄️🏔️☃️
 </h1>
 
-WAVI (Wavelet-based Adaptive-grid Vertically-integrated Ice-model) is a fast and friendly ice sheet model, written in Julia. 
+WAVI (Wavelet-based Adaptive-grid Vertically-integrated Ice-model) is a fast and friendly ice sheet model, written in Julia. WAVI documentation can be found [here](https://rjarthern.github.io/WAVI.jl/).
 
 ## Contents
 
