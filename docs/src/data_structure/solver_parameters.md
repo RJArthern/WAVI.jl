@@ -1,5 +1,5 @@
 # Solver Parameters
-A `SolverParameters` object is a WAVI.jl object that stores parameters related to the [numerical solution](../numerical_procedure/numerical_procedure.md) of the [governing equations](../physics/governing_equations.md). The following table summarises these parameters
+A `SolverParams` object is a WAVI.jl object that stores parameters related to the [numerical solution](../numerical_procedure/numerical_procedure.md) of the [governing equations](../physics/governing_equations.md). The following table summarises these parameters
 
 
 | Keyword Argument   | Description                   | Default Value         |
@@ -15,4 +15,6 @@ A `SolverParameters` object is a WAVI.jl object that stores parameters related t
 | `smoother_omega`               | | 1.0             |
 | `stencil_margin`               |  | 3           |
 
-
+```@docs
+SolverParams()
+```

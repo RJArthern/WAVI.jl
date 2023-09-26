@@ -25,5 +25,7 @@ A `Params` object is a WAVI.jl object that stores parameters related to physical
 | `sea_level_wrt_geoid`     | Reference sea level        | 0 m     |
 | `minimum_thickness`     | Minimum ice thickness (on grid points in ice domain)             | 50 m     |
 
-
+```@docs
+Params()
+```
 

@@ -9,7 +9,7 @@ This example demonstrates how to
 First let's make sure we have all required packages installed.
 ```julia
 using Pkg
-Pkg.add("https://github.com/RJArthern/WAVI.jl")
+Pkg.add(PackageSpec(url="https://github.com/RJArthern/WAVI.jl.git", rev = "main"))
 Pkg.add(`Plots`)
 using WAVI, Plots
 ```

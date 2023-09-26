@@ -3,7 +3,7 @@
 WAVI.jl uses a hierachical data structure, which is shown schematically below. This page provides a brief overview of each of these structures; you can find out more information about each of these via the tabs in the sidebar.
 
 ```@raw html
-<center><img src="../assets/structure_flowchart.jpeg" alt="" title="" width="500" height="400" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/structure-flowchart.jpg" alt="" title="" width="500" height="400" /></center>
 ```
 
 
