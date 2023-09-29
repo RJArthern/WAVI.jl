@@ -1,26 +1,39 @@
+
+#Traits for specifying how to perform parallel operations
+struct BasicParallelSpec <: AbstractParallelSpec end
+
 """
 update_velocities!(model::AbstractModel)
 
 Solve momentum equation to update the velocities, plus Picard iteration for non-linear rheology.
 
 """
-function update_velocities!(model::AbstractModel)
+function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 @unpack params,solver_params=model
 @unpack gu,gv,wu,wv = model.fields
-n = gu.n + gv.n
 
-x=get_start_guess(model)
-b=get_rhs(model)
-
-rel_resid=zero(eltype(b))
+update_preconditioner!(model)
 
 converged::Bool = false
 i_picard::Int64 = 0
+rel_resid = Inf
 while !converged && (i_picard < solver_params.maxiter_picard)
 
-    i_picard = i_picard + 1
+   i_picard = i_picard + 1
 
-    set_velocities!(model,x)
+   inner_update!(model)
+   
+   converged, rel_resid = precondition!(model)
+
+end
+println("Solved momentum equation on thread ",Threads.threadid()," with residual ", 
+      round(rel_resid,sigdigits=3)," at iteration ",i_picard)
+
+return model
+end
+
+
+function inner_update!(model::AbstractModel)
     update_shelf_strain_rate!(model)
     update_av_speed!(model)
     update_bed_speed!(model)
@@ -32,18 +45,45 @@ while !converged && (i_picard < solver_params.maxiter_picard)
     update_βeff!(model)
     update_βeff_on_uv_grids!(model)
     update_rheological_operators!(model)
+    return model
+end
+
+
+precondition!(model::AbstractModel) = precondition!(model,get_parallel_spec(model))
+
+function precondition!(model::AbstractModel,::BasicParallelSpec)
+    @unpack solver_params=model
+
+    x=get_start_guess(model)
+    
     op=get_op(model)
 
-    rel_resid = norm(b .- op*x)/norm(b)
+    b=get_rhs(model)
+
+    resid=get_resid(x,op,b)
+
+    set_residual!(model,resid)
+
+    rel_resid = norm(resid)/norm(b)
+
     converged = rel_resid < solver_params.tol_picard
 
-    p=get_preconditioner(model,op)
-    precondition!(x, p, b)
+    correction = zero(x)
 
-end
-set_velocities!(model,x)
+    if ! converged
 
-return model
+      p=get_preconditioner(model,op)
+
+      precondition!(correction, p, resid)
+    
+      correction_coarse = get_correction_coarse(p)
+      set_correction_coarse!(model,correction_coarse)
+    
+    end
+    x .= x .+ correction
+    set_velocities!(model,x)
+
+    return converged, rel_resid
 end
 
 
@@ -56,8 +96,7 @@ end
 function get_start_guess(model::AbstractModel)
     @unpack gu,gv=model.fields
     @assert eltype(gu.u)==eltype(gv.v)
-    n = gu.n + gv.n
-    x=[gu.samp*gu.u[:];gv.samp*gv.v[:]]
+    x=[gu.samp_inner*gu.u[:];gv.samp_inner*gv.v[:]]
     return x
 end
 
@@ -68,26 +107,81 @@ end
  Return right hand side vector of momentum equations.
 
 """
-function get_rhs(model::AbstractModel)
+function get_rhs(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
-    @unpack params=model
-    onesvec=ones(gh.nxh*gh.nyh)
-    surf_elev_adjusted = gh.crop*(gh.s[:] .+ params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
-    f1=[
-        (params.density_ice*params.g*gu.h[gu.mask]).*(gu.samp*(-gu.∂x'*surf_elev_adjusted))
-        ;
-        (params.density_ice*params.g*gv.h[gv.mask]).*(gv.samp*(-gv.∂y'*surf_elev_adjusted))
-       ]
-    f2=[
-        (0.5*params.density_ice*params.g*gu.h[gu.mask].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask],gu.h[gu.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gu.h[gu.mask].*gu.s[gu.mask]).*gu.samp*(-gu.∂x'*(gh.crop*onesvec))
-        ;
-        (0.5*params.density_ice*params.g*gv.h[gv.mask].^2
-        -0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask],gv.h[gv.mask],params.sea_level_wrt_geoid)).^2
-        -params.density_ice*params.g*gv.h[gv.mask].*gv.s[gv.mask]).*gv.samp*(-gv.∂y'*(gh.crop*onesvec))
-        ]
-    rhs=f1+f2
+    @unpack params, solver_params = model
+    onesvec=ones(T,gh.nxh*gh.nyh)
+    surf_elev_adjusted = gh.crop*(gh.s[:] .+ solver_params.super_implicitness.*params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
+    
+    rhs = zeros(T,gu.ni+gv.ni)
+    f1 = zeros(T,gu.ni+gv.ni)
+    f2 = zeros(T,gu.ni+gv.ni)
+    f3 = zeros(T,gu.ni+gv.ni)
+    tmph = zeros(T,gh.nxh*gh.nyh)
+    tmpu = zeros(T,gu.nxu*gu.nyu)
+    tmpui = zeros(T,gu.ni)
+    tmpv = zeros(T,gv.nxv*gv.nyv)
+    tmpvi = zeros(T,gv.ni)
+    sui = zeros(T,gu.ni)
+    hui = zeros(T,gu.ni)
+    dui = zeros(T,gu.ni)
+    svi = zeros(T,gv.ni)
+    hvi = zeros(T,gv.ni)
+    dvi = zeros(T,gv.ni)
+
+
+@!  tmpu = gu.∂xᵀ*surf_elev_adjusted
+@.  tmpu = -tmpu
+@!  tmpui = gu.samp_inner*tmpu
+@.  tmpui = (params.density_ice*params.g*gu.h[gu.mask_inner]).* tmpui
+
+@!  tmpv = gv.∂yᵀ*surf_elev_adjusted
+@.  tmpv = -tmpv
+@!  tmpvi = gv.samp_inner*tmpv
+@.  tmpvi = (params.density_ice*params.g*gv.h[gv.mask_inner]).*tmpvi
+              
+    f1[1:gu.ni] .= tmpui
+    f1[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
+
+    sui .= gu.s[gu.mask_inner]
+    hui .= gu.h[gu.mask_inner]
+    dui .= icedraft.(sui,hui,params.sea_level_wrt_geoid)
+@!  tmph = gh.crop*onesvec
+@!  tmpu = gu.∂xᵀ*tmph
+@.  tmpu = -tmpu
+@!  tmpui = gu.samp_inner*tmpu
+@.  tmpui = tmpui * params.g*(0.5*params.density_ice*hui^2
+                            - 0.5*params.density_ocean*dui^2
+                            - params.density_ice*hui*sui)
+
+    svi .= gv.s[gv.mask_inner]
+    hvi .= gv.h[gv.mask_inner]
+    dvi .= icedraft.(svi,hvi,params.sea_level_wrt_geoid)
+@!  tmph = gh.crop*onesvec
+@!  tmpv = gv.∂yᵀ*tmph
+@.  tmpv = -tmpv
+@!  tmpvi = gv.samp_inner*tmpv
+@.  tmpvi = tmpvi * params.g*(0.5*params.density_ice*hvi^2
+                            - 0.5*params.density_ocean*dvi^2
+                            - params.density_ice*hvi*svi)
+
+    f2[1:gu.ni] .= tmpui
+    f2[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
+
+ #   f2=[
+ #       (0.5*params.density_ice*params.g*gu.h[gu.mask_inner].^2
+ #       .- 0.5*params.density_ocean*params.g*(icedraft.(gu.s[gu.mask_inner],gu.h[gu.mask_inner],params.sea_level_wrt_geoid)).^2
+ #       .- params.density_ice*params.g*gu.h[gu.mask_inner].*gu.s[gu.mask_inner]).*gu.samp_inner*(-gu.∂xᵀ*(gh.crop*onesvec))
+ #       ;
+ #       (0.5*params.density_ice*params.g*gv.h[gv.mask_inner].^2
+ #       .- 0.5*params.density_ocean*params.g*(icedraft.(gv.s[gv.mask_inner],gv.h[gv.mask_inner],params.sea_level_wrt_geoid)).^2
+ #       .- params.density_ice*params.g*gv.h[gv.mask_inner].*gv.s[gv.mask_inner]).*gv.samp_inner*(-gv.∂yᵀ*(gh.crop*onesvec))
+ #       ]
+    
+    get_rhs_dirichlet!(f3,model)
+
+    rhs .= f1 .+ f2 .+ f3
+
     return rhs
 end
 
@@ -99,8 +193,8 @@ Set velocities to particular values. Input vector x represents stacked u and v c
 """
 function set_velocities!(model::AbstractModel,x)
     @unpack gh,gu,gv,gc=model.fields
-    gu.u[:] .= gu.spread*x[1:gu.n]
-    gv.v[:] .= gv.spread*x[(gu.n+1):(gu.n+gv.n)]
+    @views gu.u[gu.mask_inner] .= x[1:gu.ni]
+    @views gv.v[gv.mask_inner] .= x[(gu.ni+1):(gu.ni+gv.ni)]
     return model
 end
 
@@ -255,22 +349,20 @@ end
 
 Interpolate the effective drag coefficient onto u- and v-grids, accounting for grounded fraction.
 """
-function update_βeff_on_uv_grids!(model::AbstractModel)
+function update_βeff_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv=model.fields
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
 
-    T=eltype(gh.grounded_fraction)
-
     onesvec=ones(T,gh.nxh*gh.nyh)
-    gu.βeff[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    gu.βeff[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
     ipolgfu=zeros(T,gu.nxu,gu.nyu);
-    ipolgfu[gu.mask].=(gu.samp*(gu.cent'*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.cent'*(gh.crop*onesvec)))
+    ipolgfu[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
 
-    gv.βeff[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    gv.βeff[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
     ipolgfv=zeros(T,gv.nxv,gv.nyv);
-    ipolgfv[gv.mask].=(gv.samp*(gv.cent'*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.cent'*(gh.crop*onesvec)))
+    ipolgfv[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
     gv.βeff[ipolgfv .> zero(T)] .= gv.βeff[ipolgfv .> zero(T)].*gv.grounded_fraction[ipolgfv .> zero(T)]./
                                                  ipolgfv[ipolgfv .> zero(T)];
 
@@ -284,12 +376,13 @@ end
 Precompute various diagonal matrices used in defining the momentum operator.
 """
 function update_rheological_operators!(model::AbstractModel)
-    @unpack gh,gu,gv=model.fields
-    @unpack params=model
+    @unpack gh,gu,gv,gc = model.fields
+    @unpack params, solver_params = model
     gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
+    gc.dneghηav[] .= gc.crop*Diagonal(-gh.cent_xy*(gh.h[:].*gh.ηav[:]))*gc.crop
     gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
     gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
-    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * params.dt * gh.dsdh[:])*gh.crop
+    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * solver_params.super_implicitness .* params.dt * gh.dsdh[:])*gh.crop
     return model
 end
 
@@ -302,7 +395,43 @@ end
 """
 function get_op(model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
-    n = gu.n + gv.n
-    op_fun(x) = opvec(model,x)
-    op=LinearMap{T}(op_fun,n;issymmetric=true,ismutating=false,ishermitian=true,isposdef=true)
+    ni = gu.ni + gv.ni
+    op_fun! = get_op_fun(model)
+    op=LinearMap{T}(op_fun!,ni;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+end
+
+
+"""
+    get_rhs_dirichlet(model::AbstractModel{T,N}) where {T,N}
+
+    Extra term of right hand side to implement non-homogenous Dirichlet conditions   
+
+"""
+function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
+    @unpack gu,gv=model.fields
+
+    uvfixed=[
+    gu.u[:].*gu.u_isfixed[:]
+    ;
+    gv.v[:].*gv.v_isfixed[:]
+    ]
+
+    op_fun! = get_op_fun(model)
+    op_fun!(rhs_dirichlet,uvfixed,vecSampled=false)
+    
+    @. rhs_dirichlet = - rhs_dirichlet
+    
+    return rhs_dirichlet
+end
+
+"""
+    set_residual!(model::AbstractModel,residual)
+
+Set residuals to particular values. Input vector residual represents stacked u and v components at valid grid points.
+"""
+function set_residual!(model::AbstractModel,residual)
+    @unpack gu,gv=model.fields
+    @views gu.residual[gu.mask_inner] .= residual[1:gu.ni]
+    @views gv.residual[gv.mask_inner] .= residual[(gu.ni+1):(gu.ni+gv.ni)]
+    return model
 end

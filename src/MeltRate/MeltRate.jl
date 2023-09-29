@@ -6,7 +6,10 @@ include("./pico.jl")
 include("./quadratic_melt_rate.jl")
 include("./mismip_melt_rate.jl")
 include("./quadratic_forced_melt_rate.jl")
-
+include("./uniform_melt_under_shelves.jl")
+include("./uniform_melt_under_shelves_basin_specific.jl")
+include("./melt_rate_exponent_variation.jl")
+include("./melt_rate_exponent_variation_basin_specific.jl")
              
 
 ##### default temperature and salinity profiles #####

@@ -1,9 +1,9 @@
-using WAVI, Test
+using WAVI, Test, LinearAlgebra
 
-@testset "Version Updates" begin
-    @info "testing the current version of WAVI against previous version...."
+@testset "Shared Memory Parallelism" begin
+    @info "testing the parallel version against previous version...."
 
-    function version_update_test()
+    function shared_memory_test()
         #Grid and boundary conditions
         nx = 80
         ny = 10
@@ -45,11 +45,14 @@ using WAVI, Test
                         accumulation_rate = accumulation_rate,
                         default_temperature = default_temperature)
 
+        parallel_spec = SharedMemorySpec(ngridsx = 16,ngridsy=2,overlap=2,niterations=1)
+
         #make the model
         model = Model(grid = grid,
                         bed_elevation = bed, 
                         params = params, 
-                        solver_params = solver_params)
+                        solver_params = solver_params,
+                        parallel_spec = parallel_spec)
 
         #timestepping parameters
         niter0 = 0
@@ -59,7 +62,10 @@ using WAVI, Test
                                                 dt = dt, 
                                                 end_time = end_time)
 
+
+
         #nb no output parameters
+
 
         simulation = Simulation(model = model, 
                             timestepping_params = timestepping_params)
@@ -69,42 +75,30 @@ using WAVI, Test
         return simulation
     end
 
-    simulation = version_update_test();
+    simulation = shared_memory_test();
 
     if  VERSION == v"1.8.3"
-        filename = joinpath(dirname(@__FILE__), "v1_8_3_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_8_3_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif  VERSION == v"1.6.2"
-        filename = joinpath(dirname(@__FILE__), "v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_6_2_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif VERSION == v"1.6.1"
-        filename = joinpath(dirname(@__FILE__), "v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_6_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     elseif  VERSION == v"1.5.1"
-        filename = joinpath(dirname(@__FILE__), "v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
+        filename = joinpath(splitdir(dirname(@__FILE__))[1], "version_update_test_verification/v1_5_1_MISMIP_100yr_output_8kmres_maxiter1_timesteppt1.jld2")
         example_output = load(filename)
     else
     example_output = Dict("h" => NaN, "u" => NaN, "v" => NaN, "viscosity" => NaN, "grounded_fraction" => NaN, "bed_speed" => NaN)
     end
 
-    @testset "Approximate comparison" begin
-        @test simulation.model.fields.gh.h ≈ example_output["h"]
-        @test simulation.model.fields.gu.u ≈ example_output["u"]
-        @test simulation.model.fields.gv.v ≈ example_output["v"]
-        @test simulation.model.fields.gh.ηav ≈ example_output["viscosity"]
-        @test simulation.model.fields.gh.grounded_fraction ≈ example_output["grounded_fraction"]
-        @test simulation.model.fields.gh.bed_speed ≈ example_output["bed_speed"]
-    end
+    #println("Relative thickness error: ", norm(simulation.model.fields.gh.h .- example_output["h"])./norm(example_output["h"]))
+    #println("Relative u-velocity error", norm(simulation.model.fields.gu.u .- example_output["u"])./norm(example_output["u"]))
+    #println("Relative v-velocity error",norm(simulation.model.fields.gv.v .- example_output["v"])./norm(example_output["v"]))
 
-    @testset "Exact comparison" begin 
-        # If floating point rounding has changed since reference runs these will be broken.
-        @test_broken simulation.model.fields.gh.h == example_output["h"]
-        @test_broken simulation.model.fields.gu.u == example_output["u"]
-        @test_broken simulation.model.fields.gv.v == example_output["v"]
-        @test_broken simulation.model.fields.gh.ηav == example_output["viscosity"]
-        @test_broken simulation.model.fields.gh.grounded_fraction == example_output["grounded_fraction"]
-        @test_broken simulation.model.fields.gh.bed_speed == example_output["bed_speed"]
-    end
+    rtol=0.01
+    @test isapprox(simulation.model.fields.gh.h, example_output["h"]; rtol=rtol)
 
 end
 

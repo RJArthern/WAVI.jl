@@ -7,27 +7,11 @@ struct CGrid{T <: Real, N <: Integer}
       samp :: SparseMatrixCSC{T,N} 
     spread :: SparseMatrixCSC{T,N}
       cent :: KronType{T,N}
+     centᵀ :: KronType{T,N}
+  dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}}    # Rheological operator (-h × ηav)
 end
 
-function CGrid(;
-                nxc,
-                nyc,
-                mask = trues(nxc,nyc))
 
-    #check the sizes of inputs
-    (size(mask) == (nxc,nyc)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxc x nyc (i.e. $nxc x $nyc)"))
-
-    #construct operators
-    n = count(mask)
-    crop = Diagonal(float(mask[:]))
-    samp = crop[mask[:],:]
-    spread = sparse(samp')
-    cent = sparse(c(nyc)') ⊗ sparse(c(nxc)')
-
-    #make sure boolean type rather than bitarray
-    mask = convert(Array{Bool,2}, mask)
-
-        
 """
 CGrid(;
         nxc,
@@ -45,14 +29,36 @@ Keyword arguments
 - 'nyc': (required) Number of grid cells in y-direction in CGrid (should be same as grid.ny - 1)
 - 'mask': Mask specifying the model domain with respect to C grid
 """
-return CGrid(
-            nxc,
-            nyc, 
-            mask,
-            n,
-            crop, 
-            samp, 
-            spread,
-            cent)
+function CGrid(;
+                nxc,
+                nyc,
+                mask = trues(nxc,nyc))
+
+    #check the sizes of inputs
+    (size(mask) == (nxc,nyc)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxc x nyc (i.e. $nxc x $nyc)"))
+
+    #construct operators
+    n = count(mask)
+    crop = Diagonal(float(mask[:]))
+    samp = sparse(1:n,(1:(nxc*nyc))[mask[:]],ones(n),n,nxc*nyc)
+    spread = sparse(samp')
+    cent = sparse(c(nyc)') ⊗ sparse(c(nxc)')
+    centᵀ = c(nyc) ⊗ c(nxc)
+    dneghηav = Ref(crop*Diagonal(zeros(nxc*nyc))*crop)
+
+    #make sure boolean type rather than bitarray
+    mask = convert(Array{Bool,2}, mask)
+
+    return CGrid(
+                nxc,
+                nyc, 
+                mask,
+                n,
+                crop, 
+                samp, 
+                spread,
+                cent,
+                centᵀ,
+                dneghηav)
 end
     

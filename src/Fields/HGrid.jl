@@ -1,11 +1,13 @@
 struct HGrid{T <: Real, N  <: Integer}
-                   nxh :: N                                     # Number of grid cells in x-direction in HGrid
-                   nyh :: N                                     # Number of grid cells in y-direction in HGrid
+                  nxh :: N                                     # Number of grid cells in x-direction in HGrid
+                  nyh :: N                                     # Number of grid cells in y-direction in HGrid
                  mask :: Array{Bool,2}                         # Mask specifying the model domain
+            h_isfixed :: Array{Bool,2}                         # Mask specifying locations of fixed thickness
                     n :: N                                     # Total number of cells in the model domain
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
+              cent_xy :: KronType{T,N}                         # Centering operator from H-grid to C-grid
                     b :: Array{T,2}                            # Bed elevation
                     h :: Array{T,2}                            # Ice thickness 
                     s :: Array{T,2}                            # Current surface elevation
@@ -41,9 +43,11 @@ end
             nxh, 
             nyh,
             mask = trues(nxh,nyh),
+            h_isfixed = falses(nxh,nxy),
             b,
             h,
-            ηav = zeros(nxh,nyh))
+            ηav = zeros(nxh,nyh),
+            grounded_fraction = ones(nxh,nyh))
 
 Construct a WAVI.jl HGrid with size (nxh,nyh)
 HGrid stores fields that are defined on the problem's H grid. 
@@ -55,9 +59,11 @@ Keyword arguments
             Note that we store the grid size here, even though it can be easily inferred from grid, to increase transparency in velocity solve.
     - 'nyh': (required) Number of grid cells in y-direction in HGrid (should be same as grid.ny)
     - 'mask': Mask specifying the model domain
+    - 'h_isfixed': Mask specifying points where ice thickness is fixed
     - 'b': (requried) Bed elevation (bottom bathymetry)
     - 'h': (required) initial thickness of the ice
     - 'ηav': depth averaged visosity initially
+    - 'grounded_fraction': initial grounded fraction
 """
 
 
@@ -65,18 +71,21 @@ function HGrid(;
                 nxh, 
                 nyh,
                 mask = trues(nxh,nyh),
+                h_isfixed = falses(nxh,nxy),
                 b,
                 h = zeros(nxh,nyh),
-                ηav = zeros(nxh,nyh))
+                ηav = zeros(nxh,nyh),
+                grounded_fraction = ones(nxh,nyh))
 
     #check the sizes of inputs
-    (size(mask) == size(b) == size(h) == size(ηav) == (nxh,nyh)) || throw(DimensionMismatch("Sizes of inputs to UGrid must all be equal to nxh x nyh (i.e. $nxh x $nyh)"))
+    (size(mask) == size(h_isfixed) == size(b) == size(h) == size(ηav) == size(grounded_fraction) == (nxh,nyh)) || throw(DimensionMismatch("Sizes of inputs to HGrid must all be equal to nxh x nyh (i.e. $nxh x $nyh)"))
 
     #construct operators
-    n = count(mask);
-    crop = Diagonal(float(mask[:]));
-    samp = crop[mask[:],:]; 
-    spread = sparse(samp');
+    n = count(mask)
+    crop = Diagonal(float(mask[:]))
+    samp = sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
+    spread = sparse(samp')
+    cent_xy = c(nyh-1) ⊗ c(nxh-1)
     dneghηav = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
     dimplicit = Ref(crop*Diagonal(zeros(nxh*nyh))*crop)
      
@@ -86,7 +95,6 @@ function HGrid(;
     accumulation = zeros(nxh,nyh)
     basal_melt = zeros(nxh,nyh)
     haf = zeros(nxh,nyh)
-    grounded_fraction = ones(nxh,nyh)
     dsdh = ones(nxh,nyh)
     shelf_strain_rate = zeros(nxh,nyh)
     av_speed = zeros(nxh,nyh) 
@@ -106,11 +114,13 @@ function HGrid(;
     quad_f2[mask] = h[mask]./(3*ηav[mask])
 
     #check sizes of everything
-    @assert size(mask)==(nxh,nyh); @assert mask == clip(mask)
+    @assert size(mask)==(nxh,nyh); #@assert mask == clip(mask)
+    @assert size(h_isfixed)==(nxh,nyh); 
     @assert n == count(mask)
     @assert crop == Diagonal(float(mask[:]))
-    @assert samp == crop[mask[:],:]
+    @assert samp == sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
     @assert spread == sparse(samp')
+    @assert size(cent_xy) == ((nxh-1)*(nyh-1),nxh*nyh)
     @assert size(b)==(nxh,nyh)
     @assert size(h)==(nxh,nyh)
     @assert size(s)==(nxh,nyh)
@@ -139,16 +149,19 @@ function HGrid(;
 
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
+    h_isfixed = convert(Array{Bool,2}, h_isfixed)
 
 
 return HGrid(
             nxh,
             nyh,
             mask,
+            h_isfixed,
             n,
             crop,
             samp, 
             spread,
+            cent_xy,
             b,
             h,
             s,
