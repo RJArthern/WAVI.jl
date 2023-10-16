@@ -18,7 +18,7 @@ using WAVI, Plots
 ```
 
 ## Basal Topography
-The MISMIP+ domain is 640km in the x-direction and 80km in the y-direction, centred around $y = 0$. The basal topography is given by $z_b = \max [B_x(x) + B_y(y), -720] where $B_x(x)$ is a sixth order, even polynomial and $B_y(y)$ introduces two bumps in the domain. We write this analytic bed expression as a function
+The MISMIP+ domain is 640km in the x-direction and 80km in the y-direction, centred around $y = 0$. The basal topography is given by $z_b = \max [B_x(x) + B_y(y), -720]$ where $B_x(x)$ is a sixth order, even polynomial and $B_y(y)$ introduces two bumps in the domain. We write this analytic bed expression as a function
 ```julia
 function mismip_plus_bed(x,y)
     xbar = 300000.0
