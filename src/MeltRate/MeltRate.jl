@@ -10,6 +10,7 @@ include("./uniform_melt_under_shelves.jl")
 include("./uniform_melt_under_shelves_basin_specific.jl")
 include("./melt_rate_exponent_variation.jl")
 include("./melt_rate_exponent_variation_basin_specific.jl")
+include("./idealized_anthro_melt_rate.jl")
              
 
 ##### default temperature and salinity profiles #####

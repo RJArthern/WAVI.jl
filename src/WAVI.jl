@@ -4,7 +4,7 @@ module WAVI
 using LinearAlgebra, SparseArrays, LinearMaps, Parameters,
       IterativeSolvers, Interpolations, BenchmarkTools, Reexport,
       NetCDF, JLD2, Setfield, MAT, ImageFiltering, InplaceOps,
-      NonlinearSolve,SciMLNLSolve
+      NonlinearSolve,SciMLNLSolve, Random, AbstractFFTs
 
 #Import functions so they can be modified in this module.
 import Base: *, size, eltype
@@ -21,10 +21,10 @@ export
     update_state!, timestep!, run_simulation!,
 
     #Melt ratesS
-    PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne, PICO, QuadraticMeltRate, QuadraticForcedMeltRate, MeltRateExponentVariation, MeltRateExponentVariationBasins, UniformMeltUnderShelves, UniformMeltUnderShelvesBasins, 
+    PlumeEmulator, BinfileMeltRate, UniformMeltRate, MISMIPMeltRateOne, PICO, QuadraticMeltRate, QuadraticForcedMeltRate, MeltRateExponentVariation, MeltRateExponentVariationBasins, UniformMeltUnderShelves, UniformMeltUnderShelvesBasins, IdealizedAnthroMeltRate 
    
     #Post-processing controls
-    volume_above_floatation, height_above_floatation
+    #volume_above_floatation, height_above_floatation
 
 #Reexport Modules useful for users of the WAVI module
 @reexport using JLD2
