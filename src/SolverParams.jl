@@ -1,4 +1,18 @@
-#structure to hold the solver parameters
+"""
+    SolverParams(;
+        n_iter_viscosity = 2,
+        tol_picard = 1e-5,
+        maxiter_picard = 30,
+        tol_coarse = 1e-5,
+        maxiter_coarse = 1000,
+        levels = 3,
+        wavelet_threshold = 10.0,
+        nsmooth = 5,
+        smoother_omega = 1.0,
+        stencil_margin = 3)
+
+Construct a WAVI.jl solver parameters object.
+"""
 @with_kw struct SolverParams{T <: Real, N <: Integer}
     n_iter_viscosity::N = 2;  @assert n_iter_viscosity ==2
     tol_picard::T = 1e-5

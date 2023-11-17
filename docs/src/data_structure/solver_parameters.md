@@ -15,6 +15,4 @@ A `SolverParams` object is a WAVI.jl object that stores parameters related to th
 | `smoother_omega`               | | 1.0             |
 | `stencil_margin`               |  | 3           |
 
-```@docs
-SolverParams()
-```
+

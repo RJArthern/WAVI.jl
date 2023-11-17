@@ -1,8 +1,8 @@
 push!(LOAD_PATH,"../src/")
-import Pkg; Pkg.add("Documenter")
-import Pkg; Pkg.add("DocumenterCitations")
-import Pkg; Pkg.add("Literate")
-import Pkg; Pkg.add("Plots")
+#import Pkg; Pkg.add("Documenter")
+#import Pkg; Pkg.add("DocumenterCitations")
+#import Pkg; Pkg.add("Literate")
+#import Pkg; Pkg.add("Plots")
 
 using Documenter
 using DocumenterCitations
@@ -62,7 +62,7 @@ data_structure_pages = [
     "Output Writing" => "data_structure/output_writing.md"
     "Grid" => "data_structure/grid.md"
     "Solver Parameters" => "data_structure/solver_parameters.md"
-    "Physical Paramters" => "data_structure/params.md"
+    "Physical Parameters" => "data_structure/params.md"
     "Initial Conditions" => "data_structure/initial_conditions.md"
     "Fields" => "data_structure/fields.md"
     "Melt Rate Models" => "data_structure/melt_rate_models.md"

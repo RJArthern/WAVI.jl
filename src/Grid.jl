@@ -52,8 +52,6 @@ Keyword arguments
     - 'v_iszero': Locations of zero v velocity points
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
 """
-
-#grid constructor
 function Grid(; 
     nx = 80,
     ny = 10,
