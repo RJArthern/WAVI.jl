@@ -50,6 +50,7 @@ It's as easy as that: entry into the state of the art ice sheet model intercompa
 ## Getting help
 
 ## Contributing
+If you're interested in contributing to the development of WAVI we want your help no matter how big or small a contribution you make! Contributing guidelines can be found in our [contributing guide](https://rjarthern.github.io/WAVI.jl/contributing/)
 
 ## Credits
 This package was initiated by Rob Arthern (https://github.com/RJArthern) and is currently maintained by Rob and Alex Bradley (https://github.com/alextbradley)
