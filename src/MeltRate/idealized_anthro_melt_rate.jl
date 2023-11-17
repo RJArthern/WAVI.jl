@@ -61,7 +61,7 @@ function IdealizedAnthroMeltRate(;
                                 trend_onset = 0.0, 
                                 pc_max = -400.0,
                                 pc_min = -600.0,
-                                M = 0.56, #value from Bradley et al. 2023
+                                M = 1.0, 
                                 λ1 = -5.73e-2,
                                 λ2 = 8.32e-4,
                                 λ3 = 7.61e-4,
