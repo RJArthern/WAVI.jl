@@ -107,17 +107,18 @@ format = Documenter.HTML(
 )
 
 
-makedocs(bib,
+makedocs(
     sitename = "WAVI.jl",
     format = format,
     pages = pages,
     modules = [WAVI],
+    plugins = [bib],
     doctest = false,
     strict = false,
     clean = false,
     checkdocs = :none)
 
-deploydocs(;
+deploydocs(
     repo="github.com/RJArthern/WAVI.jl",
     devbranch="build-docs",
     versions = nothing
