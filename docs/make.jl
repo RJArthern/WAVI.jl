@@ -1,9 +1,7 @@
 push!(LOAD_PATH,"../src/")
 import Pkg; 
-Pkg.add("Documenter")
-Pkg.add("DocumenterCitations")
-Pkg.add("Literate")
-Pkg.add("Plots")
+Pkg.activate(joinpath(@__DIR__, ".."))
+Pkg.instantiate()
 
 using Documenter
 using DocumenterCitations
@@ -13,6 +11,7 @@ using WAVI
 
 bib_filepath = joinpath(dirname(@__FILE__), "wavi.bib")
 bib = CitationBibliography(bib_filepath)
+
 
 ENV["GKSwstype"] = "100"
 
@@ -66,7 +65,7 @@ data_structure_pages = [
     "Physical Parameters" => "data_structure/params.md"
     "Initial Conditions" => "data_structure/initial_conditions.md"
     "Fields" => "data_structure/fields.md"
-    "Melt Rate Models" => "data_structure/melt_rate_models.md"
+    "Basal Melt Rate Models" => "data_structure/melt_rate_models.md"
 ]
 
 
@@ -109,16 +108,14 @@ format = Documenter.HTML(
 
 
 makedocs(bib,
-  sitename = "WAVI.jl",
-   authors = "Alexander Bradley",
+    sitename = "WAVI.jl",
     format = format,
-     pages = pages,
-   modules = [WAVI],
-   doctest = false,
+    pages = pages,
+    modules = [WAVI],
+    doctest = false,
     strict = false,
-     clean = false,
- checkdocs = :none # Should fix our docstring so we can use checkdocs=:exports with strict=true.
-)
+    clean = false,
+    checkdocs = :none)
 
 deploydocs(;
     repo="github.com/RJArthern/WAVI.jl",
