@@ -28,7 +28,7 @@ Note that WAVI requires Julia v1.5 or newer.
 Updating WAVI is also achieved using the package manager
 ```julia
 julia>using Pkg
-julia>Pkg.update("WAVI"))
+julia>Pkg.update("WAVI")
 ```
 Note that updating should be done with care as WAVI is still developing rapidly; while we aim to keep breaking changes to a minimum, this cannot be guaranteed at present.
 
@@ -48,8 +48,9 @@ run_simulation!(simulation)
 It's as easy as that: entry into the state of the art ice sheet model intercomparison in nine lines of code 😎
 
 ## Getting help
+Our accessible and friendly mantra extends to reaching out: please do not hesistate to [get in touch](https://rjarthern.github.io/WAVI.jl/contact/). We welcome any conversation, whether you're interested in using WAVI.jl, are trying to figure out how get started, are stuck with a thorny problem, or interested in collaboration.
 
-## Contributing
+## [Contributing](https://rjarthern.github.io/WAVI.jl/contributing/)
 
 ## Credits
-This package was initiated by Rob Arthern (https://github.com/RJArthern) and is currently maintained by Rob and Alex Bradley (https://github.com/alextbradley)
+This package was initiated by [Rob Arthern](https://github.com/RJArthern) and is currently maintained by Rob and [Alex Bradley](https://github.com/alextbradley)
