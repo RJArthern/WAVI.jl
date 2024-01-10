@@ -16,11 +16,10 @@ Construct a WAVI.jl Simulation object.
 
 Keyword arguments
 =================
-
-    - `model`: (required) an instance of a `Model`` object
-    - `timestepping_params`: (required) an instance of a `TimesteppingParams` object, which stores information relating to timestepping
-    - `output_params`: an instance of an `OutputParams` object, which stores information relating to outputting of solutions
-    - `pickup_output_update_flag`: a flag which specifies whether to update the output_params upon picking up.
+- `model`: (required) an instance of a `Model`` object
+- `timestepping_params`: (required) an instance of a `TimesteppingParams` object, which stores information relating to timestepping
+- `output_params`: an instance of an `OutputParams` object, which stores information relating to outputting of solutions
+- `pickup_output_update_flag`: a flag which specifies whether to update the output_params upon picking up.
 """
 function Simulation(;
                     model = nothing,
