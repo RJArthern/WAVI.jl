@@ -26,15 +26,14 @@ Construct a WAVI.jl output parameters object.
 
 Keyword arguments
 =================
-
-    - `outputs`:  a tuple of entries defining names and quantities to be outputted
-    - `output_freq`: quantity specifying hwo frequently to produce output 
-    - `output_format`: specify output format (currently only .mat and .jld2 outputs are supported, selected with 'mat' or 'jld2' options)
-    - `prefix`: prefix to be prepended onto file names
-    - `output_path`: path on which to output filese
-    - `dump_vel`: flag to toggle whether or not dumping the velocity after the final timestep (used in mitgcm coupling)
-    - `zip_format`: specify whether or not to zip the output, and the format (currently only '.nc' output supported, use flag 'nc')
-    - `output_start`: flag to specify whether to output at the zeroth time step    
+- `outputs`:  a tuple of entries defining names and quantities to be outputted
+- `output_freq`: quantity specifying hwo frequently to produce output 
+- `output_format`: specify output format (currently only .mat and .jld2 outputs are supported, selected with 'mat' or 'jld2' options)
+- `prefix`: prefix to be prepended onto file names
+- `output_path`: path on which to output filese
+- `dump_vel`: flag to toggle whether or not dumping the velocity after the final timestep (used in mitgcm coupling)
+- `zip_format`: specify whether or not to zip the output, and the format (currently only '.nc' output supported, use flag 'nc')
+- `output_start`: flag to specify whether to output at the zeroth time step    
 """
 function OutputParams(; 
     outputs = (),
