@@ -64,8 +64,6 @@ Keyword arguments
     - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
     - 'basin_ID' : grid of basin IDs 
 """
-
-#grid constructor
 function Grid(; 
     nx = 80,
     ny = 10,
