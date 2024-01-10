@@ -20,8 +20,11 @@ model = Model(grid = grid, bed_elevation = bed_elevation, melt_rate = melt_rate)
 
 
 ## Analytic Melt Rate Parametrizations
+Documentation coming soon!
 
 ## Input File Melt Rates
+Documentation coming soon!
+
 
 ## Quadratic Melt Rate
 A `QuadraticMeltModel` -- the melt rate used to implement the [quadratic temperature melt rate parametrization](../physics/melting.md#Quadratic-Temperature-Melt-Rate-Parametrization) is constructed using the `QuadraticMeltModel(<kwargs>)` constructor. 
@@ -65,5 +68,7 @@ The [plume model emulator](../physics/melting.md#Plume-Emulator-Melt-Rate) of La
 Ambient temperature and salinity profiles are passed to `PlumeEmulator` objects via the `Ta` and `Sa` keyword arguments, respectively. These must be passed as single valued functions of depth (i.e. temporal dependence in the ambient conditions is not yet supported). `Ta` and `Sa` default to the warm ambient profiles used in ISOMIP experiments (referred to as 'warm0' therein), with a lower layer of temperature 1.2∘C and salinity 34.6PSU separated from an upper layer of temperature -1∘C and salinity 33.8PSU by a pycnocline of thickness 400m, which begins at a depth of 700m below sea level.
 
 ## PICO Melt Rate Parametrization
+Documentation coming soon!
 
 ## PICOp Melt Rate Parametrization
+Documentation coming soon!
