@@ -18,7 +18,6 @@ Finally, build the ice sheet model and pass the melt rate model
 model = Model(grid = grid, bed_elevation = bed_elevation, melt_rate = melt_rate)
 ```
 
-
 ## Analytic Melt Rate Parametrizations
 Documentation coming soon!
 
