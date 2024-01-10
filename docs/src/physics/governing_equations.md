@@ -46,7 +46,7 @@ In addition, a Robin boundary condition at the bed linearly relates the basal st
     \end{align}
 ```
 
-(A no-stress condition at the surface is also implicit in the derivation of~\eqref{E:x-momentum}--\eqref{E:x-momentum}.)
+(A no-stress condition at the surface is also implicit in the derivation of \eqref{E:x-momentum}--\eqref{E:y-momentum}.)
 
 ## Conservation of Mass
 For a given depth-averaged velocity $\mathbf{\bar{u}}$, accumulation rate $a(x,y,t)$ (positive for ice gain), and basal melt rate $m(x,y,t)$ (positive for ice loss), conservation of ice mass requires that the ice thickness $h$ satisfies

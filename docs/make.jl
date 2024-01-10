@@ -1,8 +1,8 @@
 push!(LOAD_PATH,"../src/")
-import Pkg; Pkg.add("Documenter")
-import Pkg; Pkg.add("DocumenterCitations")
-import Pkg; Pkg.add("Literate")
-import Pkg; Pkg.add("Plots")
+import Pkg; 
+Pkg.activate(joinpath(@__DIR__, ".."))
+Pkg.add(name="Documenter", version="0.27.25")
+Pkg.instantiate()
 
 using Documenter
 using DocumenterCitations
@@ -12,6 +12,7 @@ using WAVI
 
 bib_filepath = joinpath(dirname(@__FILE__), "wavi.bib")
 bib = CitationBibliography(bib_filepath)
+
 
 ENV["GKSwstype"] = "100"
 
@@ -54,25 +55,25 @@ example_pages = [
 ]
 
 
-data_structure_pages = [
-    "Overview" => "data_structure/overview.md"
-    "Simulations" => "data_structure/simulations.md"
-    "Models" => "data_structure/model.md"
-    "Timestepping Parameters" => "data_structure/timestepping_params.md"
-    "Output Writing" => "data_structure/output_writing.md"
-    "Grid" => "data_structure/grid.md"
-    "Solver Parameters" => "data_structure/solver_parameters.md"
-    "Physical Paramters" => "data_structure/params.md"
-    "Initial Conditions" => "data_structure/initial_conditions.md"
-    "Fields" => "data_structure/fields.md"
-    "Melt Rate Models" => "data_structure/melt_rate_models.md"
+API_pages = [
+    "Overview" => "API/overview.md"
+    "Simulations" => "API/simulations.md"
+    "Models" => "API/model.md"
+    "Timestepping Parameters" => "API/timestepping_params.md"
+    "Output Writing" => "API/output_writing.md"
+    "Grid" => "API/grid.md"
+    "Solver Parameters" => "API/solver_parameters.md"
+    "Physical Parameters" => "API/params.md"
+    "Initial Conditions" => "API/initial_conditions.md"
+    "Fields" => "API/fields.md"
+    "Basal Melt Rate Models" => "API/melt_rate_models.md"
 ]
 
 
 physics_pages = [
     "Overview" => "physics/overview.md"
     "Governing Equations" => "physics/governing_equations.md"
-    "Melt Rates" => "physics/melting.md"
+    "Basal Melt Rate Parametrizations" => "physics/melting.md"
     #"Calving" => "physics/calving.md"
     #"Damage" => "physics/damage.md"
 ]
@@ -87,9 +88,10 @@ pages = [
     "Examples" => example_pages,
     "Physics" => physics_pages,
     "Numerical Implementation" => "numerical_procedure/numerical_procedure.md",
-    "WAVI Setup" => data_structure_pages,
+    "API" => API_pages,
    # "Simulation tips" => "simulation_tips.md",
     "MITgcm coupling" => "mitgcm_coupling.md",
+    "Contributors guide" => "contributing.md",
     "Contact us" => "contact.md",
     "References" => "references.md",
 ]
@@ -108,18 +110,16 @@ format = Documenter.HTML(
 
 
 makedocs(bib,
-  sitename = "WAVI.jl",
-   authors = "Alexander Bradley",
+    sitename = "WAVI.jl",
     format = format,
-     pages = pages,
-   modules = [WAVI],
-   doctest = false,
+    pages = pages,
+    modules = [WAVI],
+    doctest = false,
     strict = false,
-     clean = false,
- checkdocs = :none # Should fix our docstring so we can use checkdocs=:exports with strict=true.
-)
+    clean = false,
+    checkdocs = :none)
 
-deploydocs(;
+deploydocs(
     repo="github.com/RJArthern/WAVI.jl",
     devbranch="build-docs",
     versions = nothing

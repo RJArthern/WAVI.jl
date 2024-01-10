@@ -20,3 +20,8 @@ The key parameters, which are passed via keyword arguments in the `OutputParams`
 - `zip_format` specifies the format that solution files are zipped into. Currently WAVI.jl only supports zipping to an `nc` format. 
 
 - `dump_vel` is a shortcut to dump the velocity at the end of a simulation. This is an experimental feature, necessary for coupling WAVI to the MITgcm (see the [MITgcm coupling](../mitgcm_coupling.md) tab).
+
+```@docs
+OutputParams()
+```
+

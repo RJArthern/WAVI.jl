@@ -9,7 +9,7 @@ This example demonstrates how to:
 First let's make sure we have all required packages installed. As well as WAVI and Plots for plotting, we're going to use the Downloads package to pull some data from a Github repository.
 ```julia
 using Pkg
-pkg.add("https://github.com/RJArthern/WAVI.jl"), 
+Pkg.add(PackageSpec(url="https://github.com/RJArthern/WAVI.jl.git", rev = "main"))
 Pkg.add("Plots"), Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 ```
