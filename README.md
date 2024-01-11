@@ -1,7 +1,3 @@
-![Testing](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?docs-reconcile)
-
-![Documentation](https://github.com/RJArthern/WAVI.jl/actions/workflows/Documentation.yml/badge.svg?docs-reconcile)
-
 <!-- Title -->
 <h1 align="center">
   ☃️🏔️❄️ WAVI.jl ❄️🏔️☃️
@@ -12,6 +8,10 @@
 </p>
 
 WAVI (Wavelet-based Adaptive-grid Vertically-integrated Ice-model) is a fast and friendly ice sheet model, written in Julia. WAVI documentation can be found [here](https://rjarthern.github.io/WAVI.jl/).
+
+![Testing](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?docs-reconcile)
+
+![Documentation](https://github.com/RJArthern/WAVI.jl/actions/workflows/Documentation.yml/badge.svg?docs-reconcile)
 
 ## Contents
 
