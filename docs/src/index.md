@@ -1,3 +1,5 @@
+![example branch parameter](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?branch=feature-1)
+
 # WAVI.jl documentation
 
 **WAVI.jl is an ice sheet model for everyone.**
