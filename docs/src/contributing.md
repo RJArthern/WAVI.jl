@@ -7,7 +7,6 @@ Thank you for considering contributing to WAVI.jl! If you're interested in contr
   - [Reporting Bugs](#reporting-bugs)
   - [Suggesting Enhancements](#suggesting-enhancements)
   - [Code Contribution](#code-contribution)
-- [Development Setup](#development-setup)
 - [Pull Request Process](#pull-request-process)
 - [License](#license)
 
@@ -37,6 +36,7 @@ If you'd like to contribute code to the project:
 4. Make your changes and commit them with a clear message.
 5. Push your changes to your fork: `git push origin feature-branch`
 6. Open a pull request against the `main` branch of the main repository.
+
 
 ## Pull Request Process
 
