@@ -22,4 +22,4 @@ jobs:
       - name: Build and deploy
         env:
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
-        run: julia --project=test/ test/runtests_structures.jl
+        run: julia --project=test/ test/runtests_structure.jl
