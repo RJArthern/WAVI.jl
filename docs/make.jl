@@ -92,6 +92,7 @@ pages = [
    # "Simulation tips" => "simulation_tips.md",
     "MITgcm coupling" => "mitgcm_coupling.md",
     "Contributors guide" => "contributing.md",
+    "Unit Testing" => "test.md",
     "Contact us" => "contact.md",
     "References" => "references.md",
 ]
