@@ -3,7 +3,7 @@ name: Testing
 on:
   push:
     branches:
-      - docs-reconcile # update to match your development branch (master, main, dev, trunk, ...)
+      - [docs-reconcile, main] # update to match your development branch (master, main, dev, trunk, ...) or '**' for all
     tags: '*'
   pull_request:
 
