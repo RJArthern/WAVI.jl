@@ -1,4 +1,4 @@
-![example branch parameter](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?branch=feature-1)
+![example branch parameter](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?docs-reconcile)
 
 <!-- Title -->
 <h1 align="center">
