@@ -1,3 +1,5 @@
+![example branch parameter](https://github.com/RJArthern/WAVI.jl/actions/workflows/Testing.yml/badge.svg?branch=feature-1)
+
 <!-- Title -->
 <h1 align="center">
   ☃️🏔️❄️ WAVI.jl ❄️🏔️☃️
