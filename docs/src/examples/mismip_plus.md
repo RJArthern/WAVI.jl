@@ -46,11 +46,12 @@ y = yy[1,:];
 plt =  Plots.heatmap(x/1e3, y/1e3, mismip_plus_bed.(xx,yy)', 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
-                    colorbar_title = "bed depth (m)")
-plot!(size = (800,400))
+                    colorbar_title = "\n bed depth (m)",
+                    right_margin = 4Plots.mm)
+plot!(size = (600,400))
 ```
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/MISMIP/mismip_bed.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/MISMIP/mismip_bed.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ## Boundary Conditions 
@@ -147,7 +148,8 @@ Let's have a look at the steady state thickness:
 Plots.heatmap(simulation.model.grid.xxh[:,1]/1e3, simulation.model.grid.yyh[1,:]/1e3, simulation.model.fields.gh.h', 
                 xlabel = "x (km)", 
                 ylabel = "y (km)",
-                colorbar_title = "ice thickness (m)")
+                colorbar_title = "\n ice thickness (m)", 
+                right_margin = 4Plots.mm)
 ```
 
 And add the grounding line, which is where the grounded fraction transitions between 0 and 1 (grounded_fraction takes the value 1 at fully grounded grid points and 0 at fully floating grid points.) Our choice of 0.5 is somewhat arbitrary here -- any value between 0 and 1 will do!
@@ -159,13 +161,13 @@ Plots.contour!(simulation.model.grid.xxh[:,1]/1e3,
             levels = [0.5,0.5],
             linecolor = :blue,
             linewidth = 2)
-plot!(size = (1000,550))
+plot!(size = (600,400))
 ```
 
 You can see, by comparing with the plot of the bed earlier, that the grounding line sits on an overdeepened section of the bed! You can also compare it with the other MISMIP submissions (figure 3 in [Cornford et al., 2020](https://tc.copernicus.org/articles/14/2283/2020/)) and see that the grounding line position agrees pretty well with other models, despite being lower resolution.
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/MISMIP/mismip_thickness_and_gl.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/MISMIP/mismip_thickness_and_gl.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 Finally, let's check that it's in steady state, by looking at the evolution of the volume above floatation:
@@ -189,7 +191,7 @@ Plots.plot(time, vaf[:]/1e9,
 The volume above floatation reaches a plateau, suggesting that we have indeed reached a steady state.
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/MISMIP/mismip_vaf_evolution.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/MISMIP/mismip_vaf_evolution.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 Finally, we clear up the files we just outputted

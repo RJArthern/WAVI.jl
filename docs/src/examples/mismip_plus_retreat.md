@@ -107,7 +107,7 @@ Plots.plot(time, vaf[:]/1e9,
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/MISMIP/ice1r_vaf.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/MISMIP/ice1r_vaf.png" alt="" title="" width="600" height="600" /></center>
 ```
 The volume above floatation decreases, indicating that the ice sheet is retreating. That's to be expected: the initial condition is in steady state with no melting, and the melting in this experiemnt is quite aggressive. 
 

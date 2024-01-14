@@ -90,7 +90,7 @@ display(ice_plot)
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/planar_1D_flow/ice-profile.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/planar_1D_flow/ice-profile.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 We see that the ice shelf goes afloat when the ice base is approximately 270m below sea level, which fits which Archimedean floatation principles: 270m is the product of the ratio of the densities of ice (about 900 km/m^3) and ocean (about 1000 kg/m^3) with the ice thickness (300m).
@@ -107,7 +107,7 @@ display(vel_plot)
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/planar_1D_flow/ice-velocity.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/planar_1D_flow/ice-velocity.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 We see that ice velocities are very small (but non-zero, although not obvious from the plot) in the grounded ice, where friction between the ice and the bed restrains the flow. In the shelf, where there is no basal friction, velocities increase linearly to a maximum of 12km/yr (very fast!) at the downstream end of the shelf.
@@ -198,7 +198,7 @@ Plots.plot!(pl,simulation.model.grid.xxh[:,1], base_out, legend = :none, linecol
 ```
 As time proceeds, the ice sheet accelerates, causing thinning. 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/planar_1D_flow/ice-evolution.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/planar_1D_flow/ice-evolution.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 
