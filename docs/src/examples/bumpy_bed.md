@@ -43,8 +43,9 @@ z_b80 = z_b.(grid80.xxh,grid80.yyh; α = 0.5, ω = 2π/L );
 plt = Plots.heatmap(grid80.xxh[:,1]/1e3, grid80.yyh[1,:]/1e3, z_b80, 
                         xlabel = "x (km)", 
                         ylabel = "y (km)",
-                        colorbar_title = "bed depth (m)")
-plot!(size = (800,800))
+                        colorbar_title = "\n bed depth (m)",
+                        right_margin = 4Plots.mm)
+plot!(size = (600,400))
 ```
 
 ```@raw html
@@ -76,8 +77,9 @@ Now we can look at the velocity:
 Plots.heatmap(model80.grid.xxh[:,1]/1e3, model80.grid.yyh[1,:]/1e3, model80.fields.gh.u', 
                         xlabel = "x (km)", 
                         ylabel = "y (km)",
-                        colorbar_title = "ice velocity in x-direction (m/yr)")
-plot!(size = (800,600))
+                        right_margin = 4Plots.mm,
+                        colorbar_title = "\n ice velocity in x-direction (m/yr)")
+plot!(size = (600,400))
 ```
 
 ```@raw html
