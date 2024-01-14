@@ -14,7 +14,7 @@ First let's make sure we have all required packages installed. We're also going 
 ```julia
 using Pkg
 Pkg.add("https://github.com/RJArthern/WAVI.jl")
-Pkg.add(Plots)
+Pkg.add("Plots")
 Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 ```
