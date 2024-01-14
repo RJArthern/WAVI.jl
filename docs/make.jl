@@ -122,7 +122,7 @@ makedocs(bib,
 
 deploydocs(
     repo="github.com/RJArthern/WAVI.jl",
-    devbranch="main",
+    devbranch="docs-reconcile",
     versions = nothing
 )
 
