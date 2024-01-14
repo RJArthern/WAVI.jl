@@ -135,9 +135,10 @@ Now we can visualize the ice velocity, which is stored in the model fields via `
 plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, model.fields.gh.av_speed', 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
-                    colorbar_title = "ice speed (m/yr)",
+                    colorbar_title = "\n ice speed (m/yr)",
                     title = "West Antarctica ice speed",
                     framestyle = "box",
+                    right_margin = 4Plots.mm,                 
                     clim=(0,4000))
 ```
 ```@raw html
