@@ -96,9 +96,11 @@ function update_melt_rate!(idealized_anthro_melt_rate::IdealizedAnthroMeltRate, 
     zb = fields.gh.b .* (grounded_fraction .== 1) + - ρi / ρw .* fields.gh.h .* (grounded_fraction .< 1)
 
     set_idealized_anthro_melt_rate!(basal_melt,
-                           idealized_anthro_melt_rate,
-                            zb, 
-                            grounded_fraction, clock.time)
+                                idealized_anthro_melt_rate,
+                                zb, 
+                                grounded_fraction, 
+                                clock.time,
+                                fields.gh.mask)
     return nothing
 end
 
@@ -111,7 +113,9 @@ function set_idealized_anthro_melt_rate!(basal_melt, idealized_anthro_melt_rate,
 function set_idealized_anthro_melt_rate!(basal_melt,
                            idealized_anthro_melt_rate,
                             zb, 
-                            grounded_fraction, t)       
+                            grounded_fraction, 
+                            t,
+                            mask)       
 
     #get the current pycncoline position
     pc = pc_position(t,
@@ -143,13 +147,12 @@ function set_idealized_anthro_melt_rate!(basal_melt,
 
     # set the melt rate
     if (idealized_anthro_melt_rate.melt_partial_cell) #we do have partial cell melting 
-        basal_melt[:] .= idealized_anthro_melt_rate.M .* Tstar[:].^2 .* (1 .- grounded_fraction[:])
+        basal_melt[mask] .= idealized_anthro_melt_rate.M .* Tstar[mask].^2 .* (1 .- grounded_fraction[mask])
     else  #no partial cell melting an
         basal_melt[grounded_fraction .== 0] .=  idealized_anthro_melt_rate.M .* Tstar[grounded_fraction .== 0].^2 #set melt rate on fully floating points 
         basal_melt[.~(grounded_fraction .== 0)] .= 0 #check that anywhere with grounded_fraction not equal to 1 gets no melting
-
+        basal_melt[.~mask] .= 0 #set outside the mask to zero
     end
-
     return nothing
 end
 
