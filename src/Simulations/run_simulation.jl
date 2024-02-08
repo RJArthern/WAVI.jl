@@ -1,39 +1,42 @@
 """
     timestep!(simulation)
 
-Perform one timestep of the simulation
+Perform one timestep of the simulation. 
 """
 function timestep!(simulation)
     @unpack model,timestepping_params, output_params, clock = simulation
-    
-    #full update of the model
-    update_state!(model, clock)
-    #write solution if at the first timestep (hack for https://github.com/RJArthern/WAVI.jl/issues/46 until synchronicity is fixed)
-    if (output_params.output_start) && (simulation.clock.n_iter == 0)
-        write_output(simulation)
-    end
-    if timestepping_params.step_thickness
-        update_thickness!(simulation)
-    end
-    if timestepping_params.verbose
-        println("Completed outer timestep (velocity and thickness updated), t = ", clock.time)
-    end
 
-    #sub updates of the thickness if required
-    nsubstep = 1/timestepping_params.thickness_timestep_fraction;
-    for i = 1:(nsubstep-1)
+    if mod(clock.n_iter, timestepping_params.ntimesteps_velocity_update) == 0 #if we're on a velocity + thickness update output step
+        update_state!(model, clock)
+        if timestepping_params.verbose
+            println("Completed main timestep (velocity and thickness updated), t = ", clock.time)
+        end
+
+        if timestepping_params.step_thickness
+            update_thickness!(simulation)
+        end
+
+    else #just a thickness update step
         update_state_novelocity!(model, clock)
+
         if timestepping_params.step_thickness
             update_thickness!(simulation)
         end
 
         if timestepping_params.verbose
-            println("Completed inner timestep (thickness only updated), t = ", (clock.time+(i/nsubstep)*timestepping_params.dt))
+            println("Completed sub-timestep (thickness only updated), t = ", clock.time)
         end
     end
 
+    #write solution if at the first timestep (hack for https://github.com/RJArthern/WAVI.jl/issues/46 until synchronicity is fixed)
+    if (output_params.output_start) && (simulation.clock.n_iter == 0)
+        write_output(simulation)
+    end
+
     update_clock!(simulation)
+
 end
+
 
 """
 update_thickness!(model::AbstractModel)
