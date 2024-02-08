@@ -1,16 +1,18 @@
 
 struct TimesteppingParams{T <: Real, N <: Integer, TO, C, P}
-            niter0 :: N      #starting iteration number
-                dt :: T      #timestep
-          end_time :: T      #end time of this simulation
-                t0 :: T      #start time of this simulation 
-        chkpt_freq :: T      #temporary checkpoint frequency
-       pchkpt_freq :: T      #permanent checkpoint frequency  
-       chkpt_path  :: String #path to location of permanent and tempoary checkpoint output
-      n_iter_total :: TO     #total number of timesteps counting from zero
-      n_iter_chkpt :: C      #number of iterations per temporary checkpoint
-     n_iter_pchkpt :: P      #number of iterations per permanent checkpoint
-    step_thickness :: Bool   #toggle whether to step the thickness at each timestep or not (coupling control)
+                        niter0 :: N      #starting iteration number
+                            dt :: T      #timestep
+   thickness_timestep_fraction :: N      #integer fraction of the velocity update timestep (dt) on which to update the thickness
+                      end_time :: T      #end time of this simulation
+                            t0 :: T      #start time of this simulation 
+                    chkpt_freq :: T      #temporary checkpoint frequency
+                   pchkpt_freq :: T      #permanent checkpoint frequency  
+                   chkpt_path  :: String #path to location of permanent and tempoary checkpoint output
+                  n_iter_total :: TO     #total number of timesteps counting from zero
+                  n_iter_chkpt :: C      #number of iterations per temporary checkpoint
+                 n_iter_pchkpt :: P      #number of iterations per permanent checkpoint
+                step_thickness :: Bool   #toggle whether to step the thickness at each timestep or not (coupling control)
+                       verbose :: Bool   #toggle whether or not to output when the timestepping have been performed
 end
 
 
@@ -19,12 +21,14 @@ end
 TimesteppingParams(;
                     niter0 = 0,
                     dt = 1.0,
+                    thickness_timestep_fraction = 1,
                     end_time = 1.0,
                     t0 = nothing,
                     chkpt_freq = Inf,
                     pchkpt_freq = Inf,
                     chkpt_path = './',
-                    step_thickness = true)
+                    step_thickness = true,
+                    verbose = false)
 
 Construct a WAVI.jl TimesteppingParams object.
 TimesteppingParams stores information relating to timestepping.
@@ -33,6 +37,7 @@ Keyword arguments
 =================
 - 'niter0': Iteration number of the first timestep. niter0 = 0 corresponds to a new simulation, while niter0 > 0 (positive integer) corresponds to a pickup.
 - 'dt': Model timestep
+- 'thickness_timestep_fraction': integer fraction of the velocity update timestep (dt) on which to update the thickness, i.e. the thickness (and associated divergence) is updated on a timestep dt/thickness_timestep_fraction
 - 'end_time': Simulation termination time
 - 't0': Starting time of the simulation
 - 'chkpt_freq': Frequency of outputting temporary checkpoints
@@ -43,18 +48,25 @@ Keyword arguments
 function TimesteppingParams(;
                         niter0 = 0,
                         dt = 1.0,
+                        thickness_timestep_fraction = 1,
                         end_time = nothing,
                         n_iter_total = nothing, 
                         t0 = nothing,
                         chkpt_freq = Inf,
                         pchkpt_freq = Inf,
                         chkpt_path = "./",
-                        step_thickness = true)
-
+                        step_thickness = true,
+                        verbose = false)
 
     #initialize t0 (really you should read start time from pickup file)
     t0 = niter0 > 0 ? niter0 * dt : 0 
     t0 = map(typeof(dt), t0)
+
+    #check that thickness_timestep_fraction is a positive integer greater than one
+    if !(thickness_timestep_fraction isa Int && thickness_timestep_fraction >= 1)
+        throw(ArgumentError("thickness_timestep_fraction must be an integer greater than or equal to one"))
+    end
+
 
     #check compatibility of n_iter_total and end_time, and compute them 
     end_time, n_iter_total = compute_iterations_and_end_time(end_time, n_iter_total,dt)
@@ -70,8 +82,8 @@ function TimesteppingParams(;
         chkpt_path = "./"
     end
 
-    return TimesteppingParams(niter0, dt, end_time, t0, chkpt_freq, pchkpt_freq, 
-                            chkpt_path,n_iter_total, n_iter_chkpt, n_iter_pchkpt, step_thickness)
+    return TimesteppingParams(niter0, dt, thickness_timestep_fraction,end_time, t0, chkpt_freq, pchkpt_freq, 
+                            chkpt_path,n_iter_total, n_iter_chkpt, n_iter_pchkpt, step_thickness,verbose)
 end
 
 """

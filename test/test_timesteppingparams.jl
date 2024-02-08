@@ -25,5 +25,7 @@ using Test, WAVI
         @test_throws ArgumentError TimesteppingParams(end_time = 1., dt = 1., n_iter_total = 10) #incompatible endtime and total iters
         @test_throws ArgumentError TimesteppingParams(dt = 0.5) #pass neither of end time or total iterations --> throw error
         @test_throws ArgumentError TimesteppingParams(dt = 0.5, end_time = Inf) 
+        @test_throws ArgumentError TimesteppingParams(dt = 0.5, thickness_timestep_fraction = 0.5 ) #non integer sub sampling step
+        
     end
 end
