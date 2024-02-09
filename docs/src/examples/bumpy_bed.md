@@ -9,8 +9,8 @@ This example demonstrates how to
 First let's make sure we have all required packages installed.
 ```julia
 using Pkg
-Pkg.add("https://github.com/RJArthern/WAVI.jl")
-Pkg.add(`Plots`)
+Pkg.add(PackageSpec(url="https://github.com/RJArthern/WAVI.jl.git", rev = "main"))
+Pkg.add("Plots")
 using WAVI, Plots
 ```
 
@@ -43,12 +43,13 @@ z_b80 = z_b.(grid80.xxh,grid80.yyh; α = 0.5, ω = 2π/L );
 plt = Plots.heatmap(grid80.xxh[:,1]/1e3, grid80.yyh[1,:]/1e3, z_b80, 
                         xlabel = "x (km)", 
                         ylabel = "y (km)",
-                        colorbar_title = "bed depth (m)")
-plot!(size = (800,800))
+                        colorbar_title = "\n bed depth (m)",
+                        right_margin = 4Plots.mm)
+plot!(size = (600,400))
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//bumpy//bed.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//bumpy//bed.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ## Model Instantiation and Initial Conditions
@@ -76,12 +77,13 @@ Now we can look at the velocity:
 Plots.heatmap(model80.grid.xxh[:,1]/1e3, model80.grid.yyh[1,:]/1e3, model80.fields.gh.u', 
                         xlabel = "x (km)", 
                         ylabel = "y (km)",
-                        colorbar_title = "ice velocity in x-direction (m/yr)")
-plot!(size = (800,600))
+                        right_margin = 4Plots.mm,
+                        colorbar_title = "\n ice velocity in x-direction (m/yr)")
+plot!(size = (600,400))
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//bumpy//velocity_L80.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//bumpy//velocity_L80.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ## Different lengthscales
@@ -126,7 +128,7 @@ display(p)
 plot!(size = (1000,550))
 ```
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//bumpy//velocity_diffL.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//bumpy//velocity_diffL.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 As expected, when the bumps have a smaller aspect ratio (smaller `L`) the flow speed is smaller.

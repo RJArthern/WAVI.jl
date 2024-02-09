@@ -14,3 +14,7 @@ A `Grid` is a WAVI.jl object that stores information relating to the [numerical 
 - `quadrature_weights`: weights associated with sigma (vertical) levels used in quadrature scheme to determine depth averaged quantities (e.g. viscosity).
 
 WAVI.jl has several grids, on which different quantities are defined (see [numerical grid](../numerical_procedure/numerical_procedure.md#Numerical-Grid)). A `Grid` object contains explicit definitions of these grids; for example, the x-coordinates of the "h grid" are stored in `grid.xxh` (where `grid` is the name of the `Grid` instance).
+
+```@docs
+Grid()
+```

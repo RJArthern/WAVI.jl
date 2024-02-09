@@ -47,25 +47,22 @@ Construct a WAVI.jl grid.
 
 Keyword arguments
 =================
-
-    - 'nx': number of x grid points
-    - 'ny': number of y grid points
-    - 'dx': grid spacing in x 
-    - 'dy': grid spacing in y 
-    - 'nσ': number of levels in the vertical
-    - 'x0': grid origin x co-ordinate 
-    - 'y0': grid origin y co-ordinate
-    - 'h_mask': Mask defining domain points within grid
-    - 'h_isfixed': Mask defining locations of fixed thickness within grid
-    - 'u_iszero': Locations of zero u velocity points
-    - 'v_iszero': Locations of zero v velocity points
-    - 'u_isfixed': Locations of fixed u velocity points
-    - 'v_isfixed': Locations of fixed v velocity points
-    - 'quadrature_weights': weights associated with sigma levels used in quadrature scheme
-    - 'basin_ID' : grid of basin IDs 
+- `nx`: number of x grid points
+- `ny`: number of y grid points
+- `dx`: grid spacing in x 
+- `dy`: grid spacing in y 
+- `nσ`: number of levels in the vertical
+- `x0`: grid origin x co-ordinate 
+- `y0`: grid origin y co-ordinate
+- `h_mask`: Mask defining domain points within grid
+- `h_isfixed': Mask defining locations of fixed thickness within grid
+- `u_iszero`: Locations of zero u velocity points
+- `v_iszero`: Locations of zero v velocity points
+- `u_isfixed`: Locations of fixed u velocity points
+- `v_isfixed`: Locations of fixed v velocity points
+- `quadrature_weights`: weights associated with sigma levels used in quadrature scheme
+- `basin_ID`: grid of basin IDs 
 """
-
-#grid constructor
 function Grid(; 
     nx = 80,
     ny = 10,

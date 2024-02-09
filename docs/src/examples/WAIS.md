@@ -14,7 +14,7 @@ First let's make sure we have all required packages installed. We're also going 
 ```julia
 using Pkg
 Pkg.add("https://github.com/RJArthern/WAVI.jl")
-Pkg.add(Plots)
+Pkg.add("Plots")
 Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 ```
@@ -70,7 +70,7 @@ Before moving on, let's have a look at the h_mask (i.e. which grid points are in
 Plots.spy(hm)
 ```
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/WAIS/hmask_spy.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/WAIS/hmask_spy.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 Those familiar with it will recognise the ice fronts of Pine Island, Thwaites and Smith ice shelves and the drainage basins of their glacies. For those not familiar, trust me: this is a rough outline of the Amundsen sea sector of West Antarctica! 
@@ -87,12 +87,13 @@ Let's take a look at the bed
 plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, bed', 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
-                    colorbar_title = "bed elevation (m)",
+                    colorbar_title = "\n bed elevation (m)",
+                    right_margin = 4Plots.mm,                 #set the margin so that the colorbar title isn't cut off
                     title = "West Antarctica bed elevation",
                     framestyle = "box")
 ```
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/WAIS/WAIS_bed.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/WAIS/WAIS_bed.png" alt="" title="" width="600" height="600" /></center>
 ```
 It's a little hard to see here, but the bed gets deeper towards the right of the plot, which is the direction of retreat of Thwaites and Pine Island Glaciers. This might lead to feedbacks which promote their retreat (the so-called '[marine ice sheet instability](https://www.antarcticglaciers.org/antarctica-2/west-antarctic-ice-sheet-2/marine-ice-sheets/)')
 
@@ -134,13 +135,14 @@ Now we can visualize the ice velocity, which is stored in the model fields via `
 plt = Plots.heatmap(grid.xxh[:,1]/1e3, grid.yyh[1,:]/1e3, model.fields.gh.av_speed', 
                     xlabel = "x (km)", 
                     ylabel = "y (km)",
-                    colorbar_title = "ice speed (m/yr)",
+                    colorbar_title = "\n ice speed (m/yr)",
                     title = "West Antarctica ice speed",
                     framestyle = "box",
+                    right_margin = 4Plots.mm,                 
                     clim=(0,4000))
 ```
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots/WAIS/WAIS_velocs.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots/WAIS/WAIS_velocs.png" alt="" title="" width="600" height="600" /></center>
 ```
 Ice velocities on ice shelves can be above 5km/yr! Inland, they're smaller.
 

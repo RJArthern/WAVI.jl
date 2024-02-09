@@ -16,7 +16,7 @@ Secondly, we demonstrate how to add a simple melt rate model to WAVI.jl.
 First let's make sure we have all required packages installed. As well as WAVI and Plots for plotting, we're going to use the Downloads package to pull some data from a Github repository.
 ```julia
 using Pkg
-pkg.add("https://github.com/RJArthern/WAVI.jl"), 
+Pkg.add(PackageSpec(url="https://github.com/RJArthern/WAVI.jl.git", rev = "main"))
 Pkg.add("Plots"), Pkg.add("Downloads")
 using WAVI, Plots, Downloads
 ```
@@ -137,19 +137,19 @@ end
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//quadratic.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//melt_parametrizations//quadratic.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//pico.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//melt_parametrizations//pico.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//plume.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//melt_parametrizations//plume.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//binary.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//melt_parametrizations//binary.png" alt="" title="" width="600" height="600" /></center>
 ```
 
 As a sanity check, the binary file melt rate has the same (10m/a)melt rate over the whole shelf. The PICO parametrization, which divides the shelf up into discrete chunks, has a corresponding banded structure, with highest melt rates at the grounding line (note the different colourbar limits on the various plots!). The quadratic melt rate parametrizations similarly has the highest melt rate near the grounding line, but drops off with distance from the grounding line much quicker than the PICO parametrization. These plots can be compared to corresponding results for the NEMO ocean model  (Favier et al. 2019 doi:10.5194/gmd-12-2255-2019)
@@ -226,6 +226,6 @@ plot!(size = (500,300))
 ```
 
 ```@raw html
-<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/build-docs/docs/src/assets/example-plots//melt_parametrizations//mismip.png" alt="" title="" width="600" height="600" /></center>
+<center><img src="https://raw.githubusercontent.com/RJArthern/WAVI.jl/docs-reconcile/docs/src/assets/example-plots//melt_parametrizations//mismip.png" alt="" title="" width="600" height="600" /></center>
 ```
 Hopefully this example demonstrates the procedure for adding melt rate models to WAVI.jl. If there are any questions, don't hesistate to get in touch (see the "Contact Us" tab)

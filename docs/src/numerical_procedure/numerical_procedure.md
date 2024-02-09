@@ -1,4 +1,5 @@
-# Numerical Grid
+# Numerical Implementation
+## Numerical Grid
 WAVI.jl solves the [governing equations](../physics/governing_equations.md) on a rectangular grid, with $n_x$ grid cells in the $x$ direction and $n_y$ grid cells in the $y$ direction. Ice thickness values $h$ are defined at the cell centers (see figure) of grid cells, while velocity components $\bar{u}$ and $\bar{v}$ are defined along grid cell edges, and shear strain rates $c = (\partial u /\partial y + \partial v / \partial x)/2$ are stored at grid corners.
 
 ```@raw html
@@ -10,7 +11,7 @@ The set of all such points at which the ice thickness is stored defines the $h$-
 
 Three dimensional fields used in the governing equations (e.g. viscosity) are stored $h$-grid points, extrapolated into the $z$ direction. This grid is referred to as the $\sigma$-grid.
 
-# Problem Reduction
+## Problem Reduction
 This section contains brief details of the procedure by which the momentum balance equations [governing equations](../physics/governing_equations.md)(2)--(4) are reduced to a non-linear equation for the depth average velocity $\bar{\mathbf{u}}$. For full details, refer to [Arthern2015](@cite).
 
 To make progress in solving the [governing equations](../physics/governing_equations.md), horizontal gradients in vertical velocity are neglected and vertical shear stresses are assumed to vary linearly with depth. Then, if the ice thickness $h$, surface elevation $h$, ice stiffness, basal stresses and horizontal stress components are known, the depth integrated viscosity 
@@ -38,7 +39,7 @@ where
 ```
 with $\beta_{\text{eff}}$ an effective drag coefficient (see equation (12) in [Arthern2015](@cite)).
 
-# Velocity Solve
+## Velocity Solve
 This section described very briefly the steps involved in the procedure by which the non-linear elliptic problem for the velocity (equation \eqref{E:operator_problem}) is solved in `WAVI.jl`. Again, for full details, refer to [Arthern2015](@cite).
 
 - The problem \eqref{E:operator_problem} is discretized with a finite difference approximation. Details of the discretization are included in the appendix of [Arthern2015](@cite). 
@@ -46,6 +47,6 @@ This section described very briefly the steps involved in the procedure by which
 - The saddle point problem is expressed as two distinct problems. The first is solver iteratively using a [BiCGSTAB method](https://en.wikipedia.org/wiki/Biconjugate_gradient_stabilized_method)
 - The second problem is solved using an iterative method, leveraging an [LU-factorization] of the mass matrix in the problem.
 
-# Timestepping
+## Timestepping
 If the system is to be solved forwards in time, the velocity must be solved simultanously with the surface elevation (i.e. equations (2)--(4) and (8)) must be solved simultanously. The procedure is largely as described above for the velocity components, but the problem is preconditioned using an iterative approach inspired by [Vasilyev2005](@cite) to improve computational speed. Once the velocities have been solved for, the surface elecation is updated using a simple Euler scheme.
 
