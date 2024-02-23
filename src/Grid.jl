@@ -23,6 +23,10 @@ struct Grid{T <: Real, N <: Integer} <: AbstractGrid{T,N}
                      σ :: Vector{T}     # Dimensionless levels in the vertical
                      ζ :: Vector{T}     # Reverse dimensionless levels in the vertical
     quadrature_weights :: Vector{T}     # Quadrature weights for integration
+                   Cxl :: N              #lower x extent value of coupled child domain
+                   Cxu :: N              #upper x extent value of coupled child domain
+                   Cyl :: N              #lower y extent value of coupled child domain
+                   Cyu :: N              #upper y extent value of coupled child domain
               basin_ID :: Array{T,2}    # grid of IDs for different basins
 end
 
@@ -39,6 +43,10 @@ end
     h_isfixed = nothing,
     u_iszero = nothing,
     v_iszero = nothing,
+    Cxl = 1,
+    Cxu = nothing,
+    Cyl = 1,
+    Cyu = nothing,
     basin_ID = nothing,
     u_isfixed = nothing,
     v_isfixed = nothing)
@@ -79,6 +87,10 @@ function Grid(;
     v_isfixed = nothing,
     quadrature_weights = nothing,
     σ = nothing,
+    Cxl = 1,
+    Cxu = nothing,
+    Cyl = 1,
+    Cyu = nothing,
     basin_ID = nothing)
 
 #check integer inputs
@@ -86,6 +98,9 @@ function Grid(;
 ((typeof(ny) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in y direction (ny)  must a positive integer larger than one")) 
 ((typeof(nσ) <: Integer) && nx > 1) || throw(ArgumentError("number of grid cells in vertical (nσ)  must a positive integer larger than one")) 
 
+(~(Cxu === nothing)) || (Cxu = nx) #if no Cxu passed, set the default to nx
+(~(Cyu === nothing)) || (Cyu = ny) #if no Cyu passed, set the default to ny
+   
 #if boundary conditions passed as string array, assemble these matric
 ~(typeof(u_iszero) == Vector{String}) || (u_iszero = orientations2bc(deepcopy(u_iszero),nx+1,ny))
 ~(typeof(v_iszero) == Vector{String}) || (v_iszero = orientations2bc(deepcopy(v_iszero),nx,ny+1))
@@ -198,6 +213,10 @@ return Grid(nx,
             σ,
             ζ,
             quadrature_weights,
+            Cxl,
+            Cxu,
+            Cyl,
+            Cyu,
             basin_ID)
 end
 

@@ -20,6 +20,7 @@ glen_a_activation_energy :: T
       weertman_reg_speed :: T 
      sea_level_wrt_geoid :: T
        minimum_thickness :: T 
+                step_haf :: Bool   
            evolveShelves :: Bool
                 smallHAF :: T
 end
@@ -76,6 +77,7 @@ function Params(; g = 9.81,
                   weertman_reg_speed = 1.0e-5,
                   sea_level_wrt_geoid  = 0.0,
                   minimum_thickness = 50.0,
+                  step_haf = true,
                   evolveShelves = true,
                   smallHAF = 1.0)
                       
@@ -104,6 +106,7 @@ function Params(; g = 9.81,
                   weertman_reg_speed,
                   sea_level_wrt_geoid,
                   minimum_thickness,
+                  step_haf,
                   evolveShelves,
                   smallHAF
                   )
