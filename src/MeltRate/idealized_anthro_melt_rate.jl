@@ -1,6 +1,6 @@
 using Statistics
 
-struct IdealizedAnthroMeltRate{T <: Real, N <: Integer} <: AbstractMeltRate
+struct IdealizedAnthroMeltRate{T <: Real, N <: Integer, TR} <: AbstractMeltRate
     bump_width :: T               #lengthscale of the quadratic bump in forcing
     bump_time  :: T               #time of the center of the bump
     bump_amplitude :: T           #amplitude of the bump
@@ -21,6 +21,7 @@ struct IdealizedAnthroMeltRate{T <: Real, N <: Integer} <: AbstractMeltRate
     Tl :: T                       #temperature of the upper layer
     Tu :: T                       #temperature of the lower layer
     pw :: T                       #width of the pycnocline
+    tround_digits :: TR            #number of digits to round the time in the forcing to
 end
 
 
@@ -51,6 +52,7 @@ Keyword arguments
 - Tl                            #temperature of the upper layer
 - Tu                            #temperature of the lower layer
 - pw                            #width of the pycnocline
+- tround_digits                 #number of digits to round the time in the forcing to (set to nothing for no rounding)
 """
 
 function IdealizedAnthroMeltRate(;
@@ -73,11 +75,12 @@ function IdealizedAnthroMeltRate(;
                                 Su = 34.0,
                                 Tl = 1.0, 
                                 Tu = -1.2,
-                                pw = 400.0)
+                                pw = 400.0, 
+                                tround_digits = nothing)
 
     return IdealizedAnthroMeltRate(bump_width, bump_time, bump_amplitude, per_century_trend, trend_onset,
                     pc_max, pc_min, M, λ1, λ2,λ3, melt_partial_cell, random_seed,rf_threshold, r ,
-                    Sl, Su, Tl, Tu, pw)
+                    Sl, Su, Tl, Tu, pw, tround_digits)
 end
 
 
@@ -128,7 +131,8 @@ function set_idealized_anthro_melt_rate!(basal_melt,
                 idealized_anthro_melt_rate.trend_onset,
                 idealized_anthro_melt_rate.bump_width, 
                 idealized_anthro_melt_rate.bump_amplitude, 
-                idealized_anthro_melt_rate.bump_time) 
+                idealized_anthro_melt_rate.bump_time,
+                idealized_anthro_melt_rate.tround_digits) 
         
     #compute the salinity and temperature
     Sa_shelf = get_Sa.(zb,
@@ -162,7 +166,7 @@ end
 Generate values of the random forcing as an AR1 process with autocorrelation r at time point t
 
 """
-function generate_random_forcing_anomaly(t, r, random_seed)
+function generate_random_forcing_anomaly(t, r, random_seed, tround_digits)
     N = 1000  # number of timeseries in the series to be sampled(can be big)
     dt = 1    # script assumes this is 1, no guarantees it is robust if changed!
     td = 0:dt:(N-1)*dt
@@ -203,8 +207,12 @@ function generate_random_forcing_anomaly(t, r, random_seed)
 
     # interpolate to target value
     linterp = Interpolations.LinearInterpolation(td, ar1)
-    rf = linterp(t)
- 
+    if tround_digits === nothing #no rounding
+        rf = linterp(t)
+    else
+        t_rounded = round.(t,digits = tround_digits) #round t to digits
+        rf = linterp(t_rounded)
+    end
     return rf
 end
 
@@ -213,8 +221,8 @@ end
 
 Map the value of the autoregressive process to the pycnocline position, i.e. get the internal part of the pycnoline position
 """
-function get_random_pc_component(t, r, random_seed, rf_threshold, pc_max, pc_min)
-    rf = generate_random_forcing_anomaly(t, r, random_seed)
+function get_random_pc_component(t, r, random_seed, rf_threshold, pc_max, pc_min, digits)
+    rf = generate_random_forcing_anomaly(t, r, random_seed, digits)
     if rf  > rf_threshold
         rf = rf_threshold
     end
@@ -247,7 +255,7 @@ get_bump_pc_component(t, bump_width, bump_amplitude, bump_time) = bump_amplitude
 
 
 
-pc_position(t,r, random_seed, rf_threshold, pc_max, pc_min, per_century_trend, trend_onset,bump_width, bump_amplitude, bump_time) = get_random_pc_component(t,r, random_seed, rf_threshold, pc_max, pc_min) + get_trend_pc_component(t, per_century_trend, trend_onset) + get_bump_pc_component(t, bump_width, bump_amplitude, bump_time)
+pc_position(t,r, random_seed, rf_threshold, pc_max, pc_min, per_century_trend, trend_onset,bump_width, bump_amplitude, bump_time, tround_digits) = get_random_pc_component(t,r, random_seed, rf_threshold, pc_max, pc_min, tround_digits) + get_trend_pc_component(t, per_century_trend, trend_onset) + get_bump_pc_component(t, bump_width, bump_amplitude, bump_time)
 
 """
     function get_Ta(z,Tl,Tu,pc)
