@@ -12,13 +12,17 @@ authors:
   - name: Alexander T. Bradley
     orcid: 0000-0001-8381-5317
     affiliation: 1
-  - name: Robert Arthern
+  - name: Robert J. Arthern
+    orcid: 0000-0002-3762-8219
     affiliation: 1
   - name: David T. Bett
+    orcid: 0000-0003-3118-9902
     affiliation: 1
   - name: C. Rosie Williams
+    orcid: 0000-0002-8131-4946
     affiliation: 1
   - name: James Byrne
+    orcid: 0000-0003-3731-2377
     affiliation: 1
 affiliations:
  - name: British Antarctic Survey, Cambridge, UK
