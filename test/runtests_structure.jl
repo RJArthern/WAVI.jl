@@ -3,6 +3,7 @@ group = "all"
 if group == "fields" || group == "all"
     println(1)
     include("test_fields.jl")
+    include("Stencils_test.jl")
 end
 
 if group == "grids" || group == "all"
