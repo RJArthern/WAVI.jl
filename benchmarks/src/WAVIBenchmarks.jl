@@ -62,6 +62,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
     sample_interval::Float64 = 0.25,
     no_plots::Bool = false,
     warmup::Bool = false,
+    tag::String = "",
 )
     opts = BenchmarkOptions(
         mode;
@@ -75,6 +76,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
         sample_interval = sample_interval,
         no_plots = no_plots,
         warmup = warmup,
+        tag = tag,
     )
     run_benchmark(opts)
 end
@@ -108,6 +110,7 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
     niterations::Int = 2,
     px::Int = 0,
     py::Int = 1,
+    tag::String = "",
 )
     opts = BenchmarkOptions(
         mode;
@@ -118,6 +121,7 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
         niterations = niterations,
         px = px,
         py = py,
+        tag = tag,
     )
     run_profile(opts)
 end

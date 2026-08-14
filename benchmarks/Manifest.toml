@@ -2,7 +2,7 @@
 
 julia_version = "1.12.2"
 manifest_format = "2.0"
-project_hash = "5e7f63f610389bdd52a54c224ddd700dbc4b97cd"
+project_hash = "b7967177446a96025adec235319f352c64dafe9b"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -2553,13 +2553,13 @@ uuid = "a44049a8-05dd-5a78-86c9-5fde0876e88c"
 version = "1.3.243+0"
 
 [[deps.WAVI]]
-deps = ["BenchmarkTools", "CFTime", "CSV", "DataStructures", "Dates", "Debugger", "Dierckx", "Documenter", "DocumenterCitations", "DocumenterTools", "Downloads", "Enzyme", "FileIO", "FilePathsBase", "ImageFiltering", "InplaceOps", "Interpolations", "IterativeSolvers", "JLD2", "JSON3", "LatinHypercubeSampling", "LinearAlgebra", "LinearMaps", "MAT", "MPI", "MPIPreferences", "NCDatasets", "NonlinearSolve", "Parameters", "Plots", "PooledArrays", "PrecompileTools", "Profile", "Reexport", "Revise", "SciMLNLSolve", "Setfield", "SparseArrays", "UnPack"]
+deps = ["BenchmarkTools", "CFTime", "CSV", "DataStructures", "Dates", "Debugger", "Dierckx", "Documenter", "DocumenterCitations", "DocumenterTools", "Downloads", "Enzyme", "FileIO", "FilePathsBase", "ImageFiltering", "InplaceOps", "Interpolations", "IterativeSolvers", "JLD2", "JSON3", "LatinHypercubeSampling", "LinearAlgebra", "LinearMaps", "MAT", "MPI", "MPIPreferences", "NCDatasets", "NonlinearSolve", "Parameters", "Plots", "PooledArrays", "Profile", "Reexport", "Revise", "SciMLNLSolve", "Setfield", "SparseArrays", "UnPack"]
 path = ".."
 uuid = "881191c6-26ca-4787-919d-8f98f1c41532"
 version = "0.0.3"
 
 [[deps.WAVIBenchmarks]]
-deps = ["CSV", "Comonicon", "Dates", "JSON3", "LinearAlgebra", "MPI", "NCDatasets", "Plots", "Printf", "Profile", "WAVI"]
+deps = ["CSV", "Comonicon", "Dates", "JSON3", "LinearAlgebra", "Logging", "LoggingExtras", "MPI", "NCDatasets", "Plots", "Printf", "Profile", "WAVI"]
 path = "."
 uuid = "28b13f4d-81fd-4a65-aa2c-631609bcbcf8"
 version = "0.1.0"

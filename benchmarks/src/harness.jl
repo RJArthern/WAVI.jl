@@ -35,6 +35,7 @@ Base.@kwdef struct BenchmarkOptions
     sample_interval::Float64 = 0.25
     no_plots::Bool = false
     warmup::Bool = false
+    tag::String = ""
 end
 
 # Convenience constructor accepting a string mode (from the Comonicon CLI),
@@ -75,6 +76,13 @@ Extract benchmark details (mode, driver, julia threads, and BLAS threads)
 into a dict for serialisation with final benchmark JSON results output.
 """
 function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
+    commit_hash = ""
+    try
+        commit_hash = strip(read(`git rev-parse HEAD`, String))
+    catch
+        commit_hash = "unknown"
+    end
+
     return merge!(Dict{String, Any}(
         "mode" => string(opts.mode),
         "driver" => opts.driver,
@@ -83,6 +91,8 @@ function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothin
         "sample_interval_s" => opts.sample_interval,
         "reference_cores" => reference_cores(opts; mpi_world_size = mpi_world_size),
         "command" => BENCHMARK_COMMAND[],
+        "tag" => opts.tag,
+        "git_commit" => commit_hash,
     ), slurm_metadata())
 end
 
@@ -100,7 +110,7 @@ function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, 
     if opts.mode == :threaded
         return opts.ngridsx * opts.ngridsy
     elseif opts.mode == :mpi
-        return something(mpi_world_size, tryparse(Int, get(ENV, "SLURM_NTASKS", "")), 1)
+        return something(mpi_world_size, 1)
     else
         return 1
     end
@@ -153,10 +163,6 @@ function run_benchmark(opts::BenchmarkOptions)
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             # Narrow domains (e.g. MISMIP+ ny=10) need enough core cells after halo.
@@ -224,10 +230,6 @@ function run_profile(opts::BenchmarkOptions)
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             halo = 2
