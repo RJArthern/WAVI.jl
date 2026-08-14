@@ -34,24 +34,24 @@ echo "Tag Prefix: $TAG_PREFIX"
 echo "=========================================="
 
 echo "Running BasicSpec (serial) baseline..."
-julia --project=benchmarks -t 1 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_serial"
+julia --project=benchmarks -t 1 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_serial" --output-group "$TAG_PREFIX"
 
 echo "Running 1-core MPI baseline..."
-$MPIEXEC -n 1 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 1 --py 1 --tag "${TAG_PREFIX}_1core"
+$MPIEXEC -n 1 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 1 --py 1 --tag "${TAG_PREFIX}_1core" --output-group "$TAG_PREFIX"
 
 echo "Running 2-core (2x1) scaling..."
-$MPIEXEC -n 2 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 2 --py 1 --tag "${TAG_PREFIX}_2core"
+$MPIEXEC -n 2 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 2 --py 1 --tag "${TAG_PREFIX}_2core" --output-group "$TAG_PREFIX"
 
 echo "Running 4-core (2x2) scaling..."
-$MPIEXEC -n 4 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 2 --py 2 --tag "${TAG_PREFIX}_4core"
+$MPIEXEC -n 4 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 2 --py 2 --tag "${TAG_PREFIX}_4core" --output-group "$TAG_PREFIX"
 
 echo "Running 8-core (4x2) scaling..."
-$MPIEXEC -n 8 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 4 --py 2 --tag "${TAG_PREFIX}_8core"
+$MPIEXEC -n 8 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 4 --py 2 --tag "${TAG_PREFIX}_8core" --output-group "$TAG_PREFIX"
 
 echo "Running 16-core (4x4) scaling..."
-$MPIEXEC -n 16 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 4 --py 4 --tag "${TAG_PREFIX}_16core"
+$MPIEXEC -n 16 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 4 --py 4 --tag "${TAG_PREFIX}_16core" --output-group "$TAG_PREFIX"
 
 echo "Running 36-core (6x6) scaling..."
-$MPIEXEC -n 36 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 6 --py 6 --tag "${TAG_PREFIX}_36core"
+$MPIEXEC -n 36 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 6 --py 6 --tag "${TAG_PREFIX}_36core" --output-group "$TAG_PREFIX"
 
 echo "Scaling benchmarks complete!"

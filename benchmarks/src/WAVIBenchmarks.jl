@@ -64,6 +64,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
     no_plots::Bool = false,
     warmup::Bool = false,
     tag::String = "",
+    output_group::String = "",
 )
     opts = BenchmarkOptions(
         mode;
@@ -78,6 +79,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
         no_plots = no_plots,
         warmup = warmup,
         tag = tag,
+        output_group = output_group,
     )
     run_benchmark(opts)
 end

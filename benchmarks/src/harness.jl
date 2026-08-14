@@ -36,6 +36,7 @@ Base.@kwdef struct BenchmarkOptions
     no_plots::Bool = false
     warmup::Bool = false
     tag::String = ""
+    output_group::String = ""
 end
 
 # Convenience constructor accepting a string mode (from the Comonicon CLI),
@@ -92,6 +93,7 @@ function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothin
         "reference_cores" => reference_cores(opts; mpi_world_size = mpi_world_size),
         "command" => BENCHMARK_COMMAND[],
         "tag" => opts.tag,
+        "output_group" => opts.output_group,
         "git_commit" => commit_hash,
     ), slurm_metadata())
 end

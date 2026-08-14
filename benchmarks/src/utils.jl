@@ -147,11 +147,21 @@ function benchmark_main(id::String,
         timestamp = String(timestamp_chars)
     end
 
-    output_dir = joinpath(
-        BENCHMARK_OUTPUT_DIR,
-        driver_name,
-        "benchmark_$(id)_$(timestamp)",
-    )
+    output_group = get(metadata, "output_group", "")
+    if isempty(output_group)
+        output_dir = joinpath(
+            BENCHMARK_OUTPUT_DIR,
+            driver_name,
+            "benchmark_$(id)_$(timestamp)",
+        )
+    else
+        output_dir = joinpath(
+            BENCHMARK_OUTPUT_DIR,
+            driver_name,
+            output_group,
+            "benchmark_$(id)_$(timestamp)",
+        )
+    end
     model_args[:folder] = output_dir
     mkpath(output_dir)
 
