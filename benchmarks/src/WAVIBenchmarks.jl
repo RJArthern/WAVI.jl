@@ -7,6 +7,7 @@
 module WAVIBenchmarks
 
 using Comonicon
+import JSON3
 
 # Include shared harness components
 include(joinpath(@__DIR__, "drivers.jl"))
@@ -134,7 +135,7 @@ when needed; pass `--reference-cores` to override for every series.
 
 # Arguments
 
-- `csv_paths`: paths to `resource_timeseries.csv` files
+- `paths`: paths to benchmark output directories or `resource_timeseries.csv` files
 
 # Options
 
@@ -143,7 +144,7 @@ when needed; pass `--reference-cores` to override for every series.
 - `--output <path>`: output PNG path (default: `benchmarks/output/resource_comparison.png`)
 """
 @cast function plot(
-    csv_paths::String...;
+    paths::String...;
     labels::String = "",
     reference_cores = nothing,
     output::String = "",
@@ -151,12 +152,53 @@ when needed; pass `--reference-cores` to override for every series.
     labs = isempty(labels) ? String[] : String[strip(s) for s in split(labels, ',') if !isempty(strip(s))]
     out = isempty(output) ? joinpath(BENCHMARK_OUTPUT_DIR, "resource_comparison.png") : output
     ref = reference_cores isa Real ? Float64(reference_cores) : nothing
+
+    csv_paths = String[]
+    for p in paths
+        if isdir(p)
+            push!(csv_paths, joinpath(p, "resource_timeseries.csv"))
+        else
+            push!(csv_paths, p)
+        end
+    end
+
     plot_resource_timeseries(
-        collect(String, csv_paths);
+        csv_paths;
         labels = labs,
         reference_cores = ref,
         output = out,
     )
+end
+
+"""
+Calculate the pure MPI setup overhead by comparing the setup times of a BasicSpec
+run and an MPISpec run.
+
+# Arguments
+
+- `basic_path`: path to the BasicSpec output directory (or JSON file)
+- `mpi_path`: path to the MPISpec output directory (or JSON file)
+"""
+@cast function mpi_overhead(basic_path::String, mpi_path::String)
+
+    basic_json = isdir(basic_path) ? joinpath(basic_path, "benchmark_results.json") : basic_path
+    mpi_json = isdir(mpi_path) ? joinpath(mpi_path, "benchmark_results.json") : mpi_path
+
+    basic_data = JSON3.read(read(basic_json, String))
+    mpi_data = JSON3.read(read(mpi_json, String))
+
+    if !haskey(basic_data.metadata, :setup_time_seconds) || !haskey(mpi_data.metadata, :setup_time_seconds)
+        error("One or both JSON files are missing the 'setup_time_seconds' metadata field.")
+    end
+
+    basic_setup = basic_data.metadata.setup_time_seconds
+    mpi_setup = mpi_data.metadata.setup_time_seconds
+    overhead = mpi_setup - basic_setup
+
+    println("BasicSpec Setup Time: ", round(basic_setup, digits=3), " seconds")
+    println("MPISpec Setup Time:   ", round(mpi_setup, digits=3), " seconds")
+    println("-"^40)
+    println("Pure MPI Setup Overhead: ", round(overhead, digits=3), " seconds")
 end
 
 # Initialise Comonicon CLI

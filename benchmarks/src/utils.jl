@@ -227,6 +227,11 @@ function benchmark_main(id::String,
             @info "Solve time: $(@sprintf("%.3f", result.solve_time)) seconds"
             metadata["solve_time_seconds"] = result.solve_time
         end
+        if hasproperty(result, :setup_time) && hasproperty(result, :solve_time)
+            comp_time = max(0.0, benchmark_results.execution_time - (result.setup_time + result.solve_time))
+            @info "Compilation & Overhead time: $(@sprintf("%.3f", comp_time)) seconds"
+            metadata["compilation_and_overhead_time_seconds"] = comp_time
+        end
 
         benchmark_file = joinpath(output_dir, "benchmark_results.json")
         save_benchmark_results(benchmark_results, benchmark_file; metadata = metadata)

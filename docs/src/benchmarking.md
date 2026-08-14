@@ -35,6 +35,7 @@ julia --project=benchmarks benchmarks/run.jl <subcommand> [args...] [options...]
 | `run`      | Timed benchmark with resource telemetry |
 | `profile`  | On-demand CPU profile (`@profile`) |
 | `plot`     | Overlay RSS/CPU time series from one or more runs |
+| `mpi-overhead` | Calculate pure MPI setup overhead from JSON results |
 
 Each subcommand supports `--help`.
 
@@ -120,15 +121,27 @@ During `run`, an external sampler records RSS and CPU over time (so sampling sti
 works under `julia -t 1`). Each run directory includes:
 
 - `benchmark_results.json` — wall time, peak RSS, allocations, `reference_cores`
+  - Includes `setup_time_seconds` and `solve_time_seconds` to isolate solver math performance.
+  - Includes `compilation_and_overhead_time_seconds` which captures all remaining time (JIT compilation, MPI launch, file I/O).
 - `resource_timeseries.csv` — elapsed time vs RSS and CPU (including per-processor breakdowns for MPI runs)
 
 Compare series visually:
 
 ```bash
 julia --project=benchmarks benchmarks/run.jl plot \
-  benchmarks/output/mismip_plus/benchmark_basic_*/resource_timeseries.csv \
-  benchmarks/output/mismip_plus/benchmark_threaded.*/resource_timeseries.csv \
-  benchmarks/output/mismip_plus/benchmark_mpi.*/resource_timeseries.csv
+  benchmarks/output/mismip_plus/benchmark_basic_* \
+  benchmarks/output/mismip_plus/benchmark_threaded_* \
+  benchmarks/output/mismip_plus/benchmark_mpi_*
 ```
 
 For MPI runs, the plot will break down memory usage to show Rank 0 vs the average of other processors to help identify bottlenecks.
+
+### Calculate MPI Setup Overhead
+
+To isolate the exact cost of establishing the MPI topology and halo exchange buffers compared to a standard BasicSpec run, you can compare the `setup_time_seconds` of a pair of serial and MPI runs (with identical configuration):
+
+```bash
+julia --project=benchmarks benchmarks/run.jl mpi-overhead \
+  benchmarks/output/mismip_plus/benchmark_basic_20260814_120000 \
+  benchmarks/output/mismip_plus/benchmark_mpi_20260814_120500
+```
