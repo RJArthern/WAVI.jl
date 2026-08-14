@@ -13,7 +13,7 @@
 #SBATCH -J wavi_scale
 #SBATCH -N 1
 #SBATCH -n 36
-#SBATCH --time=03:00:00
+#SBATCH --time=05:00:00
 #SBATCH --output=benchmarks/output/ismip7_16km_synthetic/slurm-%j.out
 
 # Ensure we use the correct MPI exec wrapper for the BAS HPC environment

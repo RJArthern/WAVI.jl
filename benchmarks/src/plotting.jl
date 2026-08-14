@@ -36,7 +36,14 @@ function create_heatmap_animation(netcdf_file::String, variable_name::String, ou
         for (i, t) in enumerate(time)
             # Extract 2D slice for this time step
             slice_2d = data[:, :, i]
-            
+
+            # Handle case where min == max (prevents GKS invalid range errors)
+            d_min, d_max = minimum(data), maximum(data)
+            if d_min ≈ d_max
+                d_min -= 0.1
+                d_max += 0.1
+            end
+
             # Create heatmap
             p = heatmap(
                 x, y, slice_2d',
@@ -44,7 +51,7 @@ function create_heatmap_animation(netcdf_file::String, variable_name::String, ou
                 xlabel="X",
                 ylabel="Y",
                 color=:viridis,
-                clim=(minimum(data), maximum(data)),
+                clim=(d_min, d_max),
                 aspect_ratio=:equal,
                 size=(600, 500),
             )
