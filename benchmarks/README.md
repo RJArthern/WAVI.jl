@@ -15,10 +15,10 @@ bash benchmarks/run_scaling.sh "my_custom_tag"
 
 Alternatively, you can submit it directly to the SLURM queue from a login node:
 ```bash
-sbatch benchmarks/run_scaling.sh "my_custom_tag"
+sbatch benchmarks/run_scaling.sh "my_custom_tag" "mismip_plus"
 ```
 
-*(If you omit the tag argument, it defaults to `"baseline_sparse"`)*
+*(If you omit the arguments, they default to `"baseline_sparse"` and `"ismip7_16km_synthetic"`)*
 
 To run a simple single-core `BasicSpec` (serial) baseline locally or interactively:
 
