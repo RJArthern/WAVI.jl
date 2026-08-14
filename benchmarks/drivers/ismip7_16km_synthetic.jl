@@ -56,8 +56,8 @@ function driver_run(; folder = "outputs", grid = driver_grid(), spec = WAVI.Basi
     # Simple defaults for params so we don't need forcing files
     params = Params(default_thickness = 1000.0, default_temperature = 260.0, accumulation_rate = 0.3)
 
-    # Solver parameters
-    solver_params = SolverParams(maxiter_picard = 5)
+    # Solver parameters (force exactly 5 iterations to avoid early-convergence skew in benchmarks)
+    solver_params = SolverParams(maxiter_picard = 5, tol_picard = 0.0)
 
     model = Model(
         grid = grid,
