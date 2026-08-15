@@ -13,6 +13,7 @@ using WAVI.ThermoDynamics
 using WAVI.Time
 using WAVI.Utilities
 using WAVI.Wavelets
+using KernelAbstractions: @kernel, @index
 
 """
 update_state!(model::AbstractModel, clock)
@@ -176,16 +177,43 @@ end
 
 Update stiffness parameter B in Glen flow law.
 """
+@kernel function _update_glen_b_kernel!(
+    glen_b_arr,
+    θ,
+    Φ,
+    glen_a_ref,
+    glen_n,
+    glen_a_activation_energy,
+    glen_temperature_ref,
+    gas_const,
+)
+    i, j, k = @index(Global, NTuple)
+    @inbounds glen_b_arr[i, j, k] = glen_b(
+        θ[i, j, k],
+        Φ[i, j, k],
+        glen_a_ref[i, j],
+        glen_n,
+        glen_a_activation_energy,
+        glen_temperature_ref,
+        gas_const,
+    )
+end
+
 function update_glen_b!(model::AbstractModel)
-    @unpack g3d=model.fields
-    @unpack params=model
-    for k=1:g3d.nσs
-        for j=1:g3d.nys
-            for i=1:g3d.nxs
-                g3d.glen_b[i,j,k] = glen_b.(g3d.θ[i,j,k],g3d.Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
-            end
-        end
-    end
+    @unpack g3d = model.fields
+    @unpack params = model
+    WAVI.Stencils.launch!(
+        _update_glen_b_kernel!,
+        g3d.glen_b,
+        g3d.θ,
+        g3d.Φ,
+        params.glen_a_ref,
+        params.glen_n,
+        params.glen_a_activation_energy,
+        params.glen_temperature_ref,
+        params.gas_const;
+        ndrange = (g3d.nxs, g3d.nys, g3d.nσs),
+    )
     return model
 end
 

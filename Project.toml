@@ -44,3 +44,10 @@ SciMLNLSolve = "e9a6253c-8580-4d32-9898-8661bb511710"
 Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+
+[targets]
+test = ["Test", "KernelAbstractions"]

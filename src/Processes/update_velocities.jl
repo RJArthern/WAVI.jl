@@ -7,6 +7,7 @@ using WAVI
 using WAVI.KroneckerProducts
 using WAVI.Parameters
 using WAVI.Utilities
+using KernelAbstractions: @kernel, @index
 
 """
 update_velocities!(model::AbstractModel)
@@ -233,71 +234,139 @@ end
 
 Inner update to iteratively refine viscosity on the 3d grid at all sigma levels.
 """
-function inner_update_viscosity!(model::AbstractModel)
-    @unpack gh,g3d=model.fields
-    @unpack params,solver_params=model
-    for k=1:g3d.nσs
-        for j=1:g3d.nys
-            for i=1:g3d.nxs
-                if gh.mask[i,j]
-                    for iter=1:solver_params.n_iter_viscosity
-                        g3d.η[i,j,k] = 0.5 * g3d.glen_b[i,j,k] * (
-                                                   sqrt(    gh.shelf_strain_rate[i,j]^2 +
-                                                            0.25*(gh.τbed[i,j]*g3d.ζ[k]/g3d.η[i,j,k])^2 +
-                                                            params.glen_reg_strain_rate^2   )
-                                                                 )^(1.0/params.glen_n - 1.0)
-                    end
-                end
-            end
+@kernel function _inner_update_viscosity_kernel!(
+    η,
+    glen_b,
+    mask,
+    shelf_strain_rate,
+    τbed,
+    ζ,
+    glen_reg_strain_rate,
+    glen_n_inv_minus_1,
+    n_iter_viscosity,
+)
+    i, j, k = @index(Global, NTuple)
+    @inbounds if mask[i, j]
+        for iter in 1:n_iter_viscosity
+            η[i, j, k] = 0.5 *
+                glen_b[i, j, k] *
+                (
+                    sqrt(
+                        shelf_strain_rate[i, j]^2 +
+                            0.25 * (τbed[i, j] * ζ[k] / η[i, j, k])^2 +
+                            glen_reg_strain_rate^2,
+                    )
+                )^glen_n_inv_minus_1
         end
     end
-    return model
 end
 
-
+function inner_update_viscosity!(model::AbstractModel)
+    @unpack gh, g3d = model.fields
+    @unpack params, solver_params = model
+    glen_n_inv_minus_1 = 1.0 / params.glen_n - 1.0
+    WAVI.Stencils.launch!(
+        _inner_update_viscosity_kernel!,
+        g3d.η,
+        g3d.glen_b,
+        gh.mask,
+        gh.shelf_strain_rate,
+        gh.τbed,
+        g3d.ζ,
+        params.glen_reg_strain_rate,
+        glen_n_inv_minus_1,
+        solver_params.n_iter_viscosity;
+        ndrange = (g3d.nxs, g3d.nys, g3d.nσs),
+    )
+    return model
+end
 
 """
     update_av_viscosity!(model::AbstractModel)
 
 Use quadrature to compute the depth averaged viscosity.
 """
-function update_av_viscosity!(model::AbstractModel)
-    @unpack gh,g3d=model.fields
-    gh.ηav .= zero(gh.ηav)
-    for k=1:g3d.nσs
-       for j = 1:g3d.nys
-          for i = 1:g3d.nxs
-            if gh.mask[i,j]
-                gh.ηav[i,j] += g3d.quadrature_weights[k] * g3d.η[i,j,k]
-            end
-          end
-       end
+@kernel function _update_av_viscosity_kernel!(ηav, η, mask, quadrature_weights, nσs)
+    i, j = @index(Global, NTuple)
+    @inbounds if mask[i, j]
+        sum_η = zero(eltype(ηav))
+        for k in 1:nσs
+            sum_η += quadrature_weights[k] * η[i, j, k]
+        end
+        ηav[i, j] = sum_η
     end
-    return model
 end
 
+function update_av_viscosity!(model::AbstractModel)
+    @unpack gh, g3d = model.fields
+    gh.ηav .= zero(gh.ηav)
+    WAVI.Stencils.launch!(
+        _update_av_viscosity_kernel!,
+        gh.ηav,
+        g3d.η,
+        gh.mask,
+        g3d.quadrature_weights,
+        g3d.nσs;
+        ndrange = (g3d.nxs, g3d.nys),
+    )
+    return model
+end
 
 """
     update_quadrature_falpha!(model::AbstractModel)
 
 Use quadrature to compute falpha functions, used to relate average velocities, basal velocities, and surface velocities to one another
 """
+@kernel function _update_quadrature_falpha_kernel!(
+    quad_f0,
+    quad_f1,
+    quad_f2,
+    h,
+    η,
+    ζ,
+    mask,
+    quadrature_weights,
+    nσs,
+)
+    i, j = @index(Global, NTuple)
+    @inbounds if mask[i, j]
+        # Creating temp vars for performance (reduced memory traffic)
+        f0 = zero(eltype(quad_f0))
+        f1 = zero(eltype(quad_f1))
+        f2 = zero(eltype(quad_f2))
+        h_val = h[i, j]
+        for k in 1:nσs
+            qw = quadrature_weights[k]
+            inv_η = 1.0 / η[i, j, k]
+            z_val = ζ[k]
+            f0 += qw * h_val * inv_η
+            f1 += qw * h_val * z_val * inv_η
+            f2 += qw * h_val * (z_val^2) * inv_η
+        end
+        quad_f0[i, j] = f0
+        quad_f1[i, j] = f1
+        quad_f2[i, j] = f2
+    end
+end
+
 function update_quadrature_falpha!(model::AbstractModel)
-    @unpack gh,g3d=model.fields
+    @unpack gh, g3d = model.fields
     gh.quad_f0 .= zero(gh.quad_f0)
     gh.quad_f1 .= zero(gh.quad_f1)
     gh.quad_f2 .= zero(gh.quad_f2)
-    for k=1:g3d.nσs
-       for j = 1:g3d.nys
-          for i = 1:g3d.nxs
-            if gh.mask[i,j]
-                gh.quad_f0[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]/g3d.η[i,j,k]
-                gh.quad_f1[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*g3d.ζ[k]/g3d.η[i,j,k]
-                gh.quad_f2[i,j] += g3d.quadrature_weights[k]*gh.h[i,j]*(g3d.ζ[k])^2/g3d.η[i,j,k]
-            end
-          end
-       end
-    end
+    WAVI.Stencils.launch!(
+        _update_quadrature_falpha_kernel!,
+        gh.quad_f0,
+        gh.quad_f1,
+        gh.quad_f2,
+        gh.h,
+        g3d.η,
+        g3d.ζ,
+        gh.mask,
+        g3d.quadrature_weights,
+        g3d.nσs;
+        ndrange = (g3d.nxs, g3d.nys),
+    )
     return model
 end
 

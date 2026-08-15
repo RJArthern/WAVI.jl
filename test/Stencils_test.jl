@@ -6,7 +6,7 @@ using KernelAbstractions
     # Very basic tests to make sure kernels compile and run
 
     nx, ny = 10, 10
-    inp = ones(nx, ny)
+    inp = ones(nx+1, ny+1)
     out = zeros(nx, ny)
     dx_inv = 1.0
 
