@@ -135,7 +135,7 @@ end
     @. ϕ̄  = v
 
     # Use Enzyme's forward mode AD to compute the JVP
-    Enzyme.autodiff(Enzyme.Forward,
+    Enzyme.autodiff(Enzyme.set_runtime_activity(Enzyme.Forward),
                     residual!,
                     DuplicatedNoNeed(r, r̄),
                     DuplicatedNoNeed(ϕ, ϕ̄),
