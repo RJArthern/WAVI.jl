@@ -20,7 +20,7 @@
 MPIEXEC=mpiexecjl
 
 # Accept tag prefix from command line argument 1
-TAG_PREFIX=${1:-"ka.jl_velocity_and_state_kernels_v1_sparse"}
+TAG_PREFIX=${1:-"ka.jl_op_fun_stencils_v2"}
 
 # Accept driver from command line argument 2
 DRIVER=${2:-"ismip7_16km_synthetic"}

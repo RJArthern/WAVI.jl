@@ -4,6 +4,10 @@ export _diff_x!,
     _diff_y!,
     _diff_xT!,
     _diff_yT!,
+    _diff_x_staggered!,
+    _diff_y_staggered!,
+    _diff_xT_staggered!,
+    _diff_yT_staggered!,
     _avg_x!,
     _avg_y!,
     _apply_mask!,
@@ -16,15 +20,18 @@ using KernelAbstractions: KernelAbstractions as KA
 using KernelAbstractions: @kernel, @index
 
 """
-    launch!(kernel!, args...; ndrange, backend = KA.CPU())
+    launch!(kernel!, args...; ndrange, sync = true)
 
-Wrapper to launch a KernelAbstractions `kernel!` on the specified `backend`.
-Defaults to `KA.CPU()` if no backend is provided. Ensures synchronisation
-after the kernel is launched.
+Wrapper to launch a KernelAbstractions `kernel!`.
+The backend is taken from the first kernel argument via `KA.get_backend`.
+Ensures synchronisation after the kernel is launched unless `sync = false`.
 """
-function launch!(kernel!, args...; ndrange, backend = KA.CPU())
+function launch!(kernel!, args...; ndrange, sync = true)
+    backend = KA.get_backend(first(args))
     kernel!(backend)(args...; ndrange = ndrange)
-    KA.synchronize(backend)
+    if sync
+        KA.synchronize(backend)
+    end
 end
 
 # Finite Differences
@@ -58,10 +65,14 @@ end
 
 Compute backward (transpose) finite difference of `inp` in x-direction.
 Equivalent to `out = ∂xᵀ * inp` in sparse matrix notation.
+`out` is one cell wider than `inp` (U-grid); edge values are treated as zero.
 """
 @kernel function _diff_xT!(out, inp, dx_inv)
     i, j = @index(Global, NTuple)
-    @inbounds out[i, j] = (inp[i - 1, j] - inp[i, j]) * dx_inv
+    nx = size(inp, 1)
+    val_left = i > 1 ? inp[i - 1, j] : zero(eltype(inp))
+    val_right = i <= nx ? inp[i, j] : zero(eltype(inp))
+    @inbounds out[i, j] = (val_left - val_right) * dx_inv
 end
 
 """
@@ -69,10 +80,74 @@ end
 
 Compute backward (transpose) finite difference of `inp` in y-direction.
 Equivalent to `out = ∂yᵀ * inp` in sparse matrix notation.
+`out` is one cell taller than `inp` (V-grid); edge values are treated as zero.
 """
 @kernel function _diff_yT!(out, inp, dy_inv)
     i, j = @index(Global, NTuple)
-    @inbounds out[i, j] = (inp[i, j - 1] - inp[i, j]) * dy_inv
+    ny = size(inp, 2)
+    val_bot = j > 1 ? inp[i, j - 1] : zero(eltype(inp))
+    val_top = j <= ny ? inp[i, j] : zero(eltype(inp))
+    @inbounds out[i, j] = (val_bot - val_top) * dy_inv
+end
+
+# Staggered Finite Differences (C-grid shear)
+
+"""
+    _diff_y_staggered!(out, inp, dy_inv)
+
+Forward difference of U-grid `inp` in y onto the C-grid, using interior faces.
+Equivalent to `out = gu.∂y * inp` (`∂1d ⊗ χ`) in sparse matrix notation.
+"""
+@kernel function _diff_y_staggered!(out, inp, dy_inv)
+    i, j = @index(Global, NTuple)
+    @inbounds out[i, j] = (inp[i + 1, j + 1] - inp[i + 1, j]) * dy_inv
+end
+
+"""
+    _diff_x_staggered!(out, inp, dx_inv)
+
+Forward difference of V-grid `inp` in x onto the C-grid, using interior faces.
+Equivalent to `out = gv.∂x * inp` (`χ ⊗ ∂1d`) in sparse matrix notation.
+"""
+@kernel function _diff_x_staggered!(out, inp, dx_inv)
+    i, j = @index(Global, NTuple)
+    @inbounds out[i, j] = (inp[i + 1, j + 1] - inp[i, j + 1]) * dx_inv
+end
+
+"""
+    _diff_yT_staggered!(out, inp, dy_inv)
+
+Transpose of `_diff_y_staggered!`. Equivalent to `out = gu.∂yᵀ * inp`.
+"""
+@kernel function _diff_yT_staggered!(out, inp, dy_inv)
+    i, j = @index(Global, NTuple)
+    nxc = size(inp, 1)
+    nyc = size(inp, 2)
+    if i > 1 && i <= nxc + 1
+        val_bot = j > 1 ? inp[i - 1, j - 1] : zero(eltype(inp))
+        val_top = j <= nyc ? inp[i - 1, j] : zero(eltype(inp))
+        @inbounds out[i, j] = (val_bot - val_top) * dy_inv
+    else
+        @inbounds out[i, j] = zero(eltype(out))
+    end
+end
+
+"""
+    _diff_xT_staggered!(out, inp, dx_inv)
+
+Transpose of `_diff_x_staggered!`. Equivalent to `out = gv.∂xᵀ * inp`.
+"""
+@kernel function _diff_xT_staggered!(out, inp, dx_inv)
+    i, j = @index(Global, NTuple)
+    nxc = size(inp, 1)
+    nyc = size(inp, 2)
+    if j > 1 && j <= nyc + 1
+        val_left = i > 1 ? inp[i - 1, j - 1] : zero(eltype(inp))
+        val_right = i <= nxc ? inp[i, j - 1] : zero(eltype(inp))
+        @inbounds out[i, j] = (val_left - val_right) * dx_inv
+    else
+        @inbounds out[i, j] = zero(eltype(out))
+    end
 end
 
 # Averaging

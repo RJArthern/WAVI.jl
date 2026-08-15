@@ -6,6 +6,8 @@ using Parameters
 
 using WAVI: AbstractModel
 using WAVI.KroneckerProducts
+using KernelAbstractions: KernelAbstractions as KA
+using WAVI.Stencils
 
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
     get_glx, glen_b, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!, 
@@ -25,51 +27,68 @@ Returns a function that multiplies a vector by the momentum operator.
 """
 function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
-    
+    grid = model.grid
+
+    # Rheological diagonals, updated in-place each Picard iterate
+    gh_dneghηav_diag = gh.dneghηav[].diag
+    gc_dneghηav_diag = gc.dneghηav[].diag
+    gu_dnegβeff_diag = gu.dnegβeff[].diag
+    gv_dnegβeff_diag = gv.dnegβeff[].diag
+    gh_dimplicit_diag = gh.dimplicit[].diag
+
+    # Inner active indices for scatter/gather (replaces samp_inner / spread_inner)
+    gu_inner_indices = findall(vec(gu.mask_inner))
+    gv_inner_indices = findall(vec(gv.mask_inner))
+
     #Preallocate intermediate variables used by op_fun
-    nxnyh :: N = gh.nxh*gh.nyh
-    nxnyu :: N = gu.nxu*gu.nyu
-    nxnyv :: N = gv.nxv*gv.nyv
-    nxnyc :: N = gc.nxc*gc.nyc
-    usampi :: Vector{T} = zeros(gu.ni);                             @assert length(usampi) == gu.ni
-    vsampi :: Vector{T} = zeros(gv.ni);                             @assert length(vsampi) == gv.ni
-    uspread :: Vector{T} = zeros(nxnyu);                            @assert length(uspread) == nxnyu
-    vspread :: Vector{T} = zeros(nxnyv);                            @assert length(vspread) == nxnyv
-    dudx :: Vector{T} = zeros(nxnyh);                               @assert length(dudx) == nxnyh
-    dvdy :: Vector{T} = zeros(nxnyh);                               @assert length(dvdy) == nxnyh
-    r_xx_strain_rate_sum :: Vector{T} = zeros(nxnyh);               @assert length(r_xx_strain_rate_sum) == nxnyh
-    r_yy_strain_rate_sum :: Vector{T} = zeros(nxnyh);               @assert length(r_yy_strain_rate_sum) == nxnyh
-    r_xx :: Vector{T} = zeros(nxnyh);                               @assert length(r_xx) == nxnyh
-    r_yy :: Vector{T} = zeros(nxnyh);                               @assert length(r_yy) == nxnyh
-    dudy_c :: Vector{T} = zeros(nxnyc);                             @assert length(dudy_c) == nxnyc
-    dvdx_c :: Vector{T} = zeros(nxnyc);                             @assert length(dvdx_c) == nxnyc
-    r_xy_strain_rate_sum_c :: Vector{T} = zeros(nxnyc);             @assert length(r_xy_strain_rate_sum_c) == nxnyc
-    r_xy_strain_rate_sum_crop_c :: Vector{T} = zeros(nxnyc);        @assert length(r_xy_strain_rate_sum_crop_c) == nxnyc
-    r_xy_c :: Vector{T} = zeros(nxnyc);                             @assert length(r_xy_c) == nxnyc
-    r_xy_crop_c :: Vector{T} = zeros(nxnyc);                        @assert length(r_xy_crop_c) == nxnyc
-    d_rxx_dx :: Vector{T} = zeros(nxnyu);                           @assert length(d_rxx_dx) == nxnyu
-    d_rxy_dy :: Vector{T} = zeros(nxnyu);                           @assert length(d_rxy_dy) == nxnyu
-    d_ryy_dy :: Vector{T} = zeros(nxnyv);                           @assert length(d_ryy_dy) == nxnyv
-    d_rxy_dx :: Vector{T} = zeros(nxnyv);                           @assert length(d_rxy_dx) == nxnyv
-    taubx :: Vector{T} = zeros(nxnyu);                              @assert length(taubx) == nxnyu
-    tauby :: Vector{T} = zeros(nxnyv);                              @assert length(tauby) == nxnyv
-    qx :: Vector{T} = zeros(nxnyu);                                 @assert length(qx) == nxnyu
-    qx_crop :: Vector{T} = zeros(nxnyu);                            @assert length(qx_crop) == nxnyu
-    dqxdx :: Vector{T} = zeros(nxnyh);                              @assert length(dqxdx) == nxnyh
-    qy :: Vector{T} = zeros(nxnyv);                                 @assert length(qy) == nxnyv
-    qy_crop :: Vector{T} = zeros(nxnyv);                            @assert length(qy_crop) == nxnyv
-    dqydy :: Vector{T} = zeros(nxnyh);                              @assert length(dqydy) == nxnyh
-    divq :: Vector{T} = zeros(nxnyh);                               @assert length(divq) == nxnyh
-    extra :: Vector{T} = zeros(nxnyh);                              @assert length(extra) == nxnyh
-    d_extra_dx :: Vector{T} = zeros(nxnyu);                         @assert length(d_extra_dx) == nxnyu
-    d_extra_dy :: Vector{T} = zeros(nxnyv);                         @assert length(d_extra_dy) == nxnyv
-    h_d_extra_dx :: Vector{T} = zeros(nxnyu);                       @assert length(h_d_extra_dx) == nxnyu
-    h_d_extra_dy :: Vector{T} = zeros(nxnyv);                       @assert length(h_d_extra_dy) == nxnyv
-    fx :: Vector{T} = zeros(nxnyu);                                 @assert length(fx) == nxnyu
-    fy :: Vector{T} = zeros(nxnyv);                                 @assert length(fy) == nxnyv
-    fx_sampi :: Vector{T} = zeros(gu.ni);                           @assert length(fx_sampi) == gu.ni
-    fy_sampi :: Vector{T} = zeros(gv.ni);                           @assert length(fy_sampi) == gv.ni
-    opvecprod :: Vector{T} = zeros(gu.ni+gv.ni);                    @assert length(opvecprod) == gu.ni + gv.ni
+    usampi = similar(gu.u, gu.ni)
+    vsampi = similar(gv.v, gv.ni)
+    uspread = similar(gu.u)
+    vspread = similar(gv.v)
+
+    dudx = similar(gh.h)
+    dvdy = similar(gh.h)
+    r_xx_strain_rate_sum = similar(gh.h)
+    r_yy_strain_rate_sum = similar(gh.h)
+    r_xx = similar(gh.h)
+    r_yy = similar(gh.h)
+
+    dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    dvdx_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    r_xy_strain_rate_sum_c = similar(dudy_c)
+    r_xy_strain_rate_sum_crop_c = similar(dudy_c)
+    r_xy_c = similar(dudy_c)
+    r_xy_crop_c = similar(dudy_c)
+
+    d_rxx_dx = similar(gu.u)
+    d_rxy_dy = similar(gu.u)
+    d_ryy_dy = similar(gv.v)
+    d_rxy_dx = similar(gv.v)
+
+    taubx = similar(gu.u)
+    tauby = similar(gv.v)
+
+    qx = similar(gu.u)
+    qx_crop = similar(gu.u)
+    dqxdx = similar(gh.h)
+    qy = similar(gv.v)
+    qy_crop = similar(gv.v)
+    dqydy = similar(gh.h)
+    divq = similar(gh.h)
+    extra = similar(gh.h)
+    d_extra_dx = similar(gu.u)
+    d_extra_dy = similar(gv.v)
+    h_d_extra_dx = similar(gu.u)
+    h_d_extra_dy = similar(gv.v)
+
+    fx = similar(gu.u)
+    fy = similar(gv.v)
+    fx_sampi = similar(gu.u, gu.ni)
+    fy_sampi = similar(gv.v, gv.ni)
+
+    dx_inv = one(T) / grid.dx
+    dy_inv = one(T) / grid.dy
+    backend = KA.get_backend(gh.h)
 
     function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
@@ -80,81 +99,101 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
             vsampi .= @view inputVector[(gu.ni+1):(gu.ni+gv.ni)]
 
             #Spread to vectors that include all grid points within rectangular domain.
-            @!  uspread = gu.spread_inner*usampi
-            @!  vspread = gv.spread_inner*vsampi
+            fill!(uspread, zero(T))
+            fill!(vspread, zero(T))
+            launch!(_scatter!, uspread, usampi, gu_inner_indices; ndrange = length(usampi), sync = false)
+            launch!(_scatter!, vspread, vsampi, gv_inner_indices; ndrange = length(vsampi), sync = false)
+            KA.synchronize(backend)
 
         else
             #Vector already includes all grid points within rectangular domain.
             @assert length(inputVector)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
-            
-            uspread .= @view inputVector[1:gu.nxu*gu.nyu]
-            vspread .= @view inputVector[(gu.nxu*gu.nyu+1):(gu.nxu*gu.nyu+gv.nxv*gv.nyv)]
+            uspread .= reshape(@view(inputVector[1:gu.nxu*gu.nyu]), gu.nxu, gu.nyu)
+            vspread .= reshape(@view(inputVector[(gu.nxu*gu.nyu+1):end]), gv.nxv, gv.nyv)
 
         end
-        
-            #Extensional resistive stresses
-        @!  dudx = gu.∂x*uspread
-        @!  dvdy = gv.∂y*vspread
-        @.  r_xx_strain_rate_sum = 2dudx + dvdy
-        @.  r_yy_strain_rate_sum = 2dvdy + dudx
-        @!  r_xx = gh.dneghηav[]*r_xx_strain_rate_sum
+
+        #Extensional resistive stresses
+        launch!(_diff_x!, dudx, uspread, dx_inv; ndrange = size(dudx), sync = false)
+        launch!(_diff_y!, dvdy, vspread, dy_inv; ndrange = size(dvdy), sync = false)
+        KA.synchronize(backend)
+
+        @. r_xx_strain_rate_sum = 2 * dudx + dvdy
+        @. r_yy_strain_rate_sum = 2 * dvdy + dudx
+        launch!(_scale!, r_xx, r_xx_strain_rate_sum, gh_dneghηav_diag; ndrange = length(r_xx), sync = false)
+        launch!(_scale!, r_yy, r_yy_strain_rate_sum, gh_dneghηav_diag; ndrange = length(r_yy), sync = false)
+        KA.synchronize(backend)
         @.  r_xx = -2r_xx
-        @!  r_yy = gh.dneghηav[]*r_yy_strain_rate_sum
         @.  r_yy = -2r_yy
 
-            #Shearing resistive stresses
-        @!  dudy_c = gu.∂y*uspread
-        @!  dvdx_c = gv.∂x*vspread
-        @.  r_xy_strain_rate_sum_c = dudy_c + dvdx_c
-        @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
-        @!  r_xy_c = gc.dneghηav[]*r_xy_strain_rate_sum_crop_c
-        @.  r_xy_c = -r_xy_c
-        @!  r_xy_crop_c = gc.crop*r_xy_c
+        #Shearing resistive stresses
+        launch!(_diff_y_staggered!, dudy_c, uspread, dy_inv; ndrange = size(dudy_c), sync = false)
+        launch!(_diff_x_staggered!, dvdx_c, vspread, dx_inv; ndrange = size(dvdx_c), sync = false)
+        KA.synchronize(backend)
 
-            #Gradients of resisitve stresses
-        @!  d_rxx_dx = gu.∂xᵀ*r_xx
-        @.  d_rxx_dx = - d_rxx_dx 
-        @!  d_rxy_dy = gu.∂yᵀ*r_xy_crop_c
-        @.  d_rxy_dy = - d_rxy_dy 
-        @!  d_ryy_dy = gv.∂yᵀ*r_yy
+        @. r_xy_strain_rate_sum_c = dudy_c + dvdx_c
+        copyto!(r_xy_strain_rate_sum_crop_c, r_xy_strain_rate_sum_c)
+        launch!(_apply_mask!, r_xy_strain_rate_sum_crop_c, gc.mask; ndrange = size(r_xy_strain_rate_sum_crop_c))
+        launch!(_scale!, r_xy_c, r_xy_strain_rate_sum_crop_c, gc_dneghηav_diag; ndrange = length(r_xy_c))
+        @.  r_xy_c = -r_xy_c
+        copyto!(r_xy_crop_c, r_xy_c)
+        launch!(_apply_mask!, r_xy_crop_c, gc.mask; ndrange = size(r_xy_crop_c))
+
+        #Gradients of resisitve stresses
+        launch!(_diff_xT!, d_rxx_dx, r_xx, dx_inv; ndrange = size(d_rxx_dx), sync = false)
+        launch!(_diff_yT_staggered!, d_rxy_dy, r_xy_crop_c, dy_inv; ndrange = size(d_rxy_dy), sync = false)
+        launch!(_diff_yT!, d_ryy_dy, r_yy, dy_inv; ndrange = size(d_ryy_dy), sync = false)
+        launch!(_diff_xT_staggered!, d_rxy_dx, r_xy_crop_c, dx_inv; ndrange = size(d_rxy_dx), sync = false)
+        KA.synchronize(backend)
+        @.  d_rxx_dx = - d_rxx_dx
+        @.  d_rxy_dy = - d_rxy_dy
         @.  d_ryy_dy = -d_ryy_dy
-        @!  d_rxy_dx = gv.∂xᵀ*r_xy_crop_c
         @.  d_rxy_dx = -d_rxy_dx
 
-            #Basal drag
-        @!  taubx = gu.dnegβeff[]*uspread
+        #Basal drag
+        launch!(_scale!, taubx, uspread, gu_dnegβeff_diag; ndrange = length(taubx), sync = false)
+        launch!(_scale!, tauby, vspread, gv_dnegβeff_diag; ndrange = length(tauby), sync = false)
+        KA.synchronize(backend)
         @.  taubx = -taubx
-        @!  tauby = gv.dnegβeff[]*vspread
         @.  tauby = -tauby
-            
-            #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-            qx .= vec(gu.h).*uspread
-        @!  qx_crop = gu.crop*qx
-        @!  dqxdx = gu.∂x*qx_crop
-            qy .=  vec(gv.h).* vspread
-        @!  qy_crop = gv.crop*qy
-        @!  dqydy = gv.∂y*qy_crop
-            divq .= dqxdx .+ dqydy
-        @!  extra = gh.dimplicit[]*divq
-        @!  d_extra_dx = gu.∂xᵀ*extra
+
+        #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
+        @. qx = gu.h * uspread
+        copyto!(qx_crop, qx)
+        launch!(_apply_mask!, qx_crop, gu.mask; ndrange = size(qx_crop), sync = false)
+        @. qy = gv.h * vspread
+        copyto!(qy_crop, qy)
+        launch!(_apply_mask!, qy_crop, gv.mask; ndrange = size(qy_crop), sync = false)
+        KA.synchronize(backend)
+
+        launch!(_diff_x!, dqxdx, qx_crop, dx_inv; ndrange = size(dqxdx), sync = false)
+        launch!(_diff_y!, dqydy, qy_crop, dy_inv; ndrange = size(dqydy), sync = false)
+        KA.synchronize(backend)
+
+        @. divq = dqxdx + dqydy
+        launch!(_scale!, extra, divq, gh_dimplicit_diag; ndrange = length(extra))
+        launch!(_diff_xT!, d_extra_dx, extra, dx_inv; ndrange = size(d_extra_dx), sync = false)
+        launch!(_diff_yT!, d_extra_dy, extra, dy_inv; ndrange = size(d_extra_dy), sync = false)
+        KA.synchronize(backend)
+
         @.  d_extra_dx = -d_extra_dx
-        @!  d_extra_dy = gv.∂yᵀ*extra
         @.  d_extra_dy = -d_extra_dy
-            h_d_extra_dx .= vec(gu.h).*d_extra_dx
-            h_d_extra_dy .= vec(gv.h).*d_extra_dy
+        @. h_d_extra_dx = gu.h * d_extra_dx
+        @. h_d_extra_dy = gv.h * d_extra_dy
 
-            #Resistive forces resolved in x anf y directions
-            fx .= d_rxx_dx .+ d_rxy_dy .- taubx .- h_d_extra_dx
-            fy .= d_ryy_dy .+ d_rxy_dx .- tauby .- h_d_extra_dy
+        #Resistive forces resolved in x anf y directions
+        @. fx = d_rxx_dx + d_rxy_dy - taubx - h_d_extra_dx
+        @. fy = d_ryy_dy + d_rxy_dx - tauby - h_d_extra_dy
 
-            #Resistive forces sampled at valid grid points
-        @!  fx_sampi = gu.samp_inner*fx
-        @!  fy_sampi = gv.samp_inner*fy
+        #Resistive forces sampled at valid grid points
+        launch!(_gather!, fx_sampi, fx, gu_inner_indices; ndrange = length(fx_sampi), sync = false)
+        launch!(_gather!, fy_sampi, fy, gv_inner_indices; ndrange = length(fy_sampi), sync = false)
+        KA.synchronize(backend)
 
-            opvecprod[1:gu.ni] .= fx_sampi
-            opvecprod[(gu.ni+1):(gu.ni+gv.ni)] .= fy_sampi
+        opvecprod[1:gu.ni] .= fx_sampi
+        opvecprod[(gu.ni+1):(gu.ni+gv.ni)] .= fy_sampi
 
-            return opvecprod
+        return opvecprod
     end
 
     #Return op_fun as a closure
