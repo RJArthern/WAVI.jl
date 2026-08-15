@@ -104,7 +104,7 @@ end
 How many cores this benchmark is meant to use, for normalising CPU samples
 (`cpu_fraction = cpu_cores_used / reference_cores`).
 
-- `:basic`: `1`
+- `:basic`: `Threads.nthreads()`
 - `:threaded`: `ngridsx * ngridsy`
 - `:mpi`: `mpi_world_size` if given, else `SLURM_NTASKS`, else `1`
 """
@@ -114,7 +114,7 @@ function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, 
     elseif opts.mode == :mpi
         return something(mpi_world_size, 1)
     else
-        return 1
+        return Threads.nthreads()
     end
 end
 

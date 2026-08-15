@@ -13,16 +13,16 @@
 #SBATCH -J wavi_scale
 #SBATCH -N 1
 #SBATCH -n 36
-#SBATCH --time=05:00:00
+#SBATCH --time=08:00:00
 #SBATCH --output=benchmarks/output/ismip7_16km_synthetic/slurm-%j.out
 
 # Ensure we use the correct MPI exec wrapper for the BAS HPC environment
 MPIEXEC=mpiexecjl
 
-# Accept tag prefix from command line argument 1, default to "baseline_sparse"
-TAG_PREFIX=${1:-"baseline_sparse"}
+# Accept tag prefix from command line argument 1
+TAG_PREFIX=${1:-"ka.jl_velocity_and_state_kernels_v1_sparse"}
 
-# Accept driver from command line argument 2, default to "ismip7_16km_synthetic"
+# Accept driver from command line argument 2
 DRIVER=${2:-"ismip7_16km_synthetic"}
 
 echo "=========================================="
@@ -35,6 +35,21 @@ echo "=========================================="
 
 echo "Running BasicSpec (serial) baseline..."
 julia --project=benchmarks -t 1 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_serial" --output-group "$TAG_PREFIX"
+
+echo "Running BasicSpec 2-thread scaling..."
+julia --project=benchmarks -t 2 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_threads_2" --output-group "$TAG_PREFIX"
+
+echo "Running BasicSpec 4-thread scaling..."
+julia --project=benchmarks -t 4 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_threads_4" --output-group "$TAG_PREFIX"
+
+echo "Running BasicSpec 8-thread scaling..."
+julia --project=benchmarks -t 8 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_threads_8" --output-group "$TAG_PREFIX"
+
+echo "Running BasicSpec 16-thread scaling..."
+julia --project=benchmarks -t 16 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_threads_16" --output-group "$TAG_PREFIX"
+
+echo "Running BasicSpec 36-thread scaling..."
+julia --project=benchmarks -t 36 benchmarks/run.jl run basic $DRIVER --tag "${TAG_PREFIX}_threads_36" --output-group "$TAG_PREFIX"
 
 echo "Running 1-core MPI baseline..."
 $MPIEXEC -n 1 julia --project=benchmarks -t 1 benchmarks/run.jl run mpi $DRIVER --px 1 --py 1 --tag "${TAG_PREFIX}_1core" --output-group "$TAG_PREFIX"
