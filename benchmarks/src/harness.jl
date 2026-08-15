@@ -147,8 +147,8 @@ function run_benchmark(opts::BenchmarkOptions)
         spec_kwargs = Dict{Symbol, Any}()
 
         if opts.mode == :basic
-            # Serial: BasicSpec setup
-            run_id = "basic"
+            # Serial / Multi-threaded: BasicSpec setup
+            run_id = "basic" * (Threads.nthreads() > 1 ? "_t$(Threads.nthreads())" : "")
 
         elseif opts.mode == :threaded
             # Shared memory: ThreadedSpec setup
