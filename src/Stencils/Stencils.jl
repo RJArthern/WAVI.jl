@@ -10,6 +10,10 @@ export _diff_x!,
     _diff_yT_staggered!,
     _avg_x!,
     _avg_y!,
+    _avg_xT!,
+    _avg_yT!,
+    _avg_xy!,
+    _avg_xyT!,
     _apply_mask!,
     _scale!,
     _gather!,
@@ -176,6 +180,71 @@ Moves value from cell center to edge by averaging.
 @kernel function _avg_y!(out, inp)
     i, j = @index(Global, NTuple)
     @inbounds out[i, j] = (inp[i, j] + inp[i, j + 1]) * 0.5
+end
+
+"""
+    _avg_xT!(out, inp)
+
+Transpose of `_avg_x!`. Equivalent to `out = gu.centᵀ * inp` (H-grid to U-grid).
+Edge values are treated as zero.
+"""
+@kernel function _avg_xT!(out, inp)
+    i, j = @index(Global, NTuple)
+    nx = size(inp, 1)
+    val_left = i > 1 ? inp[i - 1, j] : zero(eltype(inp))
+    val_right = i <= nx ? inp[i, j] : zero(eltype(inp))
+    @inbounds out[i, j] = (val_left + val_right) * 0.5
+end
+
+"""
+    _avg_yT!(out, inp)
+
+Transpose of `_avg_y!`. Equivalent to `out = gv.centᵀ * inp` (H-grid to V-grid).
+Edge values are treated as zero.
+"""
+@kernel function _avg_yT!(out, inp)
+    i, j = @index(Global, NTuple)
+    ny = size(inp, 2)
+    val_bot = j > 1 ? inp[i, j - 1] : zero(eltype(inp))
+    val_top = j <= ny ? inp[i, j] : zero(eltype(inp))
+    @inbounds out[i, j] = (val_bot + val_top) * 0.5
+end
+
+"""
+    _avg_xy!(out, inp)
+
+Average four neighbouring H-grid cells onto the C-grid.
+Equivalent to `out = gh.cent_xy * inp`.
+"""
+@kernel function _avg_xy!(out, inp)
+    i, j = @index(Global, NTuple)
+    @inbounds out[i, j] = (inp[i, j] + inp[i + 1, j] + inp[i, j + 1] + inp[i + 1, j + 1]) * 0.25
+end
+
+"""
+    _avg_xyT!(out, inp)
+
+Transpose of `_avg_xy!`. Equivalent to `out = gc.cent * inp` (C-grid to H-grid).
+Edge values are treated as zero.
+"""
+@kernel function _avg_xyT!(out, inp)
+    i, j = @index(Global, NTuple)
+    nxc = size(inp, 1)
+    nyc = size(inp, 2)
+    val = zero(eltype(out))
+    if i > 1 && j > 1
+        val += inp[i - 1, j - 1]
+    end
+    if i <= nxc && j > 1
+        val += inp[i, j - 1]
+    end
+    if i > 1 && j <= nyc
+        val += inp[i - 1, j]
+    end
+    if i <= nxc && j <= nyc
+        val += inp[i, j]
+    end
+    @inbounds out[i, j] = val * 0.25
 end
 
 # Masking & Scaling

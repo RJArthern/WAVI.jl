@@ -1,12 +1,12 @@
 export update_velocities!, get_start_guess, get_op, get_rhs, get_resid, set_residual!
 
-using InplaceOps
 using LinearMaps
 
 using WAVI
-using WAVI.KroneckerProducts
 using WAVI.Parameters
 using WAVI.Utilities
+using WAVI.Stencils
+using KernelAbstractions: KernelAbstractions as KA
 using KernelAbstractions: @kernel, @index
 
 """
@@ -80,18 +80,25 @@ end
 function get_rhs(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     @unpack params, solver_params = model
-    onesvec=ones(T,gh.nxh*gh.nyh)
-    surf_elev_adjusted = gh.crop*(gh.s[:] .+ solver_params.super_implicitness.*params.dt*gh.dsdh[:].*(gh.accumulation[:].-gh.basal_melt[:]))
-    
+    grid = model.grid
+    dx_inv = one(T) / grid.dx
+    dy_inv = one(T) / grid.dy
+    backend = KA.get_backend(gh.h)
+
+    gu_inner_indices = findall(vec(gu.mask_inner))
+    gv_inner_indices = findall(vec(gv.mask_inner))
+
+    surf_crop = similar(gh.h)
+    ones_crop = similar(gh.h)
+    tmpu = similar(gu.u)
+    tmpv = similar(gv.v)
+    tmpui = similar(gu.u, gu.ni)
+    tmpvi = similar(gv.v, gv.ni)
+
     rhs = zeros(T,gu.ni+gv.ni)
     f1 = zeros(T,gu.ni+gv.ni)
     f2 = zeros(T,gu.ni+gv.ni)
     f3 = zeros(T,gu.ni+gv.ni)
-    tmph = zeros(T,gh.nxh*gh.nyh)
-    tmpu = zeros(T,gu.nxu*gu.nyu)
-    tmpui = zeros(T,gu.ni)
-    tmpv = zeros(T,gv.nxv*gv.nyv)
-    tmpvi = zeros(T,gv.ni)
     sui = zeros(T,gu.ni)
     hui = zeros(T,gu.ni)
     dui = zeros(T,gu.ni)
@@ -99,39 +106,43 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     hvi = zeros(T,gv.ni)
     dvi = zeros(T,gv.ni)
 
+    @. surf_crop = gh.s + solver_params.super_implicitness * params.dt * gh.dsdh * (gh.accumulation - gh.basal_melt)
+    launch!(_apply_mask!, surf_crop, gh.mask; ndrange = size(surf_crop), sync = false)
+    fill!(ones_crop, one(T))
+    launch!(_apply_mask!, ones_crop, gh.mask; ndrange = size(ones_crop), sync = false)
+    KA.synchronize(backend)
 
-@!  tmpu = gu.∂xᵀ*surf_elev_adjusted
-@.  tmpu = -tmpu
-@!  tmpui = gu.samp_inner*tmpu
-@.  tmpui = (params.density_ice*params.g*gu.h[gu.mask_inner]).* tmpui
+    launch!(_diff_xT!, tmpu, surf_crop, dx_inv; ndrange = size(tmpu), sync = false)
+    launch!(_diff_yT!, tmpv, surf_crop, dy_inv; ndrange = size(tmpv), sync = false)
+    KA.synchronize(backend)
+    @. tmpu = -tmpu
+    @. tmpv = -tmpv
+    launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui), sync = false)
+    launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi), sync = false)
+    KA.synchronize(backend)
+    @. tmpui = (params.density_ice*params.g*gu.h[gu.mask_inner]).* tmpui
+    @. tmpvi = (params.density_ice*params.g*gv.h[gv.mask_inner]).*tmpvi
 
-@!  tmpv = gv.∂yᵀ*surf_elev_adjusted
-@.  tmpv = -tmpv
-@!  tmpvi = gv.samp_inner*tmpv
-@.  tmpvi = (params.density_ice*params.g*gv.h[gv.mask_inner]).*tmpvi
-              
     f1[1:gu.ni] .= tmpui
     f1[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
 
     sui .= gu.s[gu.mask_inner]
     hui .= gu.h[gu.mask_inner]
     dui .= icedraft.(sui,hui,params.sea_level_wrt_geoid)
-@!  tmph = gh.crop*onesvec
-@!  tmpu = gu.∂xᵀ*tmph
-@.  tmpu = -tmpu
-@!  tmpui = gu.samp_inner*tmpu
-@.  tmpui = tmpui * params.g*(0.5*params.density_ice*hui^2
+    launch!(_diff_xT!, tmpu, ones_crop, dx_inv; ndrange = size(tmpu))
+    @. tmpu = -tmpu
+    launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui))
+    @. tmpui = tmpui * params.g*(0.5*params.density_ice*hui^2
                             - 0.5*params.density_ocean*dui^2
                             - params.density_ice*hui*sui)
 
     svi .= gv.s[gv.mask_inner]
     hvi .= gv.h[gv.mask_inner]
     dvi .= icedraft.(svi,hvi,params.sea_level_wrt_geoid)
-@!  tmph = gh.crop*onesvec
-@!  tmpv = gv.∂yᵀ*tmph
-@.  tmpv = -tmpv
-@!  tmpvi = gv.samp_inner*tmpv
-@.  tmpvi = tmpvi * params.g*(0.5*params.density_ice*hvi^2
+    launch!(_diff_yT!, tmpv, ones_crop, dy_inv; ndrange = size(tmpv))
+    @. tmpv = -tmpv
+    launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi))
+    @. tmpvi = tmpvi * params.g*(0.5*params.density_ice*hvi^2
                             - 0.5*params.density_ocean*dvi^2
                             - params.density_ice*hvi*svi)
 
@@ -173,12 +184,43 @@ end
 
 Find the effective strain rate for 'ice shelf' parts of strain rate tensor, neglecting all vertical shear.
 """
-function update_shelf_strain_rate!(model::AbstractModel)
+function update_shelf_strain_rate!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
-    gh.shelf_strain_rate[:] .= sqrt.( (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).^2 .+
-                                      (gh.crop*(gv.∂y*(gv.crop*gv.v[:]))).^2 .+
-                                (gh.crop*(gu.∂x*(gu.crop*gu.u[:]))).*(gh.crop*(gv.∂y*(gv.crop*gv.v[:]))) .+
-                       0.25*(gh.crop*(gc.cent*(gc.crop*( gu.∂y*(gu.crop*gu.u[:]) .+ gv.∂x*(gv.crop*gv.v[:]) )))).^2  )
+    grid = model.grid
+    dx_inv = one(T) / grid.dx
+    dy_inv = one(T) / grid.dy
+    backend = KA.get_backend(gh.h)
+
+    u_crop = similar(gu.u)
+    v_crop = similar(gv.v)
+    dudx = similar(gh.h)
+    dvdy = similar(gh.h)
+    dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    dvdx_c = similar(dudy_c)
+    shear_c = similar(dudy_c)
+    shear_h = similar(gh.h)
+
+    copyto!(u_crop, gu.u)
+    copyto!(v_crop, gv.v)
+    launch!(_apply_mask!, u_crop, gu.mask; ndrange = size(u_crop), sync = false)
+    launch!(_apply_mask!, v_crop, gv.mask; ndrange = size(v_crop), sync = false)
+    KA.synchronize(backend)
+
+    launch!(_diff_x!, dudx, u_crop, dx_inv; ndrange = size(dudx), sync = false)
+    launch!(_diff_y!, dvdy, v_crop, dy_inv; ndrange = size(dvdy), sync = false)
+    launch!(_diff_y_staggered!, dudy_c, u_crop, dy_inv; ndrange = size(dudy_c), sync = false)
+    launch!(_diff_x_staggered!, dvdx_c, v_crop, dx_inv; ndrange = size(dvdx_c), sync = false)
+    KA.synchronize(backend)
+
+    launch!(_apply_mask!, dudx, gh.mask; ndrange = size(dudx), sync = false)
+    launch!(_apply_mask!, dvdy, gh.mask; ndrange = size(dvdy), sync = false)
+    @. shear_c = dudy_c + dvdx_c
+    launch!(_apply_mask!, shear_c, gc.mask; ndrange = size(shear_c))
+    launch!(_avg_xyT!, shear_h, shear_c; ndrange = size(shear_h))
+    launch!(_apply_mask!, shear_h, gh.mask; ndrange = size(shear_h), sync = false)
+    KA.synchronize(backend)
+
+    @. gh.shelf_strain_rate = sqrt(dudx^2 + dvdy^2 + dudx * dvdy + 0.25 * shear_h^2)
     return model
 end
 
@@ -189,7 +231,26 @@ Find the depth-averaged speed on the h-grid using components on u- and v- grids
 """
 function update_av_speed!(model::AbstractModel)
     @unpack gh,gu,gv=model.fields
-    gh.av_speed[:] .= sqrt.( (gh.crop*(gu.cent*(gu.crop*gu.u[:]))).^2 .+ (gh.crop*(gv.cent*(gv.crop*gv.v[:]))).^2 )
+    backend = KA.get_backend(gh.h)
+    u_crop = similar(gu.u)
+    v_crop = similar(gv.v)
+    u_h = similar(gh.h)
+    v_h = similar(gh.h)
+
+    copyto!(u_crop, gu.u)
+    copyto!(v_crop, gv.v)
+    launch!(_apply_mask!, u_crop, gu.mask; ndrange = size(u_crop), sync = false)
+    launch!(_apply_mask!, v_crop, gv.mask; ndrange = size(v_crop), sync = false)
+    KA.synchronize(backend)
+
+    launch!(_avg_x!, u_h, u_crop; ndrange = size(u_h), sync = false)
+    launch!(_avg_y!, v_h, v_crop; ndrange = size(v_h), sync = false)
+    KA.synchronize(backend)
+    launch!(_apply_mask!, u_h, gh.mask; ndrange = size(u_h), sync = false)
+    launch!(_apply_mask!, v_h, gh.mask; ndrange = size(v_h), sync = false)
+    KA.synchronize(backend)
+
+    @. gh.av_speed = sqrt(u_h^2 + v_h^2)
     return model
 end
 
@@ -392,17 +453,41 @@ Interpolate the effective drag coefficient onto u- and v-grids, accounting for g
 function update_βeff_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv=model.fields
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
+    backend = KA.get_backend(gh.h)
 
-    onesvec=ones(T,gh.nxh*gh.nyh)
-    gu.βeff[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.βeff[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
-    ipolgfu=zeros(T,gu.nxu,gu.nyu);
-    ipolgfu[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
+    ones_crop = similar(gh.h)
+    β_crop = similar(gh.h)
+    gf_crop = similar(gh.h)
+    tmpu = similar(gu.u)
+    tmpv = similar(gv.v)
+    denu = similar(gu.u)
+    denv = similar(gv.v)
+    ipolgfu=zeros(T,gu.nxu,gu.nyu)
+    ipolgfv=zeros(T,gv.nxv,gv.nyv)
+
+    fill!(ones_crop, one(T))
+    copyto!(β_crop, gh.βeff)
+    copyto!(gf_crop, gh.grounded_fraction)
+    launch!(_apply_mask!, ones_crop, gh.mask; ndrange = size(ones_crop), sync = false)
+    launch!(_apply_mask!, β_crop, gh.mask; ndrange = size(β_crop), sync = false)
+    launch!(_apply_mask!, gf_crop, gh.mask; ndrange = size(gf_crop), sync = false)
+    KA.synchronize(backend)
+
+    launch!(_avg_xT!, denu, ones_crop; ndrange = size(denu), sync = false)
+    launch!(_avg_yT!, denv, ones_crop; ndrange = size(denv), sync = false)
+    KA.synchronize(backend)
+
+    launch!(_avg_xT!, tmpu, β_crop; ndrange = size(tmpu))
+    @views gu.βeff[gu.mask] .= tmpu[gu.mask] ./ denu[gu.mask]
+    launch!(_avg_xT!, tmpu, gf_crop; ndrange = size(tmpu))
+    @views ipolgfu[gu.mask] .= tmpu[gu.mask] ./ denu[gu.mask]
     gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
                                                         ipolgfu[ipolgfu .> zero(T)]
 
-    gv.βeff[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.βeff[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
-    ipolgfv=zeros(T,gv.nxv,gv.nyv);
-    ipolgfv[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.grounded_fraction[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
+    launch!(_avg_yT!, tmpv, β_crop; ndrange = size(tmpv))
+    @views gv.βeff[gv.mask] .= tmpv[gv.mask] ./ denv[gv.mask]
+    launch!(_avg_yT!, tmpv, gf_crop; ndrange = size(tmpv))
+    @views ipolgfv[gv.mask] .= tmpv[gv.mask] ./ denv[gv.mask]
     gv.βeff[ipolgfv .> zero(T)] .= gv.βeff[ipolgfv .> zero(T)].*gv.grounded_fraction[ipolgfv .> zero(T)]./
                                                  ipolgfv[ipolgfv .> zero(T)];
 
@@ -415,14 +500,30 @@ end
 
 Precompute various diagonal matrices used in defining the momentum operator.
 """
-function update_rheological_operators!(model::AbstractModel)
+function update_rheological_operators!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc = model.fields
     @unpack params, solver_params = model
-    gh.dneghηav[] .= gh.crop*Diagonal(-gh.h[:].*gh.ηav[:])*gh.crop
-    gc.dneghηav[] .= gc.crop*Diagonal(-gh.cent_xy*(gh.h[:].*gh.ηav[:]))*gc.crop
-    gu.dnegβeff[] .= gu.crop*Diagonal(-gu.βeff[:])*gu.crop
-    gv.dnegβeff[] .= gv.crop*Diagonal(-gv.βeff[:])*gv.crop
-    gh.dimplicit[] .= gh.crop*Diagonal(-params.density_ice * params.g * solver_params.super_implicitness .* params.dt * gh.dsdh[:])*gh.crop
+
+    hη = similar(gh.h)
+    hη_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    @. hη = gh.h * gh.ηav
+    launch!(_avg_xy!, hη_c, hη; ndrange = size(hη_c))
+
+    gh_diag = reshape(gh.dneghηav[].diag, gh.nxh, gh.nyh)
+    gc_diag = reshape(gc.dneghηav[].diag, gc.nxc, gc.nyc)
+    gu_diag = reshape(gu.dnegβeff[].diag, gu.nxu, gu.nyu)
+    gv_diag = reshape(gv.dnegβeff[].diag, gv.nxv, gv.nyv)
+    gh_imp = reshape(gh.dimplicit[].diag, gh.nxh, gh.nyh)
+
+    @. gh_diag = ifelse(gh.mask, -gh.h * gh.ηav, zero(T))
+    @. gc_diag = ifelse(gc.mask, -hη_c, zero(T))
+    @. gu_diag = ifelse(gu.mask, -gu.βeff, zero(T))
+    @. gv_diag = ifelse(gv.mask, -gv.βeff, zero(T))
+    @. gh_imp = ifelse(
+        gh.mask,
+        -params.density_ice * params.g * solver_params.super_implicitness * params.dt * gh.dsdh,
+        zero(T),
+    )
     return model
 end
 
