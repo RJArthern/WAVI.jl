@@ -66,7 +66,14 @@ end
 function get_start_guess(model::AbstractModel)
     @unpack gu,gv=model.fields
     @assert eltype(gu.u)==eltype(gv.v)
-    x=[gu.samp_inner*gu.u[:];gv.samp_inner*gv.v[:]]
+    s = stencil_scratch!(model)
+    x = s.start_guess
+    xu = view(x, 1:gu.ni)
+    xv = view(x, (gu.ni + 1):(gu.ni + gv.ni))
+    backend = KA.get_backend(gu.u)
+    launch!(_gather!, xu, gu.u, s.gu_inner_indices; ndrange = length(xu), sync = false)
+    launch!(_gather!, xv, gv.v, s.gv_inner_indices; ndrange = length(xv), sync = false)
+    KA.synchronize(backend)
     return x
 end
 
@@ -539,10 +546,14 @@ end
 
 """
 function get_op(model::AbstractModel{T,N}) where {T,N}
-    @unpack gu,gv=model.fields
-    ni = gu.ni + gv.ni
-    op_fun! = get_op_fun(model)
-    op=LinearMap{T}(op_fun!,ni;issymmetric=true,ismutating=true,ishermitian=true,isposdef=true)
+    s = stencil_scratch!(model)
+    op = s.op_map[]
+    if op !== nothing
+        return op
+    end
+    ni = model.fields.gu.ni + model.fields.gv.ni
+    s.op_map[] = LinearMap{T}(s.op_fun!, ni; issymmetric=true, ismutating=true, ishermitian=true, isposdef=true)
+    return s.op_map[]
 end
 
 

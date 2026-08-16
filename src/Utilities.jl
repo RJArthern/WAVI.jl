@@ -122,6 +122,27 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     dvi = zeros(T, gv.ni)
     uvfixed = zeros(T, gu.nxu * gu.nyu + gv.nxv * gv.nyv)
 
+    # Packed velocity length (active u-points then active v-points).
+    ni = gu.ni + gv.ni
+
+    # Picard / smoother vectors. Reused every iterate instead of similar/zero.
+    start_guess = zeros(T, ni)
+    picard_resid = zeros(T, ni)
+    picard_correction = zeros(T, ni)
+    gs_resid = zeros(T, ni)
+    prolonged = zeros(T, ni)
+
+    # Jacobi diagonal probes (filled on first get_op_diag).
+    op_diag = zeros(T, ni)
+    diag_probe = zeros(T, ni)
+    diag_tmp = zeros(T, ni)
+
+    # Colour lists and LinearMaps are filled lazily in the wavelet preconditioner.
+    gs_colour_indices = Ref{Any}(nothing)
+    diag_colour_indices = Ref{Any}(nothing)
+    op_map = Ref{Any}(nothing)
+    mg_ops = Ref{Any}(nothing)
+
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
     neg_dx_inv = -dx_inv
@@ -247,6 +268,18 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
         hvi = hvi,
         dvi = dvi,
         uvfixed = uvfixed,
+        start_guess = start_guess,
+        picard_resid = picard_resid,
+        picard_correction = picard_correction,
+        gs_resid = gs_resid,
+        prolonged = prolonged,
+        op_diag = op_diag,
+        diag_probe = diag_probe,
+        diag_tmp = diag_tmp,
+        gs_colour_indices = gs_colour_indices,
+        diag_colour_indices = diag_colour_indices,
+        op_map = op_map,
+        mg_ops = mg_ops,
     )
 end
 

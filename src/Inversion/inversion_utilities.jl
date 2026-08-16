@@ -69,7 +69,7 @@ function solve_dirichlet_neumann_velocities!(model, inversion,clock)
         op_BT=get_op_BT(model,inversion)
         op_C=get_op_C(model,inversion)
 
-        A_diag_vals=get_op_diag(model,op_A)
+        A_diag_vals=copy(get_op_diag(model,op_A))
         M1 = Diagonal(A_diag_vals)
         M2=[]
 

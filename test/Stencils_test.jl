@@ -31,4 +31,8 @@ end
     @test all(isfinite, model.fields.gh.shelf_strain_rate)
     @test length(rhs) == model.fields.gu.ni + model.fields.gv.ni
     @test all(isfinite, rhs)
+
+    WAVI.Processes.update_velocities!(model)
+    @test all(isfinite, model.fields.gu.u)
+    @test all(isfinite, model.fields.gv.v)
 end
