@@ -84,27 +84,27 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
     backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
 
-    gu_inner_indices = findall(vec(gu.mask_inner))
-    gv_inner_indices = findall(vec(gv.mask_inner))
+    gu_inner_indices = s.gu_inner_indices
+    gv_inner_indices = s.gv_inner_indices
+    surf_crop = s.surf_crop
+    ones_crop = s.ones_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+    tmpui = s.tmpui
+    tmpvi = s.tmpvi
 
-    surf_crop = similar(gh.h)
-    ones_crop = similar(gh.h)
-    tmpu = similar(gu.u)
-    tmpv = similar(gv.v)
-    tmpui = similar(gu.u, gu.ni)
-    tmpvi = similar(gv.v, gv.ni)
-
-    rhs = zeros(T,gu.ni+gv.ni)
-    f1 = zeros(T,gu.ni+gv.ni)
-    f2 = zeros(T,gu.ni+gv.ni)
-    f3 = zeros(T,gu.ni+gv.ni)
-    sui = zeros(T,gu.ni)
-    hui = zeros(T,gu.ni)
-    dui = zeros(T,gu.ni)
-    svi = zeros(T,gv.ni)
-    hvi = zeros(T,gv.ni)
-    dvi = zeros(T,gv.ni)
+    rhs = s.rhs
+    f1 = s.f1
+    f2 = s.f2
+    f3 = s.f3
+    sui = s.sui
+    hui = s.hui
+    dui = s.dui
+    svi = s.svi
+    hvi = s.hvi
+    dvi = s.dvi
 
     @. surf_crop = gh.s + solver_params.super_implicitness * params.dt * gh.dsdh * (gh.accumulation - gh.basal_melt)
     launch!(_apply_mask!, surf_crop, gh.mask; ndrange = size(surf_crop), sync = false)
@@ -112,11 +112,9 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     launch!(_apply_mask!, ones_crop, gh.mask; ndrange = size(ones_crop), sync = false)
     KA.synchronize(backend)
 
-    launch!(_diff_xT!, tmpu, surf_crop, dx_inv; ndrange = size(tmpu), sync = false)
-    launch!(_diff_yT!, tmpv, surf_crop, dy_inv; ndrange = size(tmpv), sync = false)
+    launch!(_diff_xT!, tmpu, surf_crop, -dx_inv; ndrange = size(tmpu), sync = false)
+    launch!(_diff_yT!, tmpv, surf_crop, -dy_inv; ndrange = size(tmpv), sync = false)
     KA.synchronize(backend)
-    @. tmpu = -tmpu
-    @. tmpv = -tmpv
     launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui), sync = false)
     launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi), sync = false)
     KA.synchronize(backend)
@@ -129,8 +127,7 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     sui .= gu.s[gu.mask_inner]
     hui .= gu.h[gu.mask_inner]
     dui .= icedraft.(sui,hui,params.sea_level_wrt_geoid)
-    launch!(_diff_xT!, tmpu, ones_crop, dx_inv; ndrange = size(tmpu))
-    @. tmpu = -tmpu
+    launch!(_diff_xT!, tmpu, ones_crop, -dx_inv; ndrange = size(tmpu))
     launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui))
     @. tmpui = tmpui * params.g*(0.5*params.density_ice*hui^2
                             - 0.5*params.density_ocean*dui^2
@@ -139,8 +136,7 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     svi .= gv.s[gv.mask_inner]
     hvi .= gv.h[gv.mask_inner]
     dvi .= icedraft.(svi,hvi,params.sea_level_wrt_geoid)
-    launch!(_diff_yT!, tmpv, ones_crop, dy_inv; ndrange = size(tmpv))
-    @. tmpv = -tmpv
+    launch!(_diff_yT!, tmpv, ones_crop, -dy_inv; ndrange = size(tmpv))
     launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi))
     @. tmpvi = tmpvi * params.g*(0.5*params.density_ice*hvi^2
                             - 0.5*params.density_ocean*dvi^2
@@ -190,15 +186,16 @@ function update_shelf_strain_rate!(model::AbstractModel{T,N}) where {T,N}
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
     backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
 
-    u_crop = similar(gu.u)
-    v_crop = similar(gv.v)
-    dudx = similar(gh.h)
-    dvdy = similar(gh.h)
-    dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
-    dvdx_c = similar(dudy_c)
-    shear_c = similar(dudy_c)
-    shear_h = similar(gh.h)
+    u_crop = s.u_crop
+    v_crop = s.v_crop
+    dudx = s.dudx
+    dvdy = s.dvdy
+    dudy_c = s.dudy_c
+    dvdx_c = s.dvdx_c
+    shear_c = s.shear_c
+    shear_h = s.shear_h
 
     copyto!(u_crop, gu.u)
     copyto!(v_crop, gv.v)
@@ -232,10 +229,11 @@ Find the depth-averaged speed on the h-grid using components on u- and v- grids
 function update_av_speed!(model::AbstractModel)
     @unpack gh,gu,gv=model.fields
     backend = KA.get_backend(gh.h)
-    u_crop = similar(gu.u)
-    v_crop = similar(gv.v)
-    u_h = similar(gh.h)
-    v_h = similar(gh.h)
+    s = stencil_scratch!(model)
+    u_crop = s.u_crop
+    v_crop = s.v_crop
+    u_h = s.u_h
+    v_h = s.v_h
 
     copyto!(u_crop, gu.u)
     copyto!(v_crop, gv.v)
@@ -454,16 +452,19 @@ function update_βeff_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv=model.fields
     @assert eltype(gh.grounded_fraction)==eltype(gh.βeff)
     backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
 
-    ones_crop = similar(gh.h)
-    β_crop = similar(gh.h)
-    gf_crop = similar(gh.h)
-    tmpu = similar(gu.u)
-    tmpv = similar(gv.v)
-    denu = similar(gu.u)
-    denv = similar(gv.v)
-    ipolgfu=zeros(T,gu.nxu,gu.nyu)
-    ipolgfv=zeros(T,gv.nxv,gv.nyv)
+    ones_crop = s.ones_crop
+    β_crop = s.β_crop
+    gf_crop = s.gf_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+    denu = s.denu
+    denv = s.denv
+    ipolgfu = s.ipolgfu
+    ipolgfv = s.ipolgfv
+    fill!(ipolgfu, zero(T))
+    fill!(ipolgfv, zero(T))
 
     fill!(ones_crop, one(T))
     copyto!(β_crop, gh.βeff)
@@ -503,9 +504,10 @@ Precompute various diagonal matrices used in defining the momentum operator.
 function update_rheological_operators!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc = model.fields
     @unpack params, solver_params = model
+    s = stencil_scratch!(model)
 
-    hη = similar(gh.h)
-    hη_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    hη = s.hη
+    hη_c = s.hη_c
     @. hη = gh.h * gh.ηav
     launch!(_avg_xy!, hη_c, hη; ndrange = size(hη_c))
 
@@ -552,14 +554,19 @@ end
 """
 function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
     @unpack gu,gv=model.fields
+    s = stencil_scratch!(model)
 
-    uvfixed=[
-    gu.u[:].*gu.u_isfixed[:]
-    ;
-    gv.v[:].*gv.v_isfixed[:]
-    ]
+    uvfixed = s.uvfixed
+    nu = length(gu.u)
+    nv = length(gv.v)
+    @inbounds for i in 1:nu
+        uvfixed[i] = gu.u[i] * gu.u_isfixed[i]
+    end
+    @inbounds for i in 1:nv
+        uvfixed[nu + i] = gv.v[i] * gv.v_isfixed[i]
+    end
 
-    op_fun! = get_op_fun(model)
+    op_fun! = s.op_fun!
     op_fun!(rhs_dirichlet,uvfixed,vecSampled=false)
     
     @. rhs_dirichlet = - rhs_dirichlet

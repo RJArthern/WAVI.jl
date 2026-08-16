@@ -16,6 +16,10 @@ export _diff_x!,
     _avg_xyT!,
     _apply_mask!,
     _scale!,
+    _scale_sum!,
+    _add_scale!,
+    _masked_mul!,
+    _masked_scale_sum!,
     _gather!,
     _scatter!,
     launch!
@@ -24,15 +28,27 @@ using KernelAbstractions: KernelAbstractions as KA
 using KernelAbstractions: @kernel, @index
 
 """
-    launch!(kernel!, args...; ndrange, sync = true)
+    launch!(kernel!, args...; ndrange, sync = true, workgroupsize = nothing)
 
 Wrapper to launch a KernelAbstractions `kernel!`.
 The backend is taken from the first kernel argument via `KA.get_backend`.
+On a CPU with more than one Julia thread, `CPU(static = true)` is used so each
+kernel does not pay an `@spawn` per launch. Nested calls from other threads
+keep the default dynamic CPU backend.
 Ensures synchronisation after the kernel is launched unless `sync = false`.
 """
-function launch!(kernel!, args...; ndrange, sync = true)
+function launch!(kernel!, args...; ndrange, sync = true, workgroupsize = nothing)
     backend = KA.get_backend(first(args))
-    kernel!(backend)(args...; ndrange = ndrange)
+    # Static assignment on the main thread only. Nested ThreadedSpec
+    # workers keep dynamic spawn so they do not nest `@threads :static`.
+    if backend isa KA.CPU && Threads.nthreads() > 1 && Threads.threadid() == 1
+        backend = KA.CPU(static = true)
+    end
+    if workgroupsize === nothing
+        kernel!(backend)(args...; ndrange = ndrange)
+    else
+        kernel!(backend)(args...; ndrange = ndrange, workgroupsize = workgroupsize)
+    end
     if sync
         KA.synchronize(backend)
     end
@@ -264,16 +280,54 @@ Zeroes out any cells that are empty ocean or rock (not ice).
 end
 
 """
-    _scale!(out, inp, diag)
+    _scale!(out, inp, diag, factor)
 
-Multiply each element of `inp` by the corresponding element of `diag`.
-Equivalent to `out = Diagonal(diag) * inp`.
-
-Multiplies every cell by a physical property, like viscosity.
+Multiply each element of `inp` by `diag` and `factor`.
+Equivalent to `out = factor * Diagonal(diag) * inp`.
 """
-@kernel function _scale!(out, inp, diag)
+@kernel function _scale!(out, inp, diag, factor)
     i = @index(Global, Linear)
-    @inbounds out[i] = diag[i] * inp[i]
+    @inbounds out[i] = factor * diag[i] * inp[i]
+end
+
+"""
+    _scale_sum!(out, x, y, c1, c2, diag, factor)
+
+`out = factor * diag * (c1 * x + c2 * y)`.
+"""
+@kernel function _scale_sum!(out, x, y, c1, c2, diag, factor)
+    i = @index(Global, Linear)
+    @inbounds out[i] = factor * diag[i] * (c1 * x[i] + c2 * y[i])
+end
+
+"""
+    _add_scale!(out, x, y, diag)
+
+`out = diag * (x + y)`.
+"""
+@kernel function _add_scale!(out, x, y, diag)
+    i = @index(Global, Linear)
+    @inbounds out[i] = diag[i] * (x[i] + y[i])
+end
+
+"""
+    _masked_mul!(out, a, b, mask)
+
+`out = mask ? a * b : 0`.
+"""
+@kernel function _masked_mul!(out, a, b, mask)
+    i, j = @index(Global, NTuple)
+    @inbounds out[i, j] = mask[i, j] ? a[i, j] * b[i, j] : zero(eltype(out))
+end
+
+"""
+    _masked_scale_sum!(out, x, y, diag, mask)
+
+`out = mask ? -diag * (x + y) : 0`.
+"""
+@kernel function _masked_scale_sum!(out, x, y, diag, mask)
+    i = @index(Global, Linear)
+    @inbounds out[i] = mask[i] ? -diag[i] * (x[i] + y[i]) : zero(eltype(out))
 end
 
 # Scatter / Gather

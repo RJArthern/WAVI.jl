@@ -11,7 +11,8 @@ using WAVI.Stencils
 
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
     get_glx, glen_b, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!, 
-    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ
+    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
+    stencil_scratch!
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -21,11 +22,22 @@ c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 
 
 """
-    get_op_fun(model::AbstractModel)
+    stencil_scratch!(model)
 
-Returns a function that multiplies a vector by the momentum operator.
+Return persistent scratch for the momentum operator and Picard stencil applies.
+Allocated on first use and kept for the life of the model's `GridField`.
 """
-function get_op_fun(model::AbstractModel{T,N}) where {T,N}
+function stencil_scratch!(model::AbstractModel)
+    ref = model.fields.stencil_scratch
+    s = ref[]
+    if s !== nothing
+        return s
+    end
+    ref[] = allocate_stencil_scratch(model)
+    return ref[]
+end
+
+function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     grid = model.grid
 
@@ -40,7 +52,7 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     gu_inner_indices = findall(vec(gu.mask_inner))
     gv_inner_indices = findall(vec(gv.mask_inner))
 
-    #Preallocate intermediate variables used by op_fun
+    # Preallocate intermediate variables used by op_fun and Picard applies
     usampi = similar(gu.u, gu.ni)
     vsampi = similar(gv.v, gv.ni)
     uspread = similar(gu.u)
@@ -48,16 +60,11 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
 
     dudx = similar(gh.h)
     dvdy = similar(gh.h)
-    r_xx_strain_rate_sum = similar(gh.h)
-    r_yy_strain_rate_sum = similar(gh.h)
     r_xx = similar(gh.h)
     r_yy = similar(gh.h)
 
     dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
-    dvdx_c = similar(gh.h, T, gc.nxc, gc.nyc)
-    r_xy_strain_rate_sum_c = similar(dudy_c)
-    r_xy_strain_rate_sum_crop_c = similar(dudy_c)
-    r_xy_c = similar(dudy_c)
+    dvdx_c = similar(dudy_c)
     r_xy_crop_c = similar(dudy_c)
 
     d_rxx_dx = similar(gu.u)
@@ -68,13 +75,10 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     taubx = similar(gu.u)
     tauby = similar(gv.v)
 
-    qx = similar(gu.u)
     qx_crop = similar(gu.u)
     dqxdx = similar(gh.h)
-    qy = similar(gv.v)
     qy_crop = similar(gv.v)
     dqydy = similar(gh.h)
-    divq = similar(gh.h)
     extra = similar(gh.h)
     d_extra_dx = similar(gu.u)
     d_extra_dy = similar(gv.v)
@@ -86,106 +90,114 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
     fx_sampi = similar(gu.u, gu.ni)
     fy_sampi = similar(gv.v, gv.ni)
 
+    surf_crop = similar(gh.h)
+    ones_crop = similar(gh.h)
+    tmpu = similar(gu.u)
+    tmpv = similar(gv.v)
+    tmpui = similar(gu.u, gu.ni)
+    tmpvi = similar(gv.v, gv.ni)
+    u_crop = similar(gu.u)
+    v_crop = similar(gv.v)
+    u_h = similar(gh.h)
+    v_h = similar(gh.h)
+    shear_c = similar(dudy_c)
+    shear_h = similar(gh.h)
+    β_crop = similar(gh.h)
+    gf_crop = similar(gh.h)
+    denu = similar(gu.u)
+    denv = similar(gv.v)
+    ipolgfu = zeros(T, gu.nxu, gu.nyu)
+    ipolgfv = zeros(T, gv.nxv, gv.nyv)
+    hη = similar(gh.h)
+    hη_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    rhs = zeros(T, gu.ni + gv.ni)
+    f1 = zeros(T, gu.ni + gv.ni)
+    f2 = zeros(T, gu.ni + gv.ni)
+    f3 = zeros(T, gu.ni + gv.ni)
+    sui = zeros(T, gu.ni)
+    hui = zeros(T, gu.ni)
+    dui = zeros(T, gu.ni)
+    svi = zeros(T, gv.ni)
+    hvi = zeros(T, gv.ni)
+    dvi = zeros(T, gv.ni)
+    uvfixed = zeros(T, gu.nxu * gu.nyu + gv.nxv * gv.nyv)
+
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
+    neg_dx_inv = -dx_inv
+    neg_dy_inv = -dy_inv
+    twoT = T(2)
+    oneT = one(T)
+    neg_twoT = -twoT
+    neg_oneT = -oneT
     backend = KA.get_backend(gh.h)
 
     function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
             @assert length(inputVector)==(gu.ni+gv.ni)
 
-            #Split vector into u- and v- components
+            # Split vector into u- and v- components
             usampi .= @view inputVector[1:gu.ni]
             vsampi .= @view inputVector[(gu.ni+1):(gu.ni+gv.ni)]
 
-            #Spread to vectors that include all grid points within rectangular domain.
+            # Spread to vectors that include all grid points within rectangular domain.
             fill!(uspread, zero(T))
             fill!(vspread, zero(T))
             launch!(_scatter!, uspread, usampi, gu_inner_indices; ndrange = length(usampi), sync = false)
             launch!(_scatter!, vspread, vsampi, gv_inner_indices; ndrange = length(vsampi), sync = false)
             KA.synchronize(backend)
-
         else
-            #Vector already includes all grid points within rectangular domain.
+            # Vector already includes all grid points within rectangular domain.
             @assert length(inputVector)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
             uspread .= reshape(@view(inputVector[1:gu.nxu*gu.nyu]), gu.nxu, gu.nyu)
             vspread .= reshape(@view(inputVector[(gu.nxu*gu.nyu+1):end]), gv.nxv, gv.nyv)
-
         end
 
-        #Extensional resistive stresses
+        # Extensional resistive stresses
         launch!(_diff_x!, dudx, uspread, dx_inv; ndrange = size(dudx), sync = false)
         launch!(_diff_y!, dvdy, vspread, dy_inv; ndrange = size(dvdy), sync = false)
-        KA.synchronize(backend)
-
-        @. r_xx_strain_rate_sum = 2 * dudx + dvdy
-        @. r_yy_strain_rate_sum = 2 * dvdy + dudx
-        launch!(_scale!, r_xx, r_xx_strain_rate_sum, gh_dneghηav_diag; ndrange = length(r_xx), sync = false)
-        launch!(_scale!, r_yy, r_yy_strain_rate_sum, gh_dneghηav_diag; ndrange = length(r_yy), sync = false)
-        KA.synchronize(backend)
-        @.  r_xx = -2r_xx
-        @.  r_yy = -2r_yy
-
-        #Shearing resistive stresses
         launch!(_diff_y_staggered!, dudy_c, uspread, dy_inv; ndrange = size(dudy_c), sync = false)
         launch!(_diff_x_staggered!, dvdx_c, vspread, dx_inv; ndrange = size(dvdx_c), sync = false)
         KA.synchronize(backend)
 
-        @. r_xy_strain_rate_sum_c = dudy_c + dvdx_c
-        copyto!(r_xy_strain_rate_sum_crop_c, r_xy_strain_rate_sum_c)
-        launch!(_apply_mask!, r_xy_strain_rate_sum_crop_c, gc.mask; ndrange = size(r_xy_strain_rate_sum_crop_c))
-        launch!(_scale!, r_xy_c, r_xy_strain_rate_sum_crop_c, gc_dneghηav_diag; ndrange = length(r_xy_c))
-        @.  r_xy_c = -r_xy_c
-        copyto!(r_xy_crop_c, r_xy_c)
-        launch!(_apply_mask!, r_xy_crop_c, gc.mask; ndrange = size(r_xy_crop_c))
+        # r_xx = -2 D (2 ∂x u + ∂y v), r_yy = -2 D (∂x u + 2 ∂y v)
+        launch!(_scale_sum!, r_xx, dudx, dvdy, twoT, oneT, gh_dneghηav_diag, neg_twoT; ndrange = length(r_xx), sync = false)
+        launch!(_scale_sum!, r_yy, dudx, dvdy, oneT, twoT, gh_dneghηav_diag, neg_twoT; ndrange = length(r_yy), sync = false)
 
-        #Gradients of resisitve stresses
-        launch!(_diff_xT!, d_rxx_dx, r_xx, dx_inv; ndrange = size(d_rxx_dx), sync = false)
-        launch!(_diff_yT_staggered!, d_rxy_dy, r_xy_crop_c, dy_inv; ndrange = size(d_rxy_dy), sync = false)
-        launch!(_diff_yT!, d_ryy_dy, r_yy, dy_inv; ndrange = size(d_ryy_dy), sync = false)
-        launch!(_diff_xT_staggered!, d_rxy_dx, r_xy_crop_c, dx_inv; ndrange = size(d_rxy_dx), sync = false)
-        KA.synchronize(backend)
-        @.  d_rxx_dx = - d_rxx_dx
-        @.  d_rxy_dy = - d_rxy_dy
-        @.  d_ryy_dy = -d_ryy_dy
-        @.  d_rxy_dx = -d_rxy_dx
+        # Shearing resistive stresses (crop D (dudy + dvdx), then negate)
+        launch!(_masked_scale_sum!, r_xy_crop_c, dudy_c, dvdx_c, gc_dneghηav_diag, gc.mask; ndrange = length(r_xy_crop_c), sync = false)
 
-        #Basal drag
-        launch!(_scale!, taubx, uspread, gu_dnegβeff_diag; ndrange = length(taubx), sync = false)
-        launch!(_scale!, tauby, vspread, gv_dnegβeff_diag; ndrange = length(tauby), sync = false)
-        KA.synchronize(backend)
-        @.  taubx = -taubx
-        @.  tauby = -tauby
+        # Basal drag
+        launch!(_scale!, taubx, uspread, gu_dnegβeff_diag, neg_oneT; ndrange = length(taubx), sync = false)
+        launch!(_scale!, tauby, vspread, gv_dnegβeff_diag, neg_oneT; ndrange = length(tauby), sync = false)
 
-        #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-        @. qx = gu.h * uspread
-        copyto!(qx_crop, qx)
-        launch!(_apply_mask!, qx_crop, gu.mask; ndrange = size(qx_crop), sync = false)
-        @. qy = gv.h * vspread
-        copyto!(qy_crop, qy)
-        launch!(_apply_mask!, qy_crop, gv.mask; ndrange = size(qy_crop), sync = false)
+        # Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
+        launch!(_masked_mul!, qx_crop, gu.h, uspread, gu.mask; ndrange = size(qx_crop), sync = false)
+        launch!(_masked_mul!, qy_crop, gv.h, vspread, gv.mask; ndrange = size(qy_crop), sync = false)
         KA.synchronize(backend)
 
+        # Gradients of resistive stresses
+        launch!(_diff_xT!, d_rxx_dx, r_xx, neg_dx_inv; ndrange = size(d_rxx_dx), sync = false)
+        launch!(_diff_yT_staggered!, d_rxy_dy, r_xy_crop_c, neg_dy_inv; ndrange = size(d_rxy_dy), sync = false)
+        launch!(_diff_yT!, d_ryy_dy, r_yy, neg_dy_inv; ndrange = size(d_ryy_dy), sync = false)
+        launch!(_diff_xT_staggered!, d_rxy_dx, r_xy_crop_c, neg_dx_inv; ndrange = size(d_rxy_dx), sync = false)
         launch!(_diff_x!, dqxdx, qx_crop, dx_inv; ndrange = size(dqxdx), sync = false)
         launch!(_diff_y!, dqydy, qy_crop, dy_inv; ndrange = size(dqydy), sync = false)
         KA.synchronize(backend)
 
-        @. divq = dqxdx + dqydy
-        launch!(_scale!, extra, divq, gh_dimplicit_diag; ndrange = length(extra))
-        launch!(_diff_xT!, d_extra_dx, extra, dx_inv; ndrange = size(d_extra_dx), sync = false)
-        launch!(_diff_yT!, d_extra_dy, extra, dy_inv; ndrange = size(d_extra_dy), sync = false)
+        launch!(_add_scale!, extra, dqxdx, dqydy, gh_dimplicit_diag; ndrange = length(extra))
+        launch!(_diff_xT!, d_extra_dx, extra, neg_dx_inv; ndrange = size(d_extra_dx), sync = false)
+        launch!(_diff_yT!, d_extra_dy, extra, neg_dy_inv; ndrange = size(d_extra_dy), sync = false)
         KA.synchronize(backend)
 
-        @.  d_extra_dx = -d_extra_dx
-        @.  d_extra_dy = -d_extra_dy
         @. h_d_extra_dx = gu.h * d_extra_dx
         @. h_d_extra_dy = gv.h * d_extra_dy
 
-        #Resistive forces resolved in x anf y directions
+        # Resistive forces resolved in x and y directions
         @. fx = d_rxx_dx + d_rxy_dy - taubx - h_d_extra_dx
         @. fy = d_ryy_dy + d_rxy_dx - tauby - h_d_extra_dy
 
-        #Resistive forces sampled at valid grid points
+        # Resistive forces sampled at valid grid points
         launch!(_gather!, fx_sampi, fx, gu_inner_indices; ndrange = length(fx_sampi), sync = false)
         launch!(_gather!, fy_sampi, fy, gv_inner_indices; ndrange = length(fy_sampi), sync = false)
         KA.synchronize(backend)
@@ -196,8 +208,55 @@ function get_op_fun(model::AbstractModel{T,N}) where {T,N}
         return opvecprod
     end
 
-    #Return op_fun as a closure
-    return op_fun!
+    return (
+        op_fun! = op_fun!,
+        gu_inner_indices = gu_inner_indices,
+        gv_inner_indices = gv_inner_indices,
+        surf_crop = surf_crop,
+        ones_crop = ones_crop,
+        tmpu = tmpu,
+        tmpv = tmpv,
+        tmpui = tmpui,
+        tmpvi = tmpvi,
+        u_crop = u_crop,
+        v_crop = v_crop,
+        u_h = u_h,
+        v_h = v_h,
+        dudx = dudx,
+        dvdy = dvdy,
+        dudy_c = dudy_c,
+        dvdx_c = dvdx_c,
+        shear_c = shear_c,
+        shear_h = shear_h,
+        β_crop = β_crop,
+        gf_crop = gf_crop,
+        denu = denu,
+        denv = denv,
+        ipolgfu = ipolgfu,
+        ipolgfv = ipolgfv,
+        hη = hη,
+        hη_c = hη_c,
+        rhs = rhs,
+        f1 = f1,
+        f2 = f2,
+        f3 = f3,
+        sui = sui,
+        hui = hui,
+        dui = dui,
+        svi = svi,
+        hvi = hvi,
+        dvi = dvi,
+        uvfixed = uvfixed,
+    )
+end
+
+"""
+    get_op_fun(model::AbstractModel)
+
+Returns a function that multiplies a vector by the momentum operator.
+"""
+function get_op_fun(model::AbstractModel)
+    return stencil_scratch!(model).op_fun!
 end
 
 """

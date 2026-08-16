@@ -39,7 +39,8 @@ struct GridField{T <: Real, N <: Integer} <: AbstractField{T, N}
     gc  :: CGrid{T,N}
     g3d :: SigmaGrid{T,N}
     wu  :: UWavelets{T,N}
-    wv  :: VWavelets{T,N}    
+    wv  :: VWavelets{T,N}
+    stencil_scratch :: Ref{Any}
 end
 
 """
@@ -131,7 +132,7 @@ function GridField(grid::AbstractGrid, bed_array;
         )
         wu=UWavelets(nxuw=grid.nx+1,nyuw=grid.ny,levels=solver_params.levels, storage_only=true)
         wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels, storage_only=true)
-        return GridField(gh,gu,gv,gc,g3d,wu,wv)
+        return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Any}(nothing))
     end
 
     #h-grid
@@ -238,7 +239,7 @@ function GridField(grid::AbstractGrid, bed_array;
 
     #Wavelet-grid, v-component.
     wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
-    return GridField(gh,gu,gv,gc,g3d,wu,wv)
+    return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Any}(nothing))
 end
 
 end
