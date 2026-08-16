@@ -22,6 +22,9 @@ export _diff_x!,
     _masked_scale_sum!,
     _gather!,
     _scatter!,
+    _op_h_stresses!,
+    _op_force_u!,
+    _op_force_v!,
     launch!
 
 using KernelAbstractions: KernelAbstractions as KA
@@ -363,6 +366,111 @@ Takes small 1D CG solver vector and spreads answers back onto full 2D map.
     @inbounds begin
         idx = indices[k]
         out_2d[idx] = inp_vec[k]
+    end
+end
+
+# Fused momentum operator (SSA resistive stresses and forces)
+
+"""
+    _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, hu, hv, mask_u, mask_v, mask_c, D_h, D_imp, D_c, dx_inv, dy_inv)
+
+On each H-cell, compute extensional stresses `r_xx`, `r_yy` and the `extra`
+term arising from the Schur complement of the semi-implicit system
+(Arthern et al. 2015). On interior C-faces, also write the shear stress `r_xy`.
+"""
+@kernel function _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, hu, hv,
+                                 mask_u, mask_v, mask_c, D_h, D_imp, D_c,
+                                 dx_inv, dy_inv)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        dudx = (u[i + 1, j] - u[i, j]) * dx_inv
+        dvdy = (v[i, j + 1] - v[i, j]) * dy_inv
+        D = D_h[i, j]
+        r_xx[i, j] = -2 * D * (2 * dudx + dvdy)
+        r_yy[i, j] = -2 * D * (dudx + 2 * dvdy)
+
+        z = zero(eltype(u))
+        qx_l = mask_u[i, j] ? hu[i, j] * u[i, j] : z
+        qx_r = mask_u[i + 1, j] ? hu[i + 1, j] * u[i + 1, j] : z
+        qy_b = mask_v[i, j] ? hv[i, j] * v[i, j] : z
+        qy_t = mask_v[i, j + 1] ? hv[i, j + 1] * v[i, j + 1] : z
+        extra[i, j] = D_imp[i, j] * ((qx_r - qx_l) * dx_inv + (qy_t - qy_b) * dy_inv)
+
+        nxc = size(r_xy, 1)
+        nyc = size(r_xy, 2)
+        if i <= nxc && j <= nyc
+            dudy = (u[i + 1, j + 1] - u[i + 1, j]) * dy_inv
+            dvdx = (v[i + 1, j + 1] - v[i, j + 1]) * dx_inv
+            r_xy[i, j] = mask_c[i, j] ? -D_c[i, j] * (dudy + dvdx) : zero(eltype(r_xy))
+        end
+    end
+end
+
+"""
+    _op_force_u!(fx, r_xx, r_xy, extra, u, hu, D_u, dx_inv, dy_inv)
+
+Assemble the x-force from neighbouring stresses, basal drag, and the Schur term.
+"""
+@kernel function _op_force_u!(fx, r_xx, r_xy, extra, u, hu, D_u, dx_inv, dy_inv)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        nxh = size(r_xx, 1)
+        nxc = size(r_xy, 1)
+        nyc = size(r_xy, 2)
+        z = zero(eltype(fx))
+
+        r_left = i > 1 ? r_xx[i - 1, j] : z
+        r_right = i <= nxh ? r_xx[i, j] : z
+        d_rxx_dx = (r_right - r_left) * dx_inv
+
+        if i > 1 && i <= nxc + 1
+            val_bot = j > 1 ? r_xy[i - 1, j - 1] : z
+            val_top = j <= nyc ? r_xy[i - 1, j] : z
+            d_rxy_dy = (val_top - val_bot) * dy_inv
+        else
+            d_rxy_dy = z
+        end
+
+        e_left = i > 1 ? extra[i - 1, j] : z
+        e_right = i <= nxh ? extra[i, j] : z
+        d_extra_dx = (e_right - e_left) * dx_inv
+
+        taubx = -D_u[i, j] * u[i, j]
+        fx[i, j] = d_rxx_dx + d_rxy_dy - taubx - hu[i, j] * d_extra_dx
+    end
+end
+
+"""
+    _op_force_v!(fy, r_yy, r_xy, extra, v, hv, D_v, dx_inv, dy_inv)
+
+Assemble the y-force from neighbouring stresses, basal drag, and the Schur term.
+"""
+@kernel function _op_force_v!(fy, r_yy, r_xy, extra, v, hv, D_v, dx_inv, dy_inv)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        nyh = size(r_yy, 2)
+        nxc = size(r_xy, 1)
+        nyc = size(r_xy, 2)
+        z = zero(eltype(fy))
+
+        r_bot = j > 1 ? r_yy[i, j - 1] : z
+        r_top = j <= nyh ? r_yy[i, j] : z
+        d_ryy_dy = (r_top - r_bot) * dy_inv
+
+        if j > 1 && j <= nyc + 1
+            val_left = i > 1 ? r_xy[i - 1, j - 1] : z
+            val_right = i <= nxc ? r_xy[i, j - 1] : z
+            d_rxy_dx = (val_right - val_left) * dx_inv
+        else
+            d_rxy_dx = z
+        end
+
+        e_bot = j > 1 ? extra[i, j - 1] : z
+        e_top = j <= nyh ? extra[i, j] : z
+        d_extra_dy = (e_top - e_bot) * dy_inv
+
+        tauby = -D_v[i, j] * v[i, j]
+        fy[i, j] = d_ryy_dy + d_rxy_dx - tauby - hv[i, j] * d_extra_dy
     end
 end
 

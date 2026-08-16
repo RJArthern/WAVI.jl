@@ -53,8 +53,6 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     gv_inner_indices = findall(vec(gv.mask_inner))
 
     # Preallocate intermediate variables used by op_fun and Picard applies
-    usampi = similar(gu.u, gu.ni)
-    vsampi = similar(gv.v, gv.ni)
     uspread = similar(gu.u)
     vspread = similar(gv.v)
 
@@ -65,30 +63,12 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
 
     dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
     dvdx_c = similar(dudy_c)
-    r_xy_crop_c = similar(dudy_c)
+    r_xy = similar(dudy_c)
 
-    d_rxx_dx = similar(gu.u)
-    d_rxy_dy = similar(gu.u)
-    d_ryy_dy = similar(gv.v)
-    d_rxy_dx = similar(gv.v)
-
-    taubx = similar(gu.u)
-    tauby = similar(gv.v)
-
-    qx_crop = similar(gu.u)
-    dqxdx = similar(gh.h)
-    qy_crop = similar(gv.v)
-    dqydy = similar(gh.h)
     extra = similar(gh.h)
-    d_extra_dx = similar(gu.u)
-    d_extra_dy = similar(gv.v)
-    h_d_extra_dx = similar(gu.u)
-    h_d_extra_dy = similar(gv.v)
 
     fx = similar(gu.u)
     fy = similar(gv.v)
-    fx_sampi = similar(gu.u, gu.ni)
-    fy_sampi = similar(gv.v, gv.ni)
 
     surf_crop = similar(gh.h)
     ones_crop = similar(gh.h)
@@ -145,27 +125,25 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
 
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
-    neg_dx_inv = -dx_inv
-    neg_dy_inv = -dy_inv
-    twoT = T(2)
-    oneT = one(T)
-    neg_twoT = -twoT
-    neg_oneT = -oneT
     backend = KA.get_backend(gh.h)
+
+    D_h = reshape(gh_dneghηav_diag, gh.nxh, gh.nyh)
+    D_c = reshape(gc_dneghηav_diag, gc.nxc, gc.nyc)
+    D_u = reshape(gu_dnegβeff_diag, gu.nxu, gu.nyu)
+    D_v = reshape(gv_dnegβeff_diag, gv.nxv, gv.nyv)
+    D_imp = reshape(gh_dimplicit_diag, gh.nxh, gh.nyh)
 
     function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
             @assert length(inputVector)==(gu.ni+gv.ni)
 
-            # Split vector into u- and v- components
-            usampi .= @view inputVector[1:gu.ni]
-            vsampi .= @view inputVector[(gu.ni+1):(gu.ni+gv.ni)]
-
-            # Spread to vectors that include all grid points within rectangular domain.
+            # Spread packed u- and v-components onto the full rectangular grids.
             fill!(uspread, zero(T))
             fill!(vspread, zero(T))
-            launch!(_scatter!, uspread, usampi, gu_inner_indices; ndrange = length(usampi), sync = false)
-            launch!(_scatter!, vspread, vsampi, gv_inner_indices; ndrange = length(vsampi), sync = false)
+            launch!(_scatter!, uspread, view(inputVector, 1:gu.ni), gu_inner_indices;
+                    ndrange = gu.ni, sync = false)
+            launch!(_scatter!, vspread, view(inputVector, (gu.ni + 1):(gu.ni + gv.ni)), gv_inner_indices;
+                    ndrange = gv.ni, sync = false)
             KA.synchronize(backend)
         else
             # Vector already includes all grid points within rectangular domain.
@@ -174,57 +152,25 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
             vspread .= reshape(@view(inputVector[(gu.nxu*gu.nyu+1):end]), gv.nxv, gv.nyv)
         end
 
-        # Extensional resistive stresses
-        launch!(_diff_x!, dudx, uspread, dx_inv; ndrange = size(dudx), sync = false)
-        launch!(_diff_y!, dvdy, vspread, dy_inv; ndrange = size(dvdy), sync = false)
-        launch!(_diff_y_staggered!, dudy_c, uspread, dy_inv; ndrange = size(dudy_c), sync = false)
-        launch!(_diff_x_staggered!, dvdx_c, vspread, dx_inv; ndrange = size(dvdx_c), sync = false)
+        # Extensional and shearing resistive stresses, plus Schur `extra`
+        # (Arthern et al. 2015). r_xx = -2 D (2 ∂x u + ∂y v), and similarly for r_yy.
+        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, uspread, vspread,
+                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv;
+                ndrange = size(r_xx))
+
+        # Resistive forces in x and y (stress gradients, basal drag, Schur term).
+        launch!(_op_force_u!, fx, r_xx, r_xy, extra, uspread, gu.h, D_u, dx_inv, dy_inv;
+                ndrange = size(fx), sync = false)
+        launch!(_op_force_v!, fy, r_yy, r_xy, extra, vspread, gv.h, D_v, dx_inv, dy_inv;
+                ndrange = size(fy), sync = false)
         KA.synchronize(backend)
 
-        # r_xx = -2 D (2 ∂x u + ∂y v), r_yy = -2 D (∂x u + 2 ∂y v)
-        launch!(_scale_sum!, r_xx, dudx, dvdy, twoT, oneT, gh_dneghηav_diag, neg_twoT; ndrange = length(r_xx), sync = false)
-        launch!(_scale_sum!, r_yy, dudx, dvdy, oneT, twoT, gh_dneghηav_diag, neg_twoT; ndrange = length(r_yy), sync = false)
-
-        # Shearing resistive stresses (crop D (dudy + dvdx), then negate)
-        launch!(_masked_scale_sum!, r_xy_crop_c, dudy_c, dvdx_c, gc_dneghηav_diag, gc.mask; ndrange = length(r_xy_crop_c), sync = false)
-
-        # Basal drag
-        launch!(_scale!, taubx, uspread, gu_dnegβeff_diag, neg_oneT; ndrange = length(taubx), sync = false)
-        launch!(_scale!, tauby, vspread, gv_dnegβeff_diag, neg_oneT; ndrange = length(tauby), sync = false)
-
-        # Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-        launch!(_masked_mul!, qx_crop, gu.h, uspread, gu.mask; ndrange = size(qx_crop), sync = false)
-        launch!(_masked_mul!, qy_crop, gv.h, vspread, gv.mask; ndrange = size(qy_crop), sync = false)
+        # Sample resistive forces at valid (inner) grid points.
+        launch!(_gather!, view(opvecprod, 1:gu.ni), fx, gu_inner_indices;
+                ndrange = gu.ni, sync = false)
+        launch!(_gather!, view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni)), fy, gv_inner_indices;
+                ndrange = gv.ni, sync = false)
         KA.synchronize(backend)
-
-        # Gradients of resistive stresses
-        launch!(_diff_xT!, d_rxx_dx, r_xx, neg_dx_inv; ndrange = size(d_rxx_dx), sync = false)
-        launch!(_diff_yT_staggered!, d_rxy_dy, r_xy_crop_c, neg_dy_inv; ndrange = size(d_rxy_dy), sync = false)
-        launch!(_diff_yT!, d_ryy_dy, r_yy, neg_dy_inv; ndrange = size(d_ryy_dy), sync = false)
-        launch!(_diff_xT_staggered!, d_rxy_dx, r_xy_crop_c, neg_dx_inv; ndrange = size(d_rxy_dx), sync = false)
-        launch!(_diff_x!, dqxdx, qx_crop, dx_inv; ndrange = size(dqxdx), sync = false)
-        launch!(_diff_y!, dqydy, qy_crop, dy_inv; ndrange = size(dqydy), sync = false)
-        KA.synchronize(backend)
-
-        launch!(_add_scale!, extra, dqxdx, dqydy, gh_dimplicit_diag; ndrange = length(extra))
-        launch!(_diff_xT!, d_extra_dx, extra, neg_dx_inv; ndrange = size(d_extra_dx), sync = false)
-        launch!(_diff_yT!, d_extra_dy, extra, neg_dy_inv; ndrange = size(d_extra_dy), sync = false)
-        KA.synchronize(backend)
-
-        @. h_d_extra_dx = gu.h * d_extra_dx
-        @. h_d_extra_dy = gv.h * d_extra_dy
-
-        # Resistive forces resolved in x and y directions
-        @. fx = d_rxx_dx + d_rxy_dy - taubx - h_d_extra_dx
-        @. fy = d_ryy_dy + d_rxy_dx - tauby - h_d_extra_dy
-
-        # Resistive forces sampled at valid grid points
-        launch!(_gather!, fx_sampi, fx, gu_inner_indices; ndrange = length(fx_sampi), sync = false)
-        launch!(_gather!, fy_sampi, fy, gv_inner_indices; ndrange = length(fy_sampi), sync = false)
-        KA.synchronize(backend)
-
-        opvecprod[1:gu.ni] .= fx_sampi
-        opvecprod[(gu.ni+1):(gu.ni+gv.ni)] .= fy_sampi
 
         return opvecprod
     end
