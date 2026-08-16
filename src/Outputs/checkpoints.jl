@@ -31,13 +31,34 @@ function should_write_checkpoint(timestepping_params::TimesteppingParams, clock:
            mod(clock.n_iter, timestepping_params.n_iter_chkpt) == 0
 end
 
+"""
+    with_cleared_stencil_scratch(f, model)
+
+Run `f()` with `model.fields.stencil_scratch` temporarily set to `nothing`.
+Scratch holds anonymous matvec / restrict / prolong closures that JLD2 cannot
+serialise usefully. Restore the previous contents afterwards so an ongoing
+solve keeps its workspace.
+"""
+function with_cleared_stencil_scratch(f, model)
+    scratch_ref = model.fields.stencil_scratch
+    scratch = scratch_ref[]
+    scratch_ref[] = nothing
+    try
+        return f()
+    finally
+        scratch_ref[] = scratch
+    end
+end
+
 function write_checkpoint!(model, timestepping_params::TimesteppingParams, output_params::OutputParams, clock::Clock)
     path = checkpoint_path(timestepping_params, output_params)
     if !isdir(path)
         mkpath(path)
     end
     fname = joinpath(path, checkpoint_filename(clock.n_iter))
-    @save fname model=model timestepping_params=timestepping_params clock=clock
+    with_cleared_stencil_scratch(model) do
+        @save fname model=model timestepping_params=timestepping_params clock=clock
+    end
     @info "Permanent checkpoint at timestep number $(clock.n_iter) — $(fname)"
     return nothing
 end

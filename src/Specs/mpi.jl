@@ -13,7 +13,7 @@ import WAVI.Fields: GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, Si
 import WAVI.Grids: Grid
 import WAVI.MeltRates: UniformMeltRate
 import WAVI.Models: BasicSpec, Model, get_bed_elevation
-import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!, checkpoint_path
+import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!, checkpoint_path, with_cleared_stencil_scratch
 import WAVI.Parameters: TimesteppingParams
 import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, update_velocities_on_h_grid!, inner_update!, precondition!, update_preconditioner!, update_rheological_operators!
 import WAVI.Simulations: run_simulation!, timestep!, update_model_climate_forcing!

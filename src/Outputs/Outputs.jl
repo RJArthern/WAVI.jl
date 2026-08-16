@@ -1,6 +1,6 @@
 module Outputs
 
-export OutputParams
+export OutputParams, with_cleared_stencil_scratch
 
 import WAVI.Deferred: clear!, collect!
 using WAVI.Deferred

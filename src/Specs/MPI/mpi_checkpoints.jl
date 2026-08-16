@@ -76,7 +76,9 @@ function write_checkpoint!(spec::MPISpec,model, timestepping_params::Timesteppin
     fname = joinpath(path, checkpoint_filename(spec,clock.n_iter))
 
     MPI.Barrier(comm)
-    @save fname model=model timestepping_params=timestepping_params clock=clock
+    with_cleared_stencil_scratch(model) do
+        @save fname model=model timestepping_params=timestepping_params clock=clock
+    end
     MPI.Barrier(comm)
 
     @info "Permanent checkpoint at timestep number $(clock.n_iter) — $(fname)"
