@@ -27,6 +27,7 @@ function get_preconditioner(model::AbstractModel{T,N}, op::LinearMap{T}) where {
     restrict, prolong, op_coarse, b_coarse, correction_coarse = ensure_multigrid_ops!(model, op, s)
     #starting guess for the multigrid coarse correction is cached by the model
     fill_correction_coarse!(model, correction_coarse)
+    ensure_colour_indices!(s, gu, gv)
     op_diag = get_op_diag(model, op)
 
     #Four colour Jacobi preconditioner. Red-Black checkerboard Jacobi for each velocity component.
@@ -97,31 +98,35 @@ end
 """
     get_op_diag(wavi::AbstractModel,op::LinearMap)
 
- Get diagonal of operator for use in preconditioner.
- The returned vector is stencil scratch and is overwritten on the next call.
-
+Get diagonal of the momentum operator for the Gauss-Seidel weights.
+Writes the self-coefficients of the fused H/U/V stencils into stencil scratch.
+The returned vector is overwritten on the next call.
 """
-function get_op_diag(model::AbstractModel,op::LinearMap)
-    @unpack gu,gv=model.fields
+function get_op_diag(model::AbstractModel, op::LinearMap)
+    @unpack gh, gu, gv, gc = model.fields
     s = stencil_scratch!(model)
-    mi,ni = size(op)
+    mi, ni = size(op)
     @assert mi == ni == gu.ni + gv.ni
 
     op_diag = s.op_diag
-    probe = s.diag_probe
-    tmp = s.diag_tmp
-    ensure_colour_indices!(s, gu, gv, model.solver_params.stencil_margin)
-    fill!(op_diag, zero(eltype(op)))
-    for idx in s.diag_colour_indices[]
-        isempty(idx) && continue
-        fill!(probe, zero(eltype(probe)))
-        @inbounds for k in idx
-            probe[k] = one(eltype(probe))
-        end
-        mul!(tmp, op, probe)
-        @inbounds for k in idx
-            op_diag[k] = tmp[k]
-        end
+    T = eltype(op)
+    dx_inv = one(T) / model.grid.dx
+    dy_inv = one(T) / model.grid.dy
+    D_h = reshape(gh.dneghηav[].diag, gh.nxh, gh.nyh)
+    D_c = reshape(gc.dneghηav[].diag, gc.nxc, gc.nyc)
+    D_u = reshape(gu.dnegβeff[].diag, gu.nxu, gu.nyu)
+    D_v = reshape(gv.dnegβeff[].diag, gv.nxv, gv.nyv)
+    D_imp = reshape(gh.dimplicit[].diag, gh.nxh, gh.nyh)
+
+    if gu.ni > 0
+        launch!(_op_diag_u!, view(op_diag, 1:gu.ni), s.gu_inner_indices,
+                D_h, D_c, D_u, D_imp, gu.h, gu.mask, gc.mask, dx_inv, dy_inv;
+                ndrange = gu.ni)
+    end
+    if gv.ni > 0
+        launch!(_op_diag_v!, view(op_diag, (gu.ni + 1):ni), s.gv_inner_indices,
+                D_h, D_c, D_v, D_imp, gv.h, gv.mask, gc.mask, dx_inv, dy_inv;
+                ndrange = gv.ni)
     end
     return op_diag
 end
@@ -167,12 +172,9 @@ function gauss_seidel_smoother!(x, op, b;
     return x
 end
 
-function ensure_colour_indices!(s, gu, gv, sm)
+function ensure_colour_indices!(s, gu, gv)
     if s.gs_colour_indices[] === nothing
         s.gs_colour_indices[] = gs_colour_index_lists(gu, gv)
-    end
-    if s.diag_colour_indices[] === nothing
-        s.diag_colour_indices[] = diag_colour_index_lists(gu, gv, sm)
     end
     return nothing
 end
@@ -194,28 +196,6 @@ function gs_colour_index_lists(gu, gv)
         if gv.mask_inner[i, j]
             k += 1
             push!(lists[3 + mod(i - j, 2)], k)
-        end
-    end
-    return lists
-end
-
-"""
-Packed colours for Jacobi diagonal probes, spaced by `stencil_margin`
-so neighbouring degrees of freedom are not in the same probe.
-"""
-function diag_colour_index_lists(gu, gv, sm)
-    lists = [Int[] for _ in 1:(2 * sm^2)]
-    k = 0
-    for j in 1:gu.nyu, i in 1:gu.nxu
-        if gu.mask_inner[i, j]
-            k += 1
-            push!(lists[1 + mod(i - 1, sm) + sm * mod(j - 1, sm)], k)
-        end
-    end
-    for j in 1:gv.nyv, i in 1:gv.nxv
-        if gv.mask_inner[i, j]
-            k += 1
-            push!(lists[1 + sm^2 + mod(i - 1, sm) + sm * mod(j - 1, sm)], k)
         end
     end
     return lists

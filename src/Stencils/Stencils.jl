@@ -25,6 +25,8 @@ export _diff_x!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
+    _op_diag_u!,
+    _op_diag_v!,
     launch!
 
 using KernelAbstractions: KernelAbstractions as KA
@@ -471,6 +473,122 @@ Assemble the y-force from neighbouring stresses, basal drag, and the Schur term.
 
         tauby = -D_v[i, j] * v[i, j]
         fy[i, j] = d_ryy_dy + d_rxy_dx - tauby - hv[i, j] * d_extra_dy
+    end
+end
+
+"""
+    _op_diag_u!(op_diag_u, inner_indices, D_h, D_c, D_u, D_imp, hu, mask_u, mask_c, dx_inv, dy_inv)
+
+Self-coefficient of the fused momentum operator at each packed inner u-point.
+Matches `_op_h_stresses!` plus `_op_force_u!` for a unit u at that point.
+`inner_indices[k]` is the column-major linear index of packed unknown `k` on the U-grid.
+"""
+@kernel function _op_diag_u!(op_diag_u, inner_indices, D_h, D_c, D_u, D_imp,
+                             hu, mask_u, mask_c, dx_inv, dy_inv)
+    k = @index(Global, Linear)
+    @inbounds begin
+        nxu = size(D_u, 1)
+        nxh = size(D_h, 1)
+        nxc = size(D_c, 1)
+        nyc = size(D_c, 2)
+        idx = inner_indices[k]
+        i = (idx - 1) % nxu + 1
+        j = (idx - 1) ÷ nxu + 1
+        z = zero(eltype(op_diag_u))
+        dx2 = dx_inv * dx_inv
+        dy2 = dy_inv * dy_inv
+
+        d_h = z
+        if i <= nxh
+            d_h += D_h[i, j]
+        end
+        if i > 1
+            d_h += D_h[i - 1, j]
+        end
+        diag = (4 * dx2) * d_h
+
+        if i > 1 && i <= nxc + 1
+            if j <= nyc && mask_c[i - 1, j]
+                diag += D_c[i - 1, j] * dy2
+            end
+            if j > 1 && mask_c[i - 1, j - 1]
+                diag += D_c[i - 1, j - 1] * dy2
+            end
+        end
+
+        diag += D_u[i, j]
+
+        if mask_u[i, j]
+            d_imp = z
+            if i <= nxh
+                d_imp += D_imp[i, j]
+            end
+            if i > 1
+                d_imp += D_imp[i - 1, j]
+            end
+            h = hu[i, j]
+            diag += (h * h * dx2) * d_imp
+        end
+
+        op_diag_u[k] = diag
+    end
+end
+
+"""
+    _op_diag_v!(op_diag_v, inner_indices, D_h, D_c, D_v, D_imp, hv, mask_v, mask_c, dx_inv, dy_inv)
+
+Self-coefficient of the fused momentum operator at each packed inner v-point.
+Matches `_op_h_stresses!` plus `_op_force_v!` for a unit v at that point.
+`inner_indices[k]` is the column-major linear index of packed unknown `k` on the V-grid.
+"""
+@kernel function _op_diag_v!(op_diag_v, inner_indices, D_h, D_c, D_v, D_imp,
+                             hv, mask_v, mask_c, dx_inv, dy_inv)
+    k = @index(Global, Linear)
+    @inbounds begin
+        nxv = size(D_v, 1)
+        nyh = size(D_h, 2)
+        nxc = size(D_c, 1)
+        nyc = size(D_c, 2)
+        idx = inner_indices[k]
+        i = (idx - 1) % nxv + 1
+        j = (idx - 1) ÷ nxv + 1
+        z = zero(eltype(op_diag_v))
+        dx2 = dx_inv * dx_inv
+        dy2 = dy_inv * dy_inv
+
+        d_h = z
+        if j <= nyh
+            d_h += D_h[i, j]
+        end
+        if j > 1
+            d_h += D_h[i, j - 1]
+        end
+        diag = (4 * dy2) * d_h
+
+        if j > 1 && j <= nyc + 1
+            if i <= nxc && mask_c[i, j - 1]
+                diag += D_c[i, j - 1] * dx2
+            end
+            if i > 1 && mask_c[i - 1, j - 1]
+                diag += D_c[i - 1, j - 1] * dx2
+            end
+        end
+
+        diag += D_v[i, j]
+
+        if mask_v[i, j]
+            d_imp = z
+            if j <= nyh
+                d_imp += D_imp[i, j]
+            end
+            if j > 1
+                d_imp += D_imp[i, j - 1]
+            end
+            h = hv[i, j]
+            diag += (h * h * dy2) * d_imp
+        end
+
+        op_diag_v[k] = diag
     end
 end
 
