@@ -118,16 +118,17 @@ function GridField(grid::AbstractGrid, bed_array;
             mask=c_mask,
             storage_only = true,
         )
+        # Collect is 2D-only, so rank-0 assembly buffers do not need 3D sigma fields.
         g3d=SigmaGrid(
             nxs=grid.nx,
             nys=grid.ny,
             nσs=grid.nσ,
             σ =grid.σ,
-            η = zeros(grid.nx, grid.ny, grid.nσ),
-            θ = zeros(grid.nx, grid.ny, grid.nσ),
-            Φ = zeros(grid.nx, grid.ny, grid.nσ),
-            strain_history = zeros(grid.nx, grid.ny, grid.nσ),
-            glen_b = zeros(grid.nx, grid.ny, grid.nσ),
+            η = zeros(0, 0, 0),
+            θ = zeros(0, 0, 0),
+            Φ = zeros(0, 0, 0),
+            strain_history = zeros(0, 0, 0),
+            glen_b = zeros(0, 0, 0),
             quadrature_weights = grid.quadrature_weights
         )
         wu=UWavelets(nxuw=grid.nx+1,nyuw=grid.ny,levels=solver_params.levels, storage_only=true)
@@ -213,13 +214,16 @@ function GridField(grid::AbstractGrid, bed_array;
         nσ = grid.nσ,
         glen_a_ref = params.glen_a_ref,
     )
-    for i = 1:grid.nx
-        for j = 1:grid.ny
-            for k = 1:grid.nσ
-                g3_glen_b[i,j,k] = glen_b(θ[i,j,k],Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
-            end
-        end
-    end
+    fill_glen_b!(
+        g3_glen_b,
+        θ,
+        Φ,
+        params.glen_a_ref,
+        params.glen_n,
+        params.glen_a_activation_energy,
+        params.glen_temperature_ref,
+        params.gas_const,
+    )
 
     g3d=SigmaGrid(
         nxs=grid.nx,

@@ -19,12 +19,12 @@ Keyword arguments
 - budd_q               : Budd exponent
 """
 
-function BuddSlidingLaw(; 
+function BuddSlidingLaw(;
                         drag_coefficient = 0.117, # 0.117 (yr/m)^(1/3) = 37.01 (s/m)^(1/3)
                         weertman_m  = 3.0,
                         reg_speed = 1.0e-5,
-                        budd_q = 1.0) 
-                        
+                        budd_q = 1.0)
+
     return BuddSlidingLaw(
                             drag_coefficient,
                             weertman_m,
@@ -46,21 +46,16 @@ end
 
 function reconstruct_on_grid(sliding_law::BuddSlidingLaw, grid::Grid)
     return BuddSlidingLaw(
-        isa(sliding_law.drag_coefficient,Number) ? sliding_law.drag_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.drag_coefficient) == (grid.nx,grid.ny) ? sliding_law.drag_coefficient :
-        throw(DimensionMismatch("Drag Coefficient does not match grid size")),
+        field_on_grid(sliding_law.drag_coefficient, grid; name = "Drag Coefficient"),
         sliding_law.weertman_m,
         sliding_law.reg_speed,
-        budd_q)
+        sliding_law.budd_q)
 end
 
 function reconstruct_on_subdomain(sliding_law::BuddSlidingLaw, grid::Grid, subdomain::NTuple{4,<: Integer})
-    
-    x_start,x_end,y_start,y_end = subdomain
-
     return BuddSlidingLaw(
-          sliding_law.drag_coefficient[x_start:x_end, y_start:y_end],
+          spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
           sliding_law.reg_speed,
-          budd_q)
+          sliding_law.budd_q)
 end

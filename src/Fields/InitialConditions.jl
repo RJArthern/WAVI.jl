@@ -198,14 +198,8 @@ function reconstruct_on_subdomain(initial_conditions::InitialConditions, grid::G
     u_grid_size, v_grid_size = (grid.nx+1, grid.ny), (grid.nx, grid.ny+1)
     
     return InitialConditions(
-        initial_thickness = 
-        size(initial_conditions.initial_thickness) == size(grid)[1:2] ? 
-            initial_conditions.initial_thickness[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_thickness,
-        initial_grounded_fraction = 
-        size(initial_conditions.initial_grounded_fraction) == size(grid)[1:2] ? 
-            initial_conditions.initial_grounded_fraction[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_grounded_fraction,
+        initial_thickness = spatial_on_subdomain(initial_conditions.initial_thickness, grid, subdomain),
+        initial_grounded_fraction = spatial_on_subdomain(initial_conditions.initial_grounded_fraction, grid, subdomain),
         initial_u_veloc = 
         size(initial_conditions.initial_u_veloc) == u_grid_size ? 
             initial_conditions.initial_u_veloc[x_start:x_end+1, y_start:y_end] : 
@@ -214,42 +208,15 @@ function reconstruct_on_subdomain(initial_conditions::InitialConditions, grid::G
         size(initial_conditions.initial_v_veloc) == v_grid_size ? 
             initial_conditions.initial_v_veloc[x_start:x_end, y_start:y_end+1] : 
             initial_conditions.initial_v_veloc,
-        initial_viscosity = 
-        size(initial_conditions.initial_viscosity) == size(grid) ? 
-            initial_conditions.initial_viscosity[x_start:x_end, y_start:y_end, :] : 
-            initial_conditions.initial_viscosity,
-        initial_temperature = 
-        size(initial_conditions.initial_temperature) == size(grid) ? 
-            initial_conditions.initial_temperature[x_start:x_end, y_start:y_end, :] :
-            initial_conditions.initial_temperature,
-        initial_damage = 
-        size(initial_conditions.initial_damage) == size(grid) ? 
-            initial_conditions.initial_damage[x_start:x_end, y_start:y_end, :] : 
-            initial_conditions.initial_damage,
-        initial_strain_history =
-        size(initial_conditions.initial_strain_history) == size(grid) ? 
-            initial_conditions.initial_strain_history[x_start:x_end, y_start:y_end, :] : 
-            initial_conditions.initial_strain_history,
-        initial_basal_water_thickness =
-        size(initial_conditions.initial_basal_water_thickness) == size(grid)[1:2] ? 
-            initial_conditions.initial_basal_water_thickness[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_basal_water_thickness,
-        initial_hydraulic_potential_b =
-        size(initial_conditions.initial_hydraulic_potential_b) == size(grid)[1:2] ? 
-            initial_conditions.initial_hydraulic_potential_b[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_hydraulic_potential_b,    
-        initial_effective_pressure =
-        size(initial_conditions.initial_effective_pressure) == size(grid)[1:2] ? 
-            initial_conditions.initial_effective_pressure[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_effective_pressure,
-        initial_θ_ave =
-        size(initial_conditions.initial_θ_ave) == size(grid)[1:2] ? 
-            initial_conditions.initial_θ_ave[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_θ_ave,
-        initial_preBfactor =
-        size(initial_conditions.initial_preBfactor) == size(grid)[1:2] ? 
-            initial_conditions.initial_preBfactor[x_start:x_end, y_start:y_end] : 
-            initial_conditions.initial_preBfactor
+        initial_viscosity = spatial_on_subdomain(initial_conditions.initial_viscosity, grid, subdomain),
+        initial_temperature = spatial_on_subdomain(initial_conditions.initial_temperature, grid, subdomain),
+        initial_damage = spatial_on_subdomain(initial_conditions.initial_damage, grid, subdomain),
+        initial_strain_history = spatial_on_subdomain(initial_conditions.initial_strain_history, grid, subdomain),
+        initial_basal_water_thickness = spatial_on_subdomain(initial_conditions.initial_basal_water_thickness, grid, subdomain),
+        initial_hydraulic_potential_b = spatial_on_subdomain(initial_conditions.initial_hydraulic_potential_b, grid, subdomain),
+        initial_effective_pressure = spatial_on_subdomain(initial_conditions.initial_effective_pressure, grid, subdomain),
+        initial_θ_ave = spatial_on_subdomain(initial_conditions.initial_θ_ave, grid, subdomain),
+        initial_preBfactor = spatial_on_subdomain(initial_conditions.initial_preBfactor, grid, subdomain),
     )
 
 end

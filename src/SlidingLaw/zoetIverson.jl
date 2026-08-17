@@ -26,8 +26,8 @@ function ZoetIversonSlidingLaw(;
                         drag_coefficient = 708.20e-6, # m/(yr Pa)
                         weertman_m  = 3.0,
                         reg_speed = 1.0e-5,
-                        zoetIverson_p = 5.0) 
-                        
+                        zoetIverson_p = 5.0)
+
     return ZoetIversonSlidingLaw(
                             coulomb_coefficient,
                             drag_coefficient,
@@ -52,23 +52,18 @@ end
 
 function reconstruct_on_grid(sliding_law::ZoetIversonSlidingLaw, grid::Grid)
     return ZoetIversonSlidingLaw(
-        isa(sliding_law.coulomb_coefficient,Number) ? sliding_law.coulomb_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.coulomb_coefficient) == (grid.nx,grid.ny) ? sliding_law.coulomb_coefficient :
-        throw(DimensionMismatch("Coulomb Coefficient does not match grid size")),
-        isa(sliding_law.drag_coefficient,Number) ? sliding_law.drag_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.drag_coefficient) == (grid.nx,grid.ny) ? sliding_law.drag_coefficient :
-        throw(DimensionMismatch("Drag Coefficient does not match grid size")),
+        field_on_grid(sliding_law.coulomb_coefficient, grid; name = "Coulomb Coefficient"),
+        field_on_grid(sliding_law.drag_coefficient, grid; name = "Drag Coefficient"),
         sliding_law.weertman_m,
-        sliding_law.reg_speed)
+        sliding_law.reg_speed,
+        sliding_law.zoetIverson_p)
 end
 
 function reconstruct_on_subdomain(sliding_law::ZoetIversonSlidingLaw, grid::Grid, subdomain::NTuple{4,<: Integer})
-    
-    x_start,x_end,y_start,y_end = subdomain
-
     return ZoetIversonSlidingLaw(
-          sliding_law.coulomb_coefficient[x_start:x_end, y_start:y_end],
-          sliding_law.drag_coefficient[x_start:x_end, y_start:y_end],
+          spatial_on_subdomain(sliding_law.coulomb_coefficient, grid, subdomain),
+          spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
-          sliding_law.reg_speed)
+          sliding_law.reg_speed,
+          sliding_law.zoetIverson_p)
 end

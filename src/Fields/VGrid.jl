@@ -121,11 +121,6 @@ function VGrid(;
         #size assertions
         @assert n == count(mask)
         @assert ni == count(mask_inner)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxv*nyv))[mask[:]],ones(n),n,nxv*nyv)
-        @assert samp_inner == sparse(1:ni,(1:(nxv*nyv))[mask_inner[:]],ones(ni),ni,nxv*nyv)
-        @assert spread == sparse(samp')
-        @assert spread_inner == sparse(samp_inner')
     end
 
     @assert size(s)==(nxv,nyv)

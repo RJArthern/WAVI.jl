@@ -6,11 +6,11 @@ using Parameters
 
 using WAVI: AbstractModel
 using WAVI.KroneckerProducts
-using KernelAbstractions: KernelAbstractions as KA
+using KernelAbstractions: KernelAbstractions as KA, @kernel, @index
 using WAVI.Stencils
 
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
-    get_glx, glen_b, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!, 
+    get_glx, glen_b, fill_glen_b!, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!,
     icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
     stencil_scratch!
 
@@ -246,7 +246,7 @@ end
 """
     get_restrict_fun(model::AbstractModel)
 
-Returns a function that restricts a vector from the fine grid to the coarse grid, 
+Returns a function that restricts a vector from the fine grid to the coarse grid,
 used in multigrid preconditioner.
 """
 function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
@@ -291,7 +291,7 @@ end
 """
     get_prolong_fun(model::AbstractModel)
 
-Returns a function that prolongs a vector from the coarse grid to the fine grid, 
+Returns a function that prolongs a vector from the coarse grid to the fine grid,
 used in multigrid preconditioner.
 """
 function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
@@ -558,6 +558,61 @@ function glen_b(temperature,damage,glen_a_ref, glen_n, glen_a_activation_energy,
     glen_a0 = glen_a_ref*exp(+glen_a_activation_energy/(glen_temperature_ref*gas_const) )
     glen_b = (1-damage)*( glen_a0*exp(-glen_a_activation_energy/(temperature*gas_const)) )^(-1.0/glen_n)
     return glen_b
+end
+
+@kernel function _update_glen_b_kernel!(
+    glen_b_arr,
+    θ,
+    Φ,
+    glen_a_ref,
+    glen_n,
+    glen_a_activation_energy,
+    glen_temperature_ref,
+    gas_const,
+)
+    i, j, k = @index(Global, NTuple)
+    @inbounds glen_b_arr[i, j, k] = glen_b(
+        θ[i, j, k],
+        Φ[i, j, k],
+        glen_a_ref[i, j],
+        glen_n,
+        glen_a_activation_energy,
+        glen_temperature_ref,
+        gas_const,
+    )
+end
+
+"""
+    fill_glen_b!(glen_b_arr, θ, Φ, glen_a_ref, glen_n, glen_a_activation_energy, glen_temperature_ref, gas_const)
+
+Fill `glen_b_arr` from temperature and damage using Glen's flow-law formula.
+
+This is the same calculation as `update_glen_b!`. Model construction calls it so the
+starting Glen B field matches what later timesteps compute.
+"""
+function fill_glen_b!(
+    glen_b_arr,
+    θ,
+    Φ,
+    glen_a_ref,
+    glen_n,
+    glen_a_activation_energy,
+    glen_temperature_ref,
+    gas_const,
+)
+    launch!(
+        _update_glen_b_kernel!,
+        glen_b_arr,
+        θ,
+        Φ,
+        glen_a_ref,
+        glen_n,
+        glen_a_activation_energy,
+        glen_temperature_ref,
+        gas_const;
+        ndrange = size(glen_b_arr),
+    )
+    return glen_b_arr
 end
 
 

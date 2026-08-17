@@ -119,11 +119,6 @@ function UGrid(;
         #size assertions
         @assert n == count(mask)
         @assert ni == count(mask_inner)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxu*nyu))[mask[:]],ones(n),n,nxu*nyu)
-        @assert samp_inner == sparse(1:ni,(1:(nxu*nyu))[mask_inner[:]],ones(ni),ni,nxu*nyu)
-        @assert spread == sparse(samp')
-        @assert spread_inner == sparse(samp_inner')
     end
 
     @assert size(s)==(nxu,nyu)

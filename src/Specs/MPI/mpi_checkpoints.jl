@@ -46,6 +46,8 @@
     spec.bottom == model.spec.bottom &&
     spec.left == model.spec.left) || error("Model spec from pickup is inconsistent with current MPISpec")
 
+    saved_global_fields = model.spec.global_fields
+
     #Rebuild model using current MPISpec rather than saved spec.
     model = Model(model.grid,
                   model.fields,
@@ -59,6 +61,7 @@
                   model.basal_hydrology,
                   model.thermo_dynamics,
                   model.verbose)
+    mpi_restore_global_fields!(spec, saved_global_fields, model)
     return model, clock
 end
 
