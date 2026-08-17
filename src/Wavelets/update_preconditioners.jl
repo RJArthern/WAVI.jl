@@ -96,11 +96,11 @@ end
 
 
 """
-    get_op_diag(wavi::AbstractModel,op::LinearMap)
+    get_op_diag(model, op)
 
-Get diagonal of the momentum operator for the Gauss-Seidel weights.
-Writes the self-coefficients of the fused H/U/V stencils into stencil scratch.
-The returned vector is overwritten on the next call.
+The Gauss-Seidel weights are the force at each inner point if that point's
+velocity is 1 and every other velocity is 0. They are written into stencil
+scratch and overwritten on the next call.
 """
 function get_op_diag(model::AbstractModel, op::LinearMap)
     @unpack gh, gu, gv, gc = model.fields

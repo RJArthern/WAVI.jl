@@ -20,6 +20,33 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
 
+"""
+    inner_index_map(mask_inner) -> Matrix{Int}
+
+The velocity solver stores one value per inner point rather than per grid
+point. Inner points are ice that is free to move, so not ocean and not a
+fixed boundary; `mask_inner` is true there.
+
+This returns a 2D array of the same size as the grid. Where the point is
+inner, `idx[i, j]` is its position `k` in the solver vector, and the
+velocity is `u[k]`. Where it is not, `idx[i, j]` is `0`.
+
+The list `inner_indices` runs the other way: `inner_indices[k]` is the 2D
+location of the k-th inner point. Both number cells down each column, then
+left to right, matching `findall(vec(mask_inner))`.
+"""
+function inner_index_map(mask_inner::AbstractMatrix{Bool})
+    idx = zeros(Int, size(mask_inner))
+    k = 0
+    @inbounds for j in axes(mask_inner, 2), i in axes(mask_inner, 1)
+        if mask_inner[i, j]
+            k += 1
+            idx[i, j] = k
+        end
+    end
+    return idx
+end
+
 
 """
     stencil_scratch!(model)
@@ -48,14 +75,13 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     gv_dnegβeff_diag = gv.dnegβeff[].diag
     gh_dimplicit_diag = gh.dimplicit[].diag
 
-    # Inner active indices for scatter/gather (replaces samp_inner / spread_inner)
+    # Inner unknowns: 1D list for gather/scatter, 2D map for op_fun! kernels.
     gu_inner_indices = findall(vec(gu.mask_inner))
     gv_inner_indices = findall(vec(gv.mask_inner))
+    gu_inner_index_map = inner_index_map(gu.mask_inner)
+    gv_inner_index_map = inner_index_map(gv.mask_inner)
 
     # Preallocate intermediate variables used by op_fun and Picard applies
-    uspread = similar(gu.u)
-    vspread = similar(gv.v)
-
     dudx = similar(gh.h)
     dvdy = similar(gh.h)
     r_xx = similar(gh.h)
@@ -66,9 +92,6 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     r_xy = similar(dudy_c)
 
     extra = similar(gh.h)
-
-    fx = similar(gu.u)
-    fy = similar(gv.v)
 
     surf_crop = similar(gh.h)
     ones_crop = similar(gh.h)
@@ -102,7 +125,7 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     dvi = zeros(T, gv.ni)
     uvfixed = zeros(T, gu.nxu * gu.nyu + gv.nxv * gv.nyv)
 
-    # Packed velocity length (active u-points then active v-points).
+    # Inner velocity length (free u-points, then free v-points).
     ni = gu.ni + gv.ni
 
     # Picard / smoother vectors. Reused every iterate instead of similar/zero.
@@ -133,40 +156,28 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
             @assert length(inputVector)==(gu.ni+gv.ni)
-
-            # Spread packed u- and v-components onto the full rectangular grids.
-            fill!(uspread, zero(T))
-            fill!(vspread, zero(T))
-            launch!(_scatter!, uspread, view(inputVector, 1:gu.ni), gu_inner_indices;
-                    ndrange = gu.ni, sync = false)
-            launch!(_scatter!, vspread, view(inputVector, (gu.ni + 1):(gu.ni + gv.ni)), gv_inner_indices;
-                    ndrange = gv.ni, sync = false)
-            KA.synchronize(backend)
+            u_in = view(inputVector, 1:gu.ni)
+            v_in = view(inputVector, (gu.ni + 1):(gu.ni + gv.ni))
         else
-            # Vector already includes all grid points within rectangular domain.
-            @assert length(inputVector)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
-            uspread .= reshape(@view(inputVector[1:gu.nxu*gu.nyu]), gu.nxu, gu.nyu)
-            vspread .= reshape(@view(inputVector[(gu.nxu*gu.nyu+1):end]), gv.nxv, gv.nyv)
+            nu = gu.nxu * gu.nyu
+            nv = gv.nxv * gv.nyv
+            @assert length(inputVector)==(nu + nv)
+            u_in = view(inputVector, 1:nu)
+            v_in = view(inputVector, (nu + 1):(nu + nv))
         end
+        out_u = view(opvecprod, 1:gu.ni)
+        out_v = view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni))
 
-        # Extensional and shearing resistive stresses, plus Schur `extra`
-        # (Arthern et al. 2015). r_xx = -2 D (2 ∂x u + ∂y v), and similarly for r_yy.
-        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, uspread, vspread,
-                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv;
+        # Stresses on each thickness cell (Arthern et al. 2015), using neighbour u and v.
+        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, u_in, v_in, gu_inner_index_map, gv_inner_index_map,
+                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv, vecSampled;
                 ndrange = size(r_xx))
 
-        # Resistive forces in x and y (stress gradients, basal drag, Schur term).
-        launch!(_op_force_u!, fx, r_xx, r_xy, extra, uspread, gu.h, D_u, dx_inv, dy_inv;
-                ndrange = size(fx), sync = false)
-        launch!(_op_force_v!, fy, r_yy, r_xy, extra, vspread, gv.h, D_v, dx_inv, dy_inv;
-                ndrange = size(fy), sync = false)
-        KA.synchronize(backend)
-
-        # Sample resistive forces at valid (inner) grid points.
-        launch!(_gather!, view(opvecprod, 1:gu.ni), fx, gu_inner_indices;
-                ndrange = gu.ni, sync = false)
-        launch!(_gather!, view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni)), fy, gv_inner_indices;
-                ndrange = gv.ni, sync = false)
+        # Force at each inner u/v point. Skip ocean and fixed boundaries (idx == 0).
+        launch!(_op_force_u!, out_u, r_xx, r_xy, extra, u_in, gu_inner_index_map, gu.h, D_u, dx_inv, dy_inv, vecSampled;
+                ndrange = size(gu_inner_index_map), sync = false)
+        launch!(_op_force_v!, out_v, r_yy, r_xy, extra, v_in, gv_inner_index_map, gv.h, D_v, dx_inv, dy_inv, vecSampled;
+                ndrange = size(gv_inner_index_map), sync = false)
         KA.synchronize(backend)
 
         return opvecprod

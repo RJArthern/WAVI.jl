@@ -374,114 +374,166 @@ end
 # Fused momentum operator (SSA resistive stresses and forces)
 
 """
-    _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, hu, hv, mask_u, mask_v, mask_c, D_h, D_imp, D_c, dx_inv, dy_inv)
+    velocity_at(u, idx, i, j, vecSampled, z)
 
-On each H-cell, compute extensional stresses `r_xx`, `r_yy` and the `extra`
-term arising from the Schur complement of the semi-implicit system
-(Arthern et al. 2015). On interior C-faces, also write the shear stress `r_xy`.
+Look up the velocity at grid point (i, j).
+
+On the usual solver path, `vecSampled` is true and `u` is the short inner
+list. `idx` comes from `inner_index_map`. If this point is inner, the
+velocity is `u[idx[i, j]]`. If `idx[i, j]` is `0`, the point is ocean or a
+fixed boundary, so return `z` (zero).
+
+On the Dirichlet path, `vecSampled` is false and `u` already holds every
+grid point, column by column. Return the entry for (i, j) with no lookup.
 """
-@kernel function _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, hu, hv,
+@inline function velocity_at(u, idx, i, j, vecSampled, z)
+    @inbounds if vecSampled
+        k = idx[i, j]
+        return k == 0 ? z : u[k]
+    else
+        return u[i + (j - 1) * size(idx, 1)]
+    end
+end
+
+"""
+    _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, u_idx, v_idx, hu, hv, mask_u, mask_v, mask_c, D_h, D_imp, D_c, dx_inv, dy_inv, vecSampled)
+
+On each thickness cell, write the SSA stresses using neighbour velocities
+from `velocity_at`.
+
+`r_xx` and `r_yy` are the extensional stresses, and `r_xy` is the shear
+stress on interior cell corners. `extra` is the Schur term from the
+semi-implicit thickness scheme (Arthern et al. 2015).
+"""
+@kernel function _op_h_stresses!(r_xx, r_yy, extra, r_xy, u, v, u_idx, v_idx, hu, hv,
                                  mask_u, mask_v, mask_c, D_h, D_imp, D_c,
-                                 dx_inv, dy_inv)
+                                 dx_inv, dy_inv, vecSampled)
     i, j = @index(Global, NTuple)
     @inbounds begin
-        dudx = (u[i + 1, j] - u[i, j]) * dx_inv
-        dvdy = (v[i, j + 1] - v[i, j]) * dy_inv
+        z = zero(eltype(u))
+        u_ij = velocity_at(u, u_idx, i, j, vecSampled, z)
+        u_ip = velocity_at(u, u_idx, i + 1, j, vecSampled, z)
+        v_ij = velocity_at(v, v_idx, i, j, vecSampled, z)
+        v_jp = velocity_at(v, v_idx, i, j + 1, vecSampled, z)
+        dudx = (u_ip - u_ij) * dx_inv
+        dvdy = (v_jp - v_ij) * dy_inv
         D = D_h[i, j]
         r_xx[i, j] = -2 * D * (2 * dudx + dvdy)
         r_yy[i, j] = -2 * D * (dudx + 2 * dvdy)
 
-        z = zero(eltype(u))
-        qx_l = mask_u[i, j] ? hu[i, j] * u[i, j] : z
-        qx_r = mask_u[i + 1, j] ? hu[i + 1, j] * u[i + 1, j] : z
-        qy_b = mask_v[i, j] ? hv[i, j] * v[i, j] : z
-        qy_t = mask_v[i, j + 1] ? hv[i, j + 1] * v[i, j + 1] : z
+        qx_l = mask_u[i, j] ? hu[i, j] * u_ij : z
+        qx_r = mask_u[i + 1, j] ? hu[i + 1, j] * u_ip : z
+        qy_b = mask_v[i, j] ? hv[i, j] * v_ij : z
+        qy_t = mask_v[i, j + 1] ? hv[i, j + 1] * v_jp : z
         extra[i, j] = D_imp[i, j] * ((qx_r - qx_l) * dx_inv + (qy_t - qy_b) * dy_inv)
 
         nxc = size(r_xy, 1)
         nyc = size(r_xy, 2)
         if i <= nxc && j <= nyc
-            dudy = (u[i + 1, j + 1] - u[i + 1, j]) * dy_inv
-            dvdx = (v[i + 1, j + 1] - v[i, j + 1]) * dx_inv
+            u_ipjp = velocity_at(u, u_idx, i + 1, j + 1, vecSampled, z)
+            v_ipjp = velocity_at(v, v_idx, i + 1, j + 1, vecSampled, z)
+            dudy = (u_ipjp - u_ip) * dy_inv
+            dvdx = (v_ipjp - v_jp) * dx_inv
             r_xy[i, j] = mask_c[i, j] ? -D_c[i, j] * (dudy + dvdx) : zero(eltype(r_xy))
         end
     end
 end
 
 """
-    _op_force_u!(fx, r_xx, r_xy, extra, u, hu, D_u, dx_inv, dy_inv)
+    _op_force_u!(out_u, r_xx, r_xy, extra, u, u_idx, hu, D_u, dx_inv, dy_inv, vecSampled)
 
-Assemble the x-force from neighbouring stresses, basal drag, and the Schur term.
+Write the x-force at each inner u-point from neighbouring stresses, basal drag,
+and the Schur term (Arthern et al. 2015).
+
+Skip the point when `u_idx[i, j]` is `0`, which means ocean or a fixed
+boundary. Otherwise write the force into `out_u[u_idx[i, j]]`, the same
+slot as that point's velocity in the short inner list.
 """
-@kernel function _op_force_u!(fx, r_xx, r_xy, extra, u, hu, D_u, dx_inv, dy_inv)
+@kernel function _op_force_u!(out_u, r_xx, r_xy, extra, u, u_idx, hu, D_u, dx_inv, dy_inv, vecSampled)
     i, j = @index(Global, NTuple)
     @inbounds begin
-        nxh = size(r_xx, 1)
-        nxc = size(r_xy, 1)
-        nyc = size(r_xy, 2)
-        z = zero(eltype(fx))
+        k = u_idx[i, j]
+        if k != 0
+            nxh = size(r_xx, 1)
+            nxc = size(r_xy, 1)
+            nyc = size(r_xy, 2)
+            z = zero(eltype(out_u))
 
-        r_left = i > 1 ? r_xx[i - 1, j] : z
-        r_right = i <= nxh ? r_xx[i, j] : z
-        d_rxx_dx = (r_right - r_left) * dx_inv
+            r_left = i > 1 ? r_xx[i - 1, j] : z
+            r_right = i <= nxh ? r_xx[i, j] : z
+            d_rxx_dx = (r_right - r_left) * dx_inv
 
-        if i > 1 && i <= nxc + 1
-            val_bot = j > 1 ? r_xy[i - 1, j - 1] : z
-            val_top = j <= nyc ? r_xy[i - 1, j] : z
-            d_rxy_dy = (val_top - val_bot) * dy_inv
-        else
-            d_rxy_dy = z
+            if i > 1 && i <= nxc + 1
+                val_bot = j > 1 ? r_xy[i - 1, j - 1] : z
+                val_top = j <= nyc ? r_xy[i - 1, j] : z
+                d_rxy_dy = (val_top - val_bot) * dy_inv
+            else
+                d_rxy_dy = z
+            end
+
+            e_left = i > 1 ? extra[i - 1, j] : z
+            e_right = i <= nxh ? extra[i, j] : z
+            d_extra_dx = (e_right - e_left) * dx_inv
+
+            u_ij = velocity_at(u, u_idx, i, j, vecSampled, z)
+            taubx = -D_u[i, j] * u_ij
+            out_u[k] = d_rxx_dx + d_rxy_dy - taubx - hu[i, j] * d_extra_dx
         end
-
-        e_left = i > 1 ? extra[i - 1, j] : z
-        e_right = i <= nxh ? extra[i, j] : z
-        d_extra_dx = (e_right - e_left) * dx_inv
-
-        taubx = -D_u[i, j] * u[i, j]
-        fx[i, j] = d_rxx_dx + d_rxy_dy - taubx - hu[i, j] * d_extra_dx
     end
 end
 
 """
-    _op_force_v!(fy, r_yy, r_xy, extra, v, hv, D_v, dx_inv, dy_inv)
+    _op_force_v!(out_v, r_yy, r_xy, extra, v, v_idx, hv, D_v, dx_inv, dy_inv, vecSampled)
 
-Assemble the y-force from neighbouring stresses, basal drag, and the Schur term.
+Write the y-force at each inner v-point from neighbouring stresses, basal drag,
+and the Schur term (Arthern et al. 2015).
+
+Skip the point when `v_idx[i, j]` is `0`, which means ocean or a fixed
+boundary. Otherwise write the force into `out_v[v_idx[i, j]]`, the same
+slot as that point's velocity in the short inner list.
 """
-@kernel function _op_force_v!(fy, r_yy, r_xy, extra, v, hv, D_v, dx_inv, dy_inv)
+@kernel function _op_force_v!(out_v, r_yy, r_xy, extra, v, v_idx, hv, D_v, dx_inv, dy_inv, vecSampled)
     i, j = @index(Global, NTuple)
     @inbounds begin
-        nyh = size(r_yy, 2)
-        nxc = size(r_xy, 1)
-        nyc = size(r_xy, 2)
-        z = zero(eltype(fy))
+        k = v_idx[i, j]
+        if k != 0
+            nyh = size(r_yy, 2)
+            nxc = size(r_xy, 1)
+            nyc = size(r_xy, 2)
+            z = zero(eltype(out_v))
 
-        r_bot = j > 1 ? r_yy[i, j - 1] : z
-        r_top = j <= nyh ? r_yy[i, j] : z
-        d_ryy_dy = (r_top - r_bot) * dy_inv
+            r_bot = j > 1 ? r_yy[i, j - 1] : z
+            r_top = j <= nyh ? r_yy[i, j] : z
+            d_ryy_dy = (r_top - r_bot) * dy_inv
 
-        if j > 1 && j <= nyc + 1
-            val_left = i > 1 ? r_xy[i - 1, j - 1] : z
-            val_right = i <= nxc ? r_xy[i, j - 1] : z
-            d_rxy_dx = (val_right - val_left) * dx_inv
-        else
-            d_rxy_dx = z
+            if j > 1 && j <= nyc + 1
+                val_left = i > 1 ? r_xy[i - 1, j - 1] : z
+                val_right = i <= nxc ? r_xy[i, j - 1] : z
+                d_rxy_dx = (val_right - val_left) * dx_inv
+            else
+                d_rxy_dx = z
+            end
+
+            e_bot = j > 1 ? extra[i, j - 1] : z
+            e_top = j <= nyh ? extra[i, j] : z
+            d_extra_dy = (e_top - e_bot) * dy_inv
+
+            v_ij = velocity_at(v, v_idx, i, j, vecSampled, z)
+            tauby = -D_v[i, j] * v_ij
+            out_v[k] = d_ryy_dy + d_rxy_dx - tauby - hv[i, j] * d_extra_dy
         end
-
-        e_bot = j > 1 ? extra[i, j - 1] : z
-        e_top = j <= nyh ? extra[i, j] : z
-        d_extra_dy = (e_top - e_bot) * dy_inv
-
-        tauby = -D_v[i, j] * v[i, j]
-        fy[i, j] = d_ryy_dy + d_rxy_dx - tauby - hv[i, j] * d_extra_dy
     end
 end
 
 """
     _op_diag_u!(op_diag_u, inner_indices, D_h, D_c, D_u, D_imp, hu, mask_u, mask_c, dx_inv, dy_inv)
 
-Self-coefficient of the fused momentum operator at each packed inner u-point.
-Matches `_op_h_stresses!` plus `_op_force_u!` for a unit u at that point.
-`inner_indices[k]` is the column-major linear index of packed unknown `k` on the U-grid.
+The Gauss-Seidel weight at each inner u-point is the force on this point
+if its velocity is 1 and every other velocity is 0. That is the same
+physics as `_op_h_stresses!` plus `_op_force_u!`, but only the diagonal
+entry.
+
+`inner_indices[k]` is the 2D grid location of the k-th inner point.
 """
 @kernel function _op_diag_u!(op_diag_u, inner_indices, D_h, D_c, D_u, D_imp,
                              hu, mask_u, mask_c, dx_inv, dy_inv)
@@ -537,9 +589,12 @@ end
 """
     _op_diag_v!(op_diag_v, inner_indices, D_h, D_c, D_v, D_imp, hv, mask_v, mask_c, dx_inv, dy_inv)
 
-Self-coefficient of the fused momentum operator at each packed inner v-point.
-Matches `_op_h_stresses!` plus `_op_force_v!` for a unit v at that point.
-`inner_indices[k]` is the column-major linear index of packed unknown `k` on the V-grid.
+The Gauss-Seidel weight at each inner v-point is the force on this point
+if its velocity is 1 and every other velocity is 0. That is the same
+physics as `_op_h_stresses!` plus `_op_force_v!`, but only the diagonal
+entry.
+
+`inner_indices[k]` is the 2D grid location of the k-th inner point.
 """
 @kernel function _op_diag_v!(op_diag_v, inner_indices, D_h, D_c, D_v, D_imp,
                              hv, mask_v, mask_c, dx_inv, dy_inv)
