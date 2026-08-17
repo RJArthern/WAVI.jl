@@ -144,7 +144,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
         bottom = MPI.Cart_shift(cart_comm, 1, 1)[2]
         left = MPI.Cart_shift(cart_comm, 0, -1)[2]
 
-        @info "[$(rank+1)/$(size)] Neighbours $(top),$(right),$(bottom),$(left)"
+        @debug "[$(rank+1)/$(size)] Neighbours $(top),$(right),$(bottom),$(left)"
 
         # Check if the process grid is valid
         if px * py != size
@@ -215,20 +215,19 @@ function Model(grid::G,
                                                         BH<:AbstractBasalHydrology,
                                                         TD<:AbstractThermoDynamics}
 
-    @unpack coords, global_size, rank = spec
-    @info "[$(rank+1)/$(global_size)] - $(coords) - creating Grid and Model for MPI rank $(rank)"
+    @unpack coords, global_size, rank, comm = spec
 
     # Recalculate grid dimensions and mask parameters, creating a new local Grid
     th, rh, bh, lh = get_halos(spec)
-    @info "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - $(th), $(rh), $(bh), $(lh)"
     nx_local, ny_local = get_size(spec)
     x_start, x_end, y_start, y_end = get_bounds(spec)
-    
     x0_local = grid.x0 + (x_start-1) * grid.dx
     y0_local = grid.y0 + (y_start-1) * grid.dy
-    
-    @info "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - grid $(nx_local)x$(ny_local)"
-    @info "[$(rank+1)/$(global_size)] - X [$(x_start):$(x_end)] - Y [$(y_start):$(y_end)] - Centroid $(x0_local),$(y0_local) "
+    @info "[$(rank+1)/$(global_size)] proc $(coords[1]),$(coords[2]) grid $(nx_local)x$(ny_local) X[$(x_start):$(x_end)] Y[$(y_start):$(y_end)]"
+    @debug "[$(rank+1)/$(global_size)] - $(coords) - creating Grid and Model for MPI rank $(rank)"
+    @debug "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - $(th), $(rh), $(bh), $(lh)"
+    @debug "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - grid $(nx_local)x$(ny_local)"
+    @debug "[$(rank+1)/$(global_size)] - X [$(x_start):$(x_end)] - Y [$(y_start):$(y_end)] - Centroid $(x0_local),$(y0_local) "
 
     u_grid_size, v_grid_size = (grid.nx+1, grid.ny), (grid.nx, grid.ny+1)
     
@@ -312,6 +311,10 @@ function Model(grid::G,
     # (Physics lives on each rank's local GridField; bed is retained for static outputs.)
     model.spec.global_fields = GridField(grid, global_bed; initial_conditions, params, solver_params, mpi_rank=global_mpi_rank, assembly_buffer=true)
 
+    MPI.Barrier(comm)
+    if rank == 0
+        @info "MPI: local models ready on $(global_size) ranks"
+    end
     return model
 end
 
@@ -400,9 +403,9 @@ function run_simulation!(model::AbstractModel{T,N,S},
                          timestepping_params::TimesteppingParams, 
                          output_params::OutputParams,
                          clock::Clock) where {T,N,S<:MPISpec}
-    for field in values(output_params.outputs.items)    
+    for field in values(output_params.outputs.items)
         if model.spec.rank == 0
-            @info "Registering $(field.path) from outputs"
+            @debug "Registering $(field.path) from outputs"
         end
         if field.path[1] == :global_fields
             register_mpi_field!(model.spec.field_collector, field.path)
@@ -411,11 +414,18 @@ function run_simulation!(model::AbstractModel{T,N,S},
 
     # TODO: we potentially register other fields here too, but currently concentrating on outputs (update_thickness might want to exploit this mechanism)
 
+    rank = model.spec.rank
+    if rank == 0
+        @info "MPI: exchanging initial halos"
+    end
     mpi_sync_halos_initial!(model)
 
     for i = (clock.n_iter+1):timestepping_params.n_iter_total
-        if model.spec.rank == 0
+        if rank == 0
             @info "Running iteration $(clock.n_iter)/$(timestepping_params.n_iter_total)"
+            if clock.n_iter == 0
+                @info "MPI: first velocity solve compiles kernels and may take a while"
+            end
         end
         timestep!(model, timestepping_params, output_params, clock)
     end

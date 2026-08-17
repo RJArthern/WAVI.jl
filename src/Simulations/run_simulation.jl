@@ -115,8 +115,16 @@ function run_simulation!(model::AbstractModel{T,N,S},
                          timestepping_params::TimesteppingParams, 
                          output_params::OutputParams,
                          clock::Clock) where {T,N,S}
+    spec = model.spec
+    spec_label = hasproperty(spec, :ngridsx) ?
+        "$(nameof(typeof(spec))) $(spec.ngridsx)x$(spec.ngridsy)" :
+        string(nameof(typeof(spec)))
+    @info "$(spec_label) grid $(model.grid.nx)x$(model.grid.ny)"
     for i = (clock.n_iter+1):timestepping_params.n_iter_total
         @info "Running iteration $(clock.n_iter)/$(timestepping_params.n_iter_total)"
+        if clock.n_iter == 0
+            @info "First velocity solve compiles kernels and may take a while"
+        end
         timestep!(model, timestepping_params, output_params, clock)
     end
 
