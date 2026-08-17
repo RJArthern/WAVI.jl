@@ -8,6 +8,7 @@ using SparseArrays
 
 using WAVI: AbstractModel, MapOrMatrix, AbstractPreconditioner
 using WAVI.KroneckerProducts
+using WAVI.Stencils
 
 include("UWavelets.jl")
 include("VWavelets.jl")

@@ -25,6 +25,9 @@ export _diff_x!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
+    _gs_colour_saxpy!,
+    _gs_scatter_colour!,
+    _gs_resid_sub!,
     launch!
 
 using KernelAbstractions: KernelAbstractions as KA
@@ -472,6 +475,50 @@ Assemble the y-force from neighbouring stresses, basal drag, and the Schur term.
         tauby = -D_v[i, j] * v[i, j]
         fy[i, j] = d_ryy_dy + d_rxy_dx - tauby - hv[i, j] * d_extra_dy
     end
+end
+
+# Gauss-Seidel colour update and residual
+
+"""
+    _gs_colour_saxpy!(x, increment, resid, op_diag, colour_idx, omega)
+
+Damped Jacobi update on one Gauss-Seidel colour: `x[k] += omega * resid[k] / op_diag[k]`.
+The increment is stored so the residual can be updated as `resid -= A * increment`.
+"""
+@kernel function _gs_colour_saxpy!(x, increment, resid, op_diag, colour_idx, omega)
+    t = @index(Global, Linear)
+    @inbounds begin
+        k = colour_idx[t]
+        inc = omega * resid[k] / op_diag[k]
+        x[k] += inc
+        increment[k] = inc
+    end
+end
+
+"""
+    _gs_scatter_colour!(out_2d, increment, colour_idx, inner_2d, offset)
+
+Scatter packed colour increments onto a 2D velocity grid.
+`colour_idx[t]` is a packed index; `inner_2d[k - offset]` is the matching linear
+index in `out_2d`. `offset` is 0 for u-colours and `gu.ni` for v-colours.
+"""
+@kernel function _gs_scatter_colour!(out_2d, increment, colour_idx, inner_2d, offset)
+    t = @index(Global, Linear)
+    @inbounds begin
+        k = colour_idx[t]
+        out_2d[inner_2d[k - offset]] = increment[k]
+    end
+end
+
+"""
+    _gs_resid_sub!(resid, applied_increment)
+
+`resid[i] -= applied_increment[i]`. After a colour update this is
+`resid = resid - A * increment`.
+"""
+@kernel function _gs_resid_sub!(resid, applied_increment)
+    i = @index(Global, Linear)
+    @inbounds resid[i] -= applied_increment[i]
 end
 
 end # module
