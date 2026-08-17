@@ -1,8 +1,21 @@
 using JLD2
+using Logging
 
 using WAVI.Parameters: TimesteppingParams
 using WAVI.Time: Clock
 using WAVI: AbstractSpec
+
+# Drop JLD2's "stores functions by name" warning; keep the caller's logger as-is.
+struct SkipJLD2FunctionWarnings <: AbstractLogger
+    parent::AbstractLogger
+end
+Logging.min_enabled_level(l::SkipJLD2FunctionWarnings) = Logging.min_enabled_level(l.parent)
+Logging.catch_exceptions(l::SkipJLD2FunctionWarnings) = Logging.catch_exceptions(l.parent)
+Logging.shouldlog(l::SkipJLD2FunctionWarnings, args...) = Logging.shouldlog(l.parent, args...)
+function Logging.handle_message(l::SkipJLD2FunctionWarnings, level, message, args...; kwargs...)
+    level == Warn && occursin("stores functions by name", string(message)) && return
+    Logging.handle_message(l.parent, level, message, args...; kwargs...)
+end
 
 """
     checkpoint_path(timestepping_params, output_params)
@@ -55,7 +68,9 @@ function with_cleared_stencil_scratch(f, model)
         spec.field_collector = Collector()
     end
     try
-        return f()
+        return with_logger(SkipJLD2FunctionWarnings(current_logger())) do
+            f()
+        end
     finally
         scratch_ref[] = scratch
         if collector !== nothing
