@@ -21,7 +21,4 @@ export Preconditioner
     resid_tmp::Vector{T} = T[]
     b_coarse::Vector{T} = T[]
     prolonged::Vector{T} = T[]
-    gs_increment::Vector{T} = T[]
-    gs_applied_increment::Vector{T} = T[]
-    apply_colour = nothing
 end

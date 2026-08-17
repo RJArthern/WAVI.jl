@@ -49,9 +49,6 @@ function get_preconditioner(model::AbstractModel{T,N}, op::LinearMap{T}) where {
         resid_tmp=s.gs_resid,
         b_coarse=b_coarse,
         prolonged=s.prolonged,
-        gs_increment=s.gs_increment,
-        gs_applied_increment=s.gs_applied_increment,
-        apply_colour=s.apply_colour_op!,
     )
 
     return p
@@ -69,17 +66,12 @@ Apply wavelet-based multigrid preconditioner using information stored in p.
 function apply_preconditioning!(x, p, b)
     @unpack op,op_diag,nsmooth,smoother_omega,restrict,
             prolong,op_coarse,correction_coarse,tol_coarse,maxiter_coarse,
-            colour_indices,resid_tmp,b_coarse,prolonged,
-            gs_increment,gs_applied_increment,apply_colour = p
+            colour_indices,resid_tmp,b_coarse,prolonged = p
 
-    # Preconditioner apply starts from x = 0, so the residual is b.
-    fill!(x, zero(eltype(x)))
-    copyto!(resid_tmp, b)
+    # Multigrid smooth
     gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                            colour_indices=colour_indices, sweep_order=GS_SWEEP_ORDER,
-                           smoother_omega=smoother_omega, resid=resid_tmp,
-                           increment=gs_increment, applied_increment=gs_applied_increment, apply_colour=apply_colour,
-                           resid_is_current=true)
+                           smoother_omega=smoother_omega, resid=resid_tmp)
 
     # Multigrid restriction. resid_tmp is already b - A x after the last colour update.
     mul!(b_coarse, restrict, resid_tmp)
@@ -93,12 +85,10 @@ function apply_preconditioning!(x, p, b)
     mul!(prolonged, prolong, correction_coarse)
     @. x = x + prolonged
 
-    # x changed by the coarse correction; rebuild the opening residual.
+    # Multigrid smooth
     gauss_seidel_smoother!(x, op, b; iters = nsmooth, op_diag=op_diag,
                            colour_indices=colour_indices, sweep_order=GS_SWEEP_ORDER_REV,
-                           smoother_omega=smoother_omega, resid=resid_tmp,
-                           increment=gs_increment, applied_increment=gs_applied_increment, apply_colour=apply_colour,
-                           resid_is_current=false)
+                           smoother_omega=smoother_omega, resid=resid_tmp)
 
     return x
 end
@@ -150,17 +140,11 @@ end
 
 
 """
-    gauss_seidel_smoother!(x, op, b; iters, op_diag, colour_indices, sweep_order,
-                           smoother_omega, resid, increment, applied_increment,
-                           apply_colour, resid_is_current)
+    gauss_seidel_smoother!(x, op, b; iters, op_diag, colour_indices, sweep_order, smoother_omega, resid)
 
 Apply smoother used in multigrid preconditioner.
 `colour_indices[c]` is the packed list of degrees of freedom for colour `c`.
-`resid` is workspace for `b - op * x`. After each colour, only that colour's
-increment is applied through `apply_colour`, then
-`resid = resid - A * increment`.
-If `resid_is_current` is true, `resid` is already `b - op * x` and the opening
-matvec is skipped.
+`resid` is workspace for `b - op * x`.
 """
 function gauss_seidel_smoother!(x, op, b;
                                 iters=5,
@@ -168,22 +152,16 @@ function gauss_seidel_smoother!(x, op, b;
                                 colour_indices,
                                 sweep_order,
                                 smoother_omega=1.0,
-                                resid,
-                                increment,
-                                applied_increment,
-                                apply_colour,
-                                resid_is_current=false)
-    if !resid_is_current
-        get_resid!(resid, x, op, b)
-    end
+                                resid)
+    get_resid!(resid, x, op, b)
     for _ in 1:iters
         for j in sweep_order
             idx = colour_indices[j]
             isempty(idx) && continue
-            launch!(_gs_colour_saxpy!, x, increment, resid, op_diag, idx, smoother_omega;
-                    ndrange = length(idx))
-            apply_colour(applied_increment, increment, idx)
-            launch!(_gs_resid_sub!, resid, applied_increment; ndrange = length(resid))
+            @inbounds for k in idx
+                x[k] += smoother_omega * resid[k] / op_diag[k]
+            end
+            get_resid!(resid, x, op, b)
         end
     end
     return x

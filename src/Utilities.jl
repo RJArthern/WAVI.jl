@@ -111,8 +111,6 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     picard_correction = zeros(T, ni)
     gs_resid = zeros(T, ni)
     prolonged = zeros(T, ni)
-    gs_increment = zeros(T, ni)
-    gs_applied_increment = zeros(T, ni)
 
     # Jacobi diagonal probes (filled on first get_op_diag).
     op_diag = zeros(T, ni)
@@ -135,27 +133,6 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     D_v = reshape(gv_dnegβeff_diag, gv.nxv, gv.nyv)
     D_imp = reshape(gh_dimplicit_diag, gh.nxh, gh.nyh)
 
-    function apply_spread_op!(opvecprod::AbstractVector)
-        # Extensional and shearing resistive stresses, plus Schur `extra`
-        # (Arthern et al. 2015). r_xx = -2 D (2 ∂x u + ∂y v), and similarly for r_yy.
-        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, uspread, vspread,
-                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv;
-                ndrange = size(r_xx))
-
-        launch!(_op_force_u!, fx, r_xx, r_xy, extra, uspread, gu.h, D_u, dx_inv, dy_inv;
-                ndrange = size(fx), sync = false)
-        launch!(_op_force_v!, fy, r_yy, r_xy, extra, vspread, gv.h, D_v, dx_inv, dy_inv;
-                ndrange = size(fy), sync = false)
-        KA.synchronize(backend)
-
-        launch!(_gather!, view(opvecprod, 1:gu.ni), fx, gu_inner_indices;
-                ndrange = gu.ni, sync = false)
-        launch!(_gather!, view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni)), fy, gv_inner_indices;
-                ndrange = gv.ni, sync = false)
-        KA.synchronize(backend)
-        return opvecprod
-    end
-
     function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
         if vecSampled
             @assert length(inputVector)==(gu.ni+gv.ni)
@@ -175,27 +152,31 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
             vspread .= reshape(@view(inputVector[(gu.nxu*gu.nyu+1):end]), gv.nxv, gv.nyv)
         end
 
-        return apply_spread_op!(opvecprod)
-    end
+        # Extensional and shearing resistive stresses, plus Schur `extra`
+        # (Arthern et al. 2015). r_xx = -2 D (2 ∂x u + ∂y v), and similarly for r_yy.
+        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, uspread, vspread,
+                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv;
+                ndrange = size(r_xx))
 
-    n_u = gu.ni
-    function apply_colour_op!(out::AbstractVector, increment::AbstractVector, colour_idx::AbstractVector{<:Integer})
-        fill!(uspread, zero(T))
-        fill!(vspread, zero(T))
-        nidx = length(colour_idx)
-        if colour_idx[1] <= n_u
-            launch!(_gs_scatter_colour!, uspread, increment, colour_idx, gu_inner_indices, 0;
-                    ndrange = nidx)
-        else
-            launch!(_gs_scatter_colour!, vspread, increment, colour_idx, gv_inner_indices, n_u;
-                    ndrange = nidx)
-        end
-        return apply_spread_op!(out)
+        # Resistive forces in x and y (stress gradients, basal drag, Schur term).
+        launch!(_op_force_u!, fx, r_xx, r_xy, extra, uspread, gu.h, D_u, dx_inv, dy_inv;
+                ndrange = size(fx), sync = false)
+        launch!(_op_force_v!, fy, r_yy, r_xy, extra, vspread, gv.h, D_v, dx_inv, dy_inv;
+                ndrange = size(fy), sync = false)
+        KA.synchronize(backend)
+
+        # Sample resistive forces at valid (inner) grid points.
+        launch!(_gather!, view(opvecprod, 1:gu.ni), fx, gu_inner_indices;
+                ndrange = gu.ni, sync = false)
+        launch!(_gather!, view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni)), fy, gv_inner_indices;
+                ndrange = gv.ni, sync = false)
+        KA.synchronize(backend)
+
+        return opvecprod
     end
 
     return (
         op_fun! = op_fun!,
-        apply_colour_op! = apply_colour_op!,
         gu_inner_indices = gu_inner_indices,
         gv_inner_indices = gv_inner_indices,
         surf_crop = surf_crop,
@@ -238,8 +219,6 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
         picard_correction = picard_correction,
         gs_resid = gs_resid,
         prolonged = prolonged,
-        gs_increment = gs_increment,
-        gs_applied_increment = gs_applied_increment,
         op_diag = op_diag,
         diag_probe = diag_probe,
         diag_tmp = diag_tmp,
