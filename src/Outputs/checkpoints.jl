@@ -34,19 +34,33 @@ end
 """
     with_cleared_stencil_scratch(f, model)
 
-Run `f()` with `model.fields.stencil_scratch` temporarily set to `nothing`.
-Scratch holds anonymous matvec / restrict / prolong closures that JLD2 cannot
-serialise usefully. Restore the previous contents afterwards so an ongoing
-solve keeps its workspace.
+Run `f()` with checkpoint-hostile caches omitted from the model.
+
+Temporarily sets `model.fields.stencil_scratch` to `nothing`, and replaces
+`model.spec.field_collector` with an empty collector when that field exists.
+Scratch holds anonymous matvec / restrict / prolong closures; the MPI field
+collector holds anonymous accessors. JLD2 cannot serialise either usefully.
+Restore both afterwards so an ongoing run keeps its workspace and registered
+outputs.
 """
 function with_cleared_stencil_scratch(f, model)
     scratch_ref = model.fields.stencil_scratch
     scratch = scratch_ref[]
     scratch_ref[] = nothing
+
+    spec = model.spec
+    collector = nothing
+    if hasproperty(spec, :field_collector)
+        collector = spec.field_collector
+        spec.field_collector = Collector()
+    end
     try
         return f()
     finally
         scratch_ref[] = scratch
+        if collector !== nothing
+            spec.field_collector = collector
+        end
     end
 end
 
