@@ -1,4 +1,5 @@
-export update_velocities!, get_start_guess, get_op, get_rhs, get_resid, set_residual!
+export update_velocities!, get_start_guess, get_op, get_rhs, get_resid, set_residual!,
+    inner_update_fields!
 
 using LinearMaps
 
@@ -38,7 +39,14 @@ function update_velocities!(model::AbstractModel{T,N}) where {T,N}
 end
 
 
-function inner_update!(model::AbstractModel)
+"""
+    inner_update_fields!(model)
+
+Update Picard physics fields (strain rate, viscosity, basal drag, βeff) from the
+current velocities. Does not assemble the momentum diagonals; call
+`update_rheological_operators!` after any halo exchange of those fields.
+"""
+function inner_update_fields!(model::AbstractModel)
     update_shelf_strain_rate!(model)
     update_av_speed!(model)
     update_bed_speed!(model)
@@ -52,6 +60,11 @@ function inner_update!(model::AbstractModel)
     update_quadrature_falpha!(model)
     update_βeff!(model)
     update_βeff_on_uv_grids!(model)
+    return model
+end
+
+function inner_update!(model::AbstractModel)
+    inner_update_fields!(model)
     update_rheological_operators!(model)
   #  update_surface_velocities_on_uv_grid!(model)
     return model

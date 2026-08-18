@@ -13,9 +13,11 @@ import WAVI.Fields: GridField, InitialConditions
 import WAVI.Grids: Grid, reconstruct_on_grid, reconstruct_on_subdomain
 import WAVI.MeltRates: UniformMeltRate
 import WAVI.Models: Model, get_bed_elevation
-import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!, checkpoint_path, with_cleared_stencil_scratch, is_output_step
+import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!,
+                    checkpoint_path, with_cleared_stencil_scratch, is_output_step
 import WAVI.Parameters: TimesteppingParams
-import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, inner_update!, precondition!, update_preconditioner!, update_rheological_operators!
+import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, inner_update!, inner_update_fields!,
+                    precondition!, update_preconditioner!, update_rheological_operators!
 import WAVI.Simulations: run_simulation!, timestep!, update_model_climate_forcing!
 import WAVI.Time: Clock
 
@@ -495,18 +497,16 @@ Overload for the inner update of the velocity solve.
 We need to sync halos before performing the update so that the viscosity and other
 calculations have correct boundary information from neighbouring procs.
 
-Note: `update_rheological_operators!` is called a second time here (after the halo sync)
-because the base `inner_update!` builds the operators before we have correct cross-rank
-rheology values (β, βeff, ηav). The second call rebuilds them with consistent halo data.
+Note: `update_rheological_operators!` is called after the halo sync because the field
+update runs before we have correct cross-rank rheology values (β, βeff, ηav). The
+operators must be built from that halo data.
 """
 function inner_update!(model::Model{<:Any, <:Any, <:MPISpec})
     # RAS ghost sync for velocities; AS-PoU keeps overlap values from the last prolongation.
     if !model.spec.pou
         halo_exchange!(model; fields=[:u, :v])
     end
-    # Call the standard inner update function for the velocity solve
-    invoke(inner_update!, Tuple{AbstractModel}, model)
-    # Sync rheology fields used near rank interfaces, then rebuild operators with correct halo data.
+    inner_update_fields!(model)
     halo_exchange!(model; fields=[:β, :βeff, :ηav])
     update_rheological_operators!(model)
     return model

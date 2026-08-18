@@ -20,7 +20,7 @@
 MPIEXEC=mpiexecjl
 
 # Accept tag prefix from command line argument 1
-TAG_PREFIX=${1:-"ka.jl_startup_speed_v10"}
+TAG_PREFIX=${1:-"ka.ka.jl_mpi_rheology_once_v11"}
 
 # Accept driver from command line argument 2
 DRIVER=${2:-"ismip7_16km_synthetic"}

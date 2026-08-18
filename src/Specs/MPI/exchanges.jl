@@ -344,7 +344,7 @@ function mpi_pou_weighted_prolong_velocities!(
     return nothing
 end
 
-function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields::Vector{Symbol}=[:h, :u, :v])
+function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
     @unpack halo, rank, comm, top, right, bottom, left = model.spec
     @unpack gh, gu, gv = model.fields
 
