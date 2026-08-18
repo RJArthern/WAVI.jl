@@ -198,6 +198,34 @@ function run_benchmark(opts::BenchmarkOptions)
 end
 
 """
+    log_wavelet_sizes(result)
+
+Print coarse wavelet DOFs (`wu.n + wv.n`) against fine inner DOFs (`gu.ni + gv.ni`).
+Used after a profile warm-up to decide whether assembling a coarse operator is cheap.
+If `io` is given, the same line is written there as well.
+"""
+function log_wavelet_sizes(result; io::Union{IO, Nothing} = nothing)
+    sim = if result isa NamedTuple && haskey(result, :simulation)
+        result.simulation
+    elseif hasproperty(result, :model)
+        result
+    else
+        nothing
+    end
+    sim === nothing && return
+    hasproperty(sim, :model) || return
+    fields = sim.model.fields
+    n_fine = fields.gu.ni + fields.gv.ni
+    n_coarse = fields.wu.n[] + fields.wv.n[]
+    msg = "Wavelet sizes: n_coarse=$(n_coarse) (wu.n=$(fields.wu.n[]), wv.n=$(fields.wv.n[])); " *
+          "n_fine=$(n_fine) (gu.ni=$(fields.gu.ni), gv.ni=$(fields.gv.ni)); " *
+          "ratio=$(round(n_coarse / max(n_fine, 1); digits = 4))"
+    @info msg
+    io !== nothing && println(io, msg)
+    return nothing
+end
+
+"""
     run_profile(opts::BenchmarkOptions)
 
 Warm up once, then `@profile` the driver. Rank 0 writes a flat Profile report
@@ -256,7 +284,15 @@ function run_profile(opts::BenchmarkOptions)
         spec_kwargs[:folder] = output_dir
 
         rank == 0 && @info "Profiling $(opts.driver) ($(opts.mode)): warm-up then @profile..."
-        Base.invokelatest(driver.run; spec_kwargs...)
+        warmup_result = Base.invokelatest(driver.run; spec_kwargs...)
+        if rank == 0
+            open(joinpath(output_dir, "wavelet_sizes.txt"), "w") do io
+                log_wavelet_sizes(warmup_result; io = io)
+            end
+        end
+        # Default n=10^7 fills on the 381x381 ISMIP7 driver; 10^8 is about 800 MB and
+        # covers a full 5-step run at -t 1 and a moderately threaded -t 16 run.
+        Profile.init(n = 10^8, delay = 0.001)
         Profile.clear()
         @profile Base.invokelatest(driver.run; spec_kwargs...)
 
