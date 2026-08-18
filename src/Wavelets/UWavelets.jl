@@ -10,13 +10,11 @@ struct UWavelets{T <: Real, N <: Integer}
         samp :: Base.RefValue{SparseMatrixCSC{T,N}}     # Sampling matrix: take full domain to model domain 
       spread :: Base.RefValue{SparseMatrixCSC{T,N}}     # Spread matrix: take model domain to full domain
       levels :: N                                       # Number of wavelet levels 
-        idwt :: KronType{T,N}                           # Wavelet matrix cross produce
-       idwtᵀ :: KronType{T,N}                           # Adjoint of wavelet matrix cross produce
+   index_map :: Matrix{Int}                             # Packed index of each kept wavelet coefficient; 0 if dropped
     wavelets :: Array{T,2}                              # Wavelet matrix
     correction_coarse::Base.RefValue{Vector{T} }        # cache to store coarse correction for multigrid                           
 end
- 
-    
+
 """
     UWavelets(;
             nxuw,
@@ -46,14 +44,13 @@ function UWavelets(;
     #make sure boolean type rather than bitarray
     mask = convert(Array{Bool,2}, mask)
     wavelets = zeros(nxuw,nyuw); @assert size(wavelets)==(nxuw,nyuw)
+    index_map = zeros(Int, nxuw, nyuw)
 
     if storage_only
         n = Ref(0)
         crop = Ref(Diagonal(Float64[]))
         samp = Ref(spzeros(Float64, 0, nxuw * nyuw))
         spread = Ref(spzeros(Float64, nxuw * nyuw, 0))
-        kron = spzeros(Float64, 1, 1) ⊗ spzeros(Float64, 1, 1)
-        idwt = idwtᵀ = kron
         correction_coarse = Ref(Float64[])
     else
         #compute non-inputs
@@ -61,8 +58,7 @@ function UWavelets(;
         crop = Ref(Diagonal(float(mask[:])))
         samp  = Ref(sparse(1:n[],(1:(nxuw*nyuw))[mask[:]],ones(n[]),n[],nxuw*nyuw))
         spread = Ref(sparse(samp[]'))
-        idwt =  wavelet_matrix(nyuw,levels,"reverse" ) ⊗ wavelet_matrix(nxuw,levels,"reverse")
-        idwtᵀ =  sparse(wavelet_matrix(nyuw,levels,"reverse" )') ⊗ sparse(wavelet_matrix(nxuw,levels,"reverse")')
+        fill_index_map!(index_map, mask)
         correction_coarse = Ref(zeros(n[])); @assert length(correction_coarse[]) == n[]
     end
 
@@ -75,8 +71,7 @@ function UWavelets(;
                     samp, 
                     spread, 
                     levels,
-                    idwt,
-                    idwtᵀ,
+                    index_map,
                     wavelets,
                     correction_coarse)
 end

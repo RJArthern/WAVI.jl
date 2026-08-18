@@ -22,6 +22,10 @@ export _diff_x!,
     _masked_scale_sum!,
     _gather!,
     _scatter!,
+    _scatter_mapped!,
+    _gather_mapped!,
+    _haar_lift_x!,
+    _haar_lift_y!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
@@ -368,6 +372,93 @@ Takes small 1D CG solver vector and spreads answers back onto full 2D map.
     @inbounds begin
         idx = indices[k]
         out_2d[idx] = inp_vec[k]
+    end
+end
+
+"""
+    _scatter_mapped!(out_2d, inp_vec, index_map)
+
+Put a short packed vector onto a 2D grid using `index_map`.
+Where `index_map[i, j]` is `k > 0`, write `inp_vec[k]`. Where it is `0`, write zero.
+Equivalent to `out = spread * inp`, and zeros cells that spread would leave untouched.
+"""
+@kernel function _scatter_mapped!(out_2d, inp_vec, index_map)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        k = index_map[i, j]
+        out_2d[i, j] = k == 0 ? zero(eltype(out_2d)) : inp_vec[k]
+    end
+end
+
+"""
+    _gather_mapped!(out_vec, inp_2d, index_map)
+
+Copy a 2D grid into a short packed vector using `index_map`.
+Where `index_map[i, j]` is `k > 0`, write `inp_2d[i, j]` into `out_vec[k]`.
+Equivalent to `out = samp * inp`.
+"""
+@kernel function _gather_mapped!(out_vec, inp_2d, index_map)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        k = index_map[i, j]
+        if k != 0
+            out_vec[k] = inp_2d[i, j]
+        end
+    end
+end
+
+# Haar lifting (same even/odd pairing as wavelet_matrix)
+
+"""
+    _haar_lift_x!(out, inp, step, transpose)
+
+One Haar pairing along x at spacing `step` (2, 4, 8, ...).
+Same even/odd split as `wavelet_matrix(..., "reverse")`.
+`idwt` / prolong: even' = even + odd, odd' = odd - even.
+`idwtᵀ` / restrict (`transpose=true`) swaps those. Unpaired points are copied.
+"""
+@kernel function _haar_lift_x!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        n = size(inp, 1)
+        half = div(step, 2)
+        rem = (i - 1) % step
+        if rem == 0 && i + half <= n
+            odd = inp[i, j]
+            even = inp[i + half, j]
+            out[i, j] = transpose ? even + odd : odd - even
+        elseif rem == half && i > half
+            odd = inp[i - half, j]
+            even = inp[i, j]
+            out[i, j] = transpose ? even - odd : even + odd
+        else
+            out[i, j] = inp[i, j]
+        end
+    end
+end
+
+"""
+    _haar_lift_y!(out, inp, step, transpose)
+
+Same as `_haar_lift_x!`, but along y.
+"""
+@kernel function _haar_lift_y!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        n = size(inp, 2)
+        half = div(step, 2)
+        rem = (j - 1) % step
+        if rem == 0 && j + half <= n
+            odd = inp[i, j]
+            even = inp[i, j + half]
+            out[i, j] = transpose ? even + odd : odd - even
+        elseif rem == half && j > half
+            odd = inp[i, j - half]
+            even = inp[i, j]
+            out[i, j] = transpose ? even - odd : even + odd
+        else
+            out[i, j] = inp[i, j]
+        end
     end
 end
 

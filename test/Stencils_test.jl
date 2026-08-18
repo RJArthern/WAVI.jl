@@ -2,7 +2,9 @@ using WAVI
 using Test
 using KernelAbstractions
 using LinearAlgebra: mul!
+using SparseArrays
 using WAVI.Stencils
+using WAVI.KroneckerProducts: ⊗
 
 @testset "Stencils" begin
     # Very basic tests to make sure kernels compile and run
@@ -119,4 +121,26 @@ end
     WAVI.Processes.update_velocities!(model)
     @test all(isfinite, model.fields.gu.u)
     @test all(isfinite, model.fields.gv.v)
+
+    wu, wv, gu, gv = model.fields.wu, model.fields.wv, model.fields.gu, model.fields.gv
+    n_wu, n_wv = wu.n[], wv.n[]
+    n_fine, n_coarse = gu.ni + gv.ni, n_wu + n_wv
+    Wxu = WAVI.wavelet_matrix(wu.nxuw, wu.levels, "reverse")
+    Wyu = WAVI.wavelet_matrix(wu.nyuw, wu.levels, "reverse")
+    Wxv = WAVI.wavelet_matrix(wv.nxvw, wv.levels, "reverse")
+    Wyv = WAVI.wavelet_matrix(wv.nyvw, wv.levels, "reverse")
+    fine = collect(range(0.2; stop = 1.7, length = n_fine))
+    coarse = collect(range(-0.4; stop = 0.9, length = n_coarse))
+
+    r_ka = WAVI.get_restrict_fun(model)(zeros(n_coarse), fine)
+    r_sp = zeros(n_coarse)
+    r_sp[1:n_wu] .= wu.samp[] * ((sparse(Wyu') ⊗ sparse(Wxu')) * (gu.spread_inner * fine[1:gu.ni]))
+    r_sp[(n_wu + 1):n_coarse] .= wv.samp[] * ((sparse(Wyv') ⊗ sparse(Wxv')) * (gv.spread_inner * fine[(gu.ni + 1):n_fine]))
+    @test r_ka ≈ r_sp rtol = 1e-12 atol = 1e-12
+
+    p_ka = WAVI.get_prolong_fun(model)(zeros(n_fine), coarse)
+    p_sp = zeros(n_fine)
+    p_sp[1:gu.ni] .= gu.samp_inner * ((Wyu ⊗ Wxu) * (wu.spread[] * coarse[1:n_wu]))
+    p_sp[(gu.ni + 1):n_fine] .= gv.samp_inner * ((Wyv ⊗ Wxv) * (wv.spread[] * coarse[(n_wu + 1):n_coarse]))
+    @test p_ka ≈ p_sp rtol = 1e-12 atol = 1e-12
 end

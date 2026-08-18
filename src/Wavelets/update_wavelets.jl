@@ -30,6 +30,9 @@ function update_wavelets!(model::AbstractModel{T}) where {T}
     wu.correction_coarse[] = zeros(T,wu.n[])
     wv.correction_coarse[] = zeros(T,wv.n[])
 
+    fill_index_map!(wu.index_map, wu.mask)
+    fill_index_map!(wv.index_map, wv.mask)
+
     return model
 end
 """

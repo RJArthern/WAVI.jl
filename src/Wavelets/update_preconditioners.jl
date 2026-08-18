@@ -251,12 +251,12 @@ function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::Line
      mi,ni = size(op)
      @assert mi == ni 
 
-     tmp1 :: Vector{T} = zeros(ni)
-     tmp2 :: Vector{T} = zeros(ni)
+     tmp1 :: Vector{T} = zeros(T, ni)
+     tmp2 :: Vector{T} = zeros(T, ni)
      function op_coarse_fun!(out,in)
-@!        tmp1 = prolong * in
-@!        tmp2 = op * tmp1
-@!        out = restrict * tmp2
+          mul!(tmp1, prolong, in)
+          mul!(tmp2, op, tmp1)
+          mul!(out, restrict, tmp2)
           return out
      end
      return op_coarse_fun!

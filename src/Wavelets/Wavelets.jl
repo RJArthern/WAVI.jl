@@ -1,13 +1,12 @@
 module Wavelets
 
-using InplaceOps
 using LinearAlgebra
 using LinearMaps
 using Parameters
 using SparseArrays
 
 using WAVI: AbstractModel, MapOrMatrix, AbstractPreconditioner
-using WAVI.KroneckerProducts
+import WAVI.Utilities: fill_index_map!
 using WAVI.Stencils
 
 include("UWavelets.jl")

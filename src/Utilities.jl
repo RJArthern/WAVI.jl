@@ -1,11 +1,10 @@
 module Utilities
 
-using InplaceOps
 using LinearAlgebra
 using Parameters
+using SparseArrays
 
 using WAVI: AbstractModel
-using WAVI.KroneckerProducts
 using KernelAbstractions: KernelAbstractions as KA, @kernel, @index
 using WAVI.Stencils
 
@@ -19,6 +18,27 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 ∂1d(n,dx) = spdiagm(n,n+1,0 => -ones(n), 1 => ones(n))/dx
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
+
+"""
+    fill_index_map!(idx, mask) -> n
+
+Build a 2D lookup from a true/false mask of the same size.
+True cells are numbered 1, 2, 3, ... down each column, then left to right
+(the position in the short packed vector). False cells get `0`.
+Returns how many cells were true.
+"""
+function fill_index_map!(idx::AbstractMatrix{<:Integer}, mask::AbstractMatrix{Bool})
+    k = 0
+    @inbounds for j in axes(mask, 2), i in axes(mask, 1)
+        if mask[i, j]
+            k += 1
+            idx[i, j] = k
+        else
+            idx[i, j] = 0
+        end
+    end
+    return k
+end
 
 """
     inner_index_map(mask_inner) -> Matrix{Int}
@@ -37,13 +57,7 @@ left to right, matching `findall(vec(mask_inner))`.
 """
 function inner_index_map(mask_inner::AbstractMatrix{Bool})
     idx = zeros(Int, size(mask_inner))
-    k = 0
-    @inbounds for j in axes(mask_inner, 2), i in axes(mask_inner, 1)
-        if mask_inner[i, j]
-            k += 1
-            idx[i, j] = k
-        end
-    end
+    fill_index_map!(idx, mask_inner)
     return idx
 end
 
@@ -147,6 +161,12 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     dy_inv = one(T) / grid.dy
     backend = KA.get_backend(gh.h)
 
+    # Two work arrays per grid: each Haar step reads one and writes the other.
+    haar_u = similar(gu.u)
+    haar_u_tmp = similar(gu.u)
+    haar_v = similar(gv.v)
+    haar_v_tmp = similar(gv.v)
+
     D_h = reshape(gh_dneghηav_diag, gh.nxh, gh.nyh)
     D_c = reshape(gc_dneghηav_diag, gc.nxc, gc.nyc)
     D_u = reshape(gu_dnegβeff_diag, gu.nxu, gu.nyu)
@@ -231,6 +251,12 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
         gs_colour_indices = gs_colour_indices,
         op_map = op_map,
         mg_ops = mg_ops,
+        gu_inner_index_map = gu_inner_index_map,
+        gv_inner_index_map = gv_inner_index_map,
+        haar_u = haar_u,
+        haar_u_tmp = haar_u_tmp,
+        haar_v = haar_v,
+        haar_v_tmp = haar_v_tmp,
     )
 end
 
@@ -244,96 +270,116 @@ function get_op_fun(model::AbstractModel)
 end
 
 """
+    haar_steps(levels)
+
+Pairing widths used by `wavelet_matrix`: 2, 4, ..., 2^(levels+1).
+"""
+haar_steps(levels::Integer) = ntuple(i -> 1 << i, levels + 1)
+
+"""
+    haar_idwt!(a, b, levels, transpose=false) -> result
+
+The old sparse `idwt` (`Wy ⊗ Wx`), applied by pairing neighbours at
+spacings 2, 4, 8, ... instead of a matrix product.
+Each step reads one array and writes the other; the returned array holds
+the result. If `transpose` is true, this is `idwtᵀ` (see `haar_idwtᵀ!`).
+"""
+function haar_idwt!(a, b, levels, transpose=false)
+    src = a
+    dst = b
+    ndrange = size(a)
+    steps = haar_steps(levels)
+    step_iter = transpose ? steps : reverse(steps)
+    for step in step_iter
+        launch!(_haar_lift_y!, dst, src, step, transpose; ndrange = ndrange)
+        src, dst = dst, src
+    end
+    for step in step_iter
+        launch!(_haar_lift_x!, dst, src, step, transpose; ndrange = ndrange)
+        src, dst = dst, src
+    end
+    return src
+end
+
+"""
+    haar_idwtᵀ!(a, b, levels) -> result
+
+The old sparse `idwtᵀ`. Used by restrict: residual to wavelet coefficients.
+"""
+haar_idwtᵀ!(a, b, levels) = haar_idwt!(a, b, levels, true)
+
+"""
     get_restrict_fun(model::AbstractModel)
 
-Returns a function that restricts a vector from the fine grid to the coarse grid,
-used in multigrid preconditioner.
+Map a residual on free ice points onto the coarse wavelet coefficients
+kept above the threshold. Matches the old sparse `samp * idwtᵀ * spread_inner`.
 """
-function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
-    @unpack wu,wv,gu,gv=model.fields
+function get_restrict_fun(model::AbstractModel)
+    s = stencil_scratch!(model)
+    @unpack wu, wv, gu, gv = model.fields
 
-    #Preallocate intermediate variables used by restrict_fun
-    nxnyu = gu.nxu*gu.nyu
-    nxnyv = gv.nxv*gv.nyv
-    nxnywu = wu.nxuw*wu.nyuw
-    nxnywv = wv.nxvw*wv.nyvw
-    vecx :: Vector{T} = zeros(gu.ni)
-    vecy :: Vector{T} = zeros(gv.ni)
-    spreadvecx :: Vector{T} = zeros(nxnyu)
-    spreadvecy :: Vector{T} = zeros(nxnyv)
-    bigoutx :: Vector{T} = zeros(nxnywu)
-    bigouty :: Vector{T} = zeros(nxnywv)
-    outx :: Vector{T} = zeros(wu.n[])
-    outy :: Vector{T} = zeros(wv.n[])
-    restrictvec :: Vector{T} = zeros(wu.n[]+wv.n[])
+    function restrict_fun!(restrictvec::AbstractVector, vec::AbstractVector)
+        @assert length(vec) == (gu.ni + gv.ni)
+        n_wu = wu.n[]
+        n_wv = wv.n[]
 
-    function restrict_fun!(restrictvec::AbstractVector,vec::AbstractVector)
-        @assert length(vec)==(gu.ni+gv.ni)
-        vecx .= @view vec[1:gu.ni]
-        vecy .= @view vec[(gu.ni+1):(gu.ni+gv.ni)]
-@!      spreadvecx = gu.spread_inner*vecx
-@!      spreadvecy = gv.spread_inner*vecy
-@!      bigoutx = wu.idwtᵀ*spreadvecx
-@!      bigouty = wv.idwtᵀ*spreadvecy
-@!      outx = wu.samp[]*bigoutx
-@!      outy = wv.samp[]*bigouty
+        # spread_inner
+        launch!(_scatter_mapped!, s.haar_u, view(vec, 1:gu.ni), s.gu_inner_index_map;
+                ndrange = size(s.haar_u), sync = false)
+        launch!(_scatter_mapped!, s.haar_v, view(vec, (gu.ni + 1):(gu.ni + gv.ni)), s.gv_inner_index_map;
+                ndrange = size(s.haar_v))
 
-        restrictvec[1:wu.n[]] .=  outx
-        restrictvec[(wu.n[]+1):(wu.n[]+wv.n[])] .= outy
+        # idwtᵀ
+        ru = haar_idwtᵀ!(s.haar_u, s.haar_u_tmp, wu.levels)
+        rv = haar_idwtᵀ!(s.haar_v, s.haar_v_tmp, wv.levels)
 
+        # samp
+        launch!(_gather_mapped!, view(restrictvec, 1:n_wu), ru, wu.index_map;
+                ndrange = size(wu.index_map), sync = false)
+        launch!(_gather_mapped!, view(restrictvec, (n_wu + 1):(n_wu + n_wv)), rv, wv.index_map;
+                ndrange = size(wv.index_map))
         return restrictvec
     end
 
-    # Return restrict_fun as a closure
     return restrict_fun!
 end
 
 """
     get_prolong_fun(model::AbstractModel)
 
-Returns a function that prolongs a vector from the coarse grid to the fine grid,
-used in multigrid preconditioner.
+Map kept coarse wavelet coefficients back to a velocity increment on free
+ice points. Matches the old sparse `samp_inner * idwt * spread`.
 """
-function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
-    @unpack wu,wv,gu,gv=model.fields
+function get_prolong_fun(model::AbstractModel)
+    s = stencil_scratch!(model)
+    @unpack wu, wv, gu, gv = model.fields
 
-    #Preallocate intermediate variables used by prolong_fun
-    nxnyu = gu.nxu*gu.nyu
-    nxnyv = gv.nxv*gv.nyv
-    nxnywu = wu.nxuw*wu.nyuw
-    nxnywv = wv.nxvw*wv.nyvw
-    waveletvecx :: Vector{T} = zeros(wu.n[])
-    waveletvecy :: Vector{T} = zeros(wv.n[])
-    spreadwaveletvecx :: Vector{T} = zeros(nxnywu)
-    spreadwaveletvecy :: Vector{T} = zeros(nxnywv)
-    bigoutx :: Vector{T} = zeros(nxnyu)
-    bigouty :: Vector{T} = zeros(nxnyv)
-    outx :: Vector{T} = zeros(gu.ni)
-    outy :: Vector{T} = zeros(gv.ni)
-    prolongvec :: Vector{T} = zeros(gu.ni+gv.ni)
+    function prolong_fun!(prolongvec::AbstractVector, waveletvec::AbstractVector)
+        n_wu = wu.n[]
+        n_wv = wv.n[]
+        @assert length(waveletvec) == (n_wu + n_wv)
 
-    function prolong_fun!(prolongvec::AbstractVector,waveletvec::AbstractVector)
+        # spread
+        launch!(_scatter_mapped!, s.haar_u, view(waveletvec, 1:n_wu), wu.index_map;
+                ndrange = size(wu.index_map), sync = false)
+        launch!(_scatter_mapped!, s.haar_v, view(waveletvec, (n_wu + 1):(n_wu + n_wv)), wv.index_map;
+                ndrange = size(wv.index_map))
 
-        @assert length(waveletvec)==(wu.n[]+wv.n[])
+        # idwt
+        ru = haar_idwt!(s.haar_u, s.haar_u_tmp, wu.levels)
+        rv = haar_idwt!(s.haar_v, s.haar_v_tmp, wv.levels)
 
-        waveletvecx .= @view waveletvec[1:wu.n[]]
-        waveletvecy .= @view waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
-@!      spreadwaveletvecx = wu.spread[]*waveletvecx
-@!      spreadwaveletvecy = wv.spread[]*waveletvecy
-@!      bigoutx = wu.idwt*spreadwaveletvecx
-@!      bigouty = wv.idwt*spreadwaveletvecy
-@!      outx = gu.samp_inner*bigoutx
-@!      outy = gv.samp_inner*bigouty
-
-        prolongvec[1:gu.ni] .= outx
-        prolongvec[(gu.ni+1):(gu.ni+gv.ni)] .= outy
-        
+        # samp_inner
+        launch!(_gather_mapped!, view(prolongvec, 1:gu.ni), ru, s.gu_inner_index_map;
+                ndrange = size(s.gu_inner_index_map), sync = false)
+        launch!(_gather_mapped!, view(prolongvec, (gu.ni + 1):(gu.ni + gv.ni)), rv, s.gv_inner_index_map;
+                ndrange = size(s.gv_inner_index_map))
         return prolongvec
     end
-    
-    # Return prolong_fun as a closure
+
     return prolong_fun!
 end
+
 """
 pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
 
