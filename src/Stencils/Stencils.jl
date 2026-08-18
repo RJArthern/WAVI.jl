@@ -24,8 +24,8 @@ export _diff_x!,
     _scatter!,
     _scatter_mapped!,
     _gather_mapped!,
-    _haar_lift_x!,
-    _haar_lift_y!,
+    _haar_lift_x_all!,
+    _haar_lift_y_all!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
@@ -407,57 +407,127 @@ Equivalent to `out = samp * inp`.
     end
 end
 
-# Haar lifting (same even/odd pairing as wavelet_matrix)
+# Haar pairing, matching wavelet_matrix(..., "reverse")
+
+@inline _haar_odd_slot(odd, even, transpose) = transpose ? even + odd : odd - even
+@inline _haar_even_slot(odd, even, transpose) = transpose ? even - odd : even + odd
 
 """
-    _haar_lift_x!(out, inp, step, transpose)
+    _haar_lift_x_line!(dst, src, j, step, transpose)
 
-One Haar pairing along x at spacing `step` (2, 4, 8, ...).
-Same even/odd split as `wavelet_matrix(..., "reverse")`.
-`idwt` / prolong: even' = even + odd, odd' = odd - even.
-`idwtᵀ` / restrict (`transpose=true`) swaps those. Unpaired points are copied.
+Apply one Haar pairing along x in column `j` at spacing `step`.
+The even/odd split matches `wavelet_matrix(..., "reverse")`.
+For prolong, even' = even + odd and odd' = odd - even.
+Restrict (`transpose=true`) swaps those. Unpaired points are copied.
 """
-@kernel function _haar_lift_x!(out, inp, step, transpose)
-    i, j = @index(Global, NTuple)
+@inline function _haar_lift_x_line!(dst, src, j, step, transpose)
+    n = size(src, 1)
+    half = div(step, 2)
     @inbounds begin
-        n = size(inp, 1)
-        half = div(step, 2)
-        rem = (i - 1) % step
-        if rem == 0 && i + half <= n
-            odd = inp[i, j]
-            even = inp[i + half, j]
-            out[i, j] = transpose ? even + odd : odd - even
-        elseif rem == half && i > half
-            odd = inp[i - half, j]
-            even = inp[i, j]
-            out[i, j] = transpose ? even - odd : even + odd
-        else
-            out[i, j] = inp[i, j]
+        for i in 1:step:(n - half)
+            i2 = i + half
+            odd = src[i, j]
+            even = src[i2, j]
+            dst[i, j] = _haar_odd_slot(odd, even, transpose)
+            dst[i2, j] = _haar_even_slot(odd, even, transpose)
+        end
+        for r in 1:(step - 1)
+            if r != half
+                for i in (1 + r):step:n
+                    dst[i, j] = src[i, j]
+                end
+            end
+        end
+        for i in 1:step:n
+            if i + half > n
+                dst[i, j] = src[i, j]
+            end
         end
     end
 end
 
 """
-    _haar_lift_y!(out, inp, step, transpose)
+    _haar_lift_y_strip!(dst, src, i0, i1, step, transpose)
 
-Same as `_haar_lift_x!`, but along y.
+Same pairing as `_haar_lift_x_line!`, applied along y for rows `i0` to `i1`.
+The inner loop is over `i` so neighbouring rows are adjacent in memory.
 """
-@kernel function _haar_lift_y!(out, inp, step, transpose)
-    i, j = @index(Global, NTuple)
+@inline function _haar_lift_y_strip!(dst, src, i0, i1, step, transpose)
+    n = size(src, 2)
+    half = div(step, 2)
     @inbounds begin
-        n = size(inp, 2)
-        half = div(step, 2)
-        rem = (j - 1) % step
-        if rem == 0 && j + half <= n
-            odd = inp[i, j]
-            even = inp[i, j + half]
-            out[i, j] = transpose ? even + odd : odd - even
-        elseif rem == half && j > half
-            odd = inp[i, j - half]
-            even = inp[i, j]
-            out[i, j] = transpose ? even - odd : even + odd
-        else
-            out[i, j] = inp[i, j]
+        for j in 1:step:(n - half)
+            j2 = j + half
+            for i in i0:i1
+                odd = src[i, j]
+                even = src[i, j2]
+                dst[i, j] = _haar_odd_slot(odd, even, transpose)
+                dst[i, j2] = _haar_even_slot(odd, even, transpose)
+            end
+        end
+        for r in 1:(step - 1)
+            if r != half
+                for j in (1 + r):step:n
+                    for i in i0:i1
+                        dst[i, j] = src[i, j]
+                    end
+                end
+            end
+        end
+        for j in 1:step:n
+            if j + half > n
+                for i in i0:i1
+                    dst[i, j] = src[i, j]
+                end
+            end
+        end
+    end
+end
+
+"""
+    _haar_lift_x_all!(a, b, steps, transpose)
+
+Apply every Haar pairing along x for one column, using the gaps in `steps`.
+The result is in `a` if `steps` has even length, otherwise in `b`.
+"""
+@kernel function _haar_lift_x_all!(a, b, steps, transpose)
+    j = @index(Global, Linear)
+    if j <= size(a, 2)
+        read_a = true
+        for step in steps
+            if read_a
+                _haar_lift_x_line!(b, a, j, step, transpose)
+            else
+                _haar_lift_x_line!(a, b, j, step, transpose)
+            end
+            read_a = !read_a
+        end
+    end
+end
+
+"""
+    _haar_lift_y_all!(a, b, steps, transpose, nwork)
+
+Same as `_haar_lift_x_all!`, but along y for a contiguous strip of rows.
+`nwork` is how many strips to use (one per work item).
+"""
+@kernel function _haar_lift_y_all!(a, b, steps, transpose, nwork)
+    t = @index(Global, Linear)
+    nx = size(a, 1)
+    if t <= nwork
+        chunk = cld(nx, nwork)
+        i0 = (t - 1) * chunk + 1
+        if i0 <= nx
+            i1 = min(t * chunk, nx)
+            read_a = true
+            for step in steps
+                if read_a
+                    _haar_lift_y_strip!(b, a, i0, i1, step, transpose)
+                else
+                    _haar_lift_y_strip!(a, b, i0, i1, step, transpose)
+                end
+                read_a = !read_a
+            end
         end
     end
 end

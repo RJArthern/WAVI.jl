@@ -272,30 +272,46 @@ end
 """
     haar_steps(levels)
 
-Pairing widths used by `wavelet_matrix`: 2, 4, ..., 2^(levels+1).
+Return the pairing gaps for a Haar transform with the given number of levels.
+The first gap is 2 cells, then 4, then 8, doubling until `levels + 1` gaps
+have been listed.
 """
-haar_steps(levels::Integer) = ntuple(i -> 1 << i, levels + 1)
+haar_steps(levels::Integer) = ntuple(i -> 2^i, levels + 1)
+
+# KernelAbstractions schedules CPU threads one workgroup at a time. A
+# default workgroup that covers the whole ndrange runs on one thread.
+# On the main thread, when Julia has extra threads, use one item
+# per workgroup so the groups can map onto those threads. Serial, MPI,
+# and nested ThreadedSpec workers keep a single workgroup.
+function _haar_workgroup()
+    (Threads.nthreads() > 1 && Threads.threadid() == 1) ? 1 : nothing
+end
 
 """
     haar_idwt!(a, b, levels, transpose=false) -> result
 
-The old sparse `idwt` (`Wy ⊗ Wx`), applied by pairing neighbours at
+Apply the Haar inverse transform to the grid `a` by pairing neighbours at
 spacings 2, 4, 8, ... instead of a matrix product.
-Each step reads one array and writes the other; the returned array holds
-the result. If `transpose` is true, this is `idwtᵀ` (see `haar_idwtᵀ!`).
+`b` is a workspace of the same size. Each axis reads one array and writes the
+other. Pairings run along y first, then along x. The array that contains the
+result is returned. If `transpose` is true, this is the adjoint used by
+restrict (see `haar_idwtᵀ!`).
 """
 function haar_idwt!(a, b, levels, transpose=false)
-    src = a
-    dst = b
-    ndrange = size(a)
     steps = haar_steps(levels)
     step_iter = transpose ? steps : reverse(steps)
-    for step in step_iter
-        launch!(_haar_lift_y!, dst, src, step, transpose; ndrange = ndrange)
+    src, dst = a, b
+    nx = size(a, 1)
+    wg = _haar_workgroup()
+    nwork = wg === 1 ? min(nx, Threads.nthreads()) : 1
+    launch!(_haar_lift_y_all!, src, dst, step_iter, transpose, nwork;
+            ndrange = nwork, workgroupsize = wg)
+    if isodd(length(steps))
         src, dst = dst, src
     end
-    for step in step_iter
-        launch!(_haar_lift_x!, dst, src, step, transpose; ndrange = ndrange)
+    launch!(_haar_lift_x_all!, src, dst, step_iter, transpose;
+            ndrange = size(a, 2), workgroupsize = wg)
+    if isodd(length(steps))
         src, dst = dst, src
     end
     return src
@@ -304,7 +320,8 @@ end
 """
     haar_idwtᵀ!(a, b, levels) -> result
 
-The old sparse `idwtᵀ`. Used by restrict: residual to wavelet coefficients.
+Apply the adjoint Haar transform.
+Restrict uses this to form wavelet coefficients.
 """
 haar_idwtᵀ!(a, b, levels) = haar_idwt!(a, b, levels, true)
 

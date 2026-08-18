@@ -20,7 +20,7 @@
 MPIEXEC=mpiexecjl
 
 # Accept tag prefix from command line argument 1
-TAG_PREFIX=${1:-"ka.jl_haar_rap_v12"}
+TAG_PREFIX=${1:-"ka.jl_haar_rap_v13"}
 
 # Accept driver from command line argument 2
 DRIVER=${2:-"ismip7_16km_synthetic"}
