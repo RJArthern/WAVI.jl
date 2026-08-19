@@ -194,6 +194,55 @@ end
 end
 
 """
+Build or reuse `MPIHaloScratch` on `model.spec` for RAS send/recv packs.
+"""
+function ensure_mpi_halo_scratch!(model::AbstractModel{<:Any, <:Any, <:MPISpec})
+    spec = model.spec
+    T = eltype(model.fields.gh.h)
+    scratch = spec.halo_scratch
+    if scratch !== nothing && eltype(scratch.send_l) === T && length(scratch.W_left) == spec.halo
+        return scratch
+    end
+    scratch = MPIHaloScratch(T, spec.halo, spec.damping)
+    spec.halo_scratch = scratch
+    return scratch
+end
+
+function copy_ras_l0!(scratch::MPIHaloScratch{T}, field_data, local_field, fields) where {T}
+    if field_data === fields.gh
+        scratch.l0_h = _copy_ras_l0_matrix!(scratch.l0_h, local_field)
+        return scratch.l0_h
+    elseif field_data === fields.gu
+        scratch.l0_u = _copy_ras_l0_matrix!(scratch.l0_u, local_field)
+        return scratch.l0_u
+    else
+        scratch.l0_v = _copy_ras_l0_matrix!(scratch.l0_v, local_field)
+        return scratch.l0_v
+    end
+end
+
+function _copy_ras_l0_matrix!(buf::Matrix{T}, src) where {T}
+    if size(buf) != size(src)
+        buf = similar(src)
+    end
+    copyto!(buf, src)
+    return buf
+end
+
+function pack_halo_strip!(buf::Vector{T}, field, irange, jrange) where {T}
+    ni, nj = length(irange), length(jrange)
+    n = ni * nj
+    ensure_strip_buf!(buf, n)
+    copyto!(reshape(view(buf, 1:n), ni, nj), @view field[irange, jrange])
+    return view(buf, 1:n)
+end
+
+function recv_halo_strip!(buf::Vector{T}, n::Int) where {T}
+    ensure_strip_buf!(buf, n)
+    return view(buf, 1:n)
+end
+
+"""
     mpi_pou_add_neighbour_strips!(field, overlapi, overlapj; scratch, ...)
 
 Additively exchange PoU contribution strips with cardinal neighbours.
@@ -345,11 +394,14 @@ function mpi_pou_weighted_prolong_velocities!(
 end
 
 function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
-    @unpack halo, rank, comm, top, right, bottom, left = model.spec
+    @unpack halo, rank, comm, top, right, bottom, left, damping = model.spec
     @unpack gh, gu, gv = model.fields
 
     if halo == 0
         rank == 0 && @warn "No halo exchange to take place, returning"
+        return
+    end
+    if left < 0 && right < 0 && top < 0 && bottom < 0
         return
     end
 
@@ -369,14 +421,15 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         hasproperty(gv, f) && push!(exchange_pairs, (gv, f))
     end
 
-    # Synchronise halo regions. 
+    # Synchronise halo regions.
     # If damping > 0, this blends the newly received neighbour values with the old local halo values.
     # If damping = 0, it simply overwrites the local halo with the neighbour's values (standard RAS).
-    @unpack damping = model.spec
-    W_left = fill(damping, halo)
-    W_right = fill(damping, halo)
-    W_top = fill(damping, 1, halo)
-    W_bottom = fill(damping, 1, halo)
+    scratch = ensure_mpi_halo_scratch!(model)
+    W_left = scratch.W_left
+    W_right = scratch.W_right
+    W_top = scratch.W_top
+    W_bottom = scratch.W_bottom
+    skip_l0 = iszero(damping)
 
     # Exchange requested fields
     for (field_data, attribute) in exchange_pairs
@@ -386,7 +439,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         length(size(local_field)) != 2 && continue
 
         field_nx, field_ny = size(local_field)
-        L0 = copy(local_field)
+        L0 = skip_l0 ? local_field : copy_ras_l0!(scratch, field_data, local_field, model.fields)
 
         # --- Phase 1: X-Direction Exchange (Left/Right) ---
         requests_x = MPI.RequestSet()
@@ -395,53 +448,54 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         # We need to skip the shared interface face to avoid 1-index shift
         off_x = (field_data === gu) ? 1 : 0
 
-        T = eltype(local_field)
-        recv_left_flat = recv_right_flat = nothing
+        recv_left = recv_right = nothing
         if left > -1
-            send_left = local_field[lh+1+off_x:lh+halo+off_x, :]
-            send_left_flat = copy(reshape(send_left, prod(size(send_left))))
-            recv_left_flat = zeros(T, prod(size(send_left)))
+            ir = (lh + 1 + off_x):(lh + halo + off_x)
+            n_x = halo * field_ny
+            send_left_flat = pack_halo_strip!(scratch.send_l, local_field, ir, axes(local_field, 2))
+            recv_left_flat = recv_halo_strip!(scratch.recv_l, n_x)
             push!(requests_x, MPI.Isend(send_left_flat, left, left_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_left_flat, left, right_send_tag, comm))
+            recv_left = reshape(recv_left_flat, halo, field_ny)
         end
         if right > -1
-            send_right = local_field[field_nx-rh-halo+1-off_x:field_nx-rh-off_x, :]
-            send_right_flat = copy(reshape(send_right, prod(size(send_right))))
-            recv_right_flat = zeros(T, prod(size(send_right)))
+            ir = (field_nx - rh - halo + 1 - off_x):(field_nx - rh - off_x)
+            n_x = halo * field_ny
+            send_right_flat = pack_halo_strip!(scratch.send_r, local_field, ir, axes(local_field, 2))
+            recv_right_flat = recv_halo_strip!(scratch.recv_r, n_x)
             push!(requests_x, MPI.Isend(send_right_flat, right, right_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_right_flat, right, left_send_tag, comm))
+            recv_right = reshape(recv_right_flat, halo, field_ny)
         end
 
         MPI.Waitall(requests_x)
-
-        recv_left = recv_left_flat === nothing ? nothing : reshape(recv_left_flat, halo, field_ny)
-        recv_right = recv_right_flat === nothing ? nothing : reshape(recv_right_flat, halo, field_ny)
 
         # --- Phase 2: Y-Direction Exchange (Top/Bottom) ---
         requests_y = MPI.RequestSet()
 
         off_y = (field_data === gv) ? 1 : 0
 
-        recv_top_flat = recv_bottom_flat = nothing
+        recv_top = recv_bottom = nothing
         if top > -1
-            send_top = local_field[:, th+1+off_y:th+halo+off_y]
-            send_top_flat = copy(reshape(send_top, prod(size(send_top))))
-            recv_top_flat = zeros(T, prod(size(send_top)))
+            jr = (th + 1 + off_y):(th + halo + off_y)
+            n_y = field_nx * halo
+            send_top_flat = pack_halo_strip!(scratch.send_t, local_field, axes(local_field, 1), jr)
+            recv_top_flat = recv_halo_strip!(scratch.recv_t, n_y)
             push!(requests_y, MPI.Isend(send_top_flat, top, top_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_top_flat, top, bottom_send_tag, comm))
+            recv_top = reshape(recv_top_flat, field_nx, halo)
         end
         if bottom > -1
-            send_bottom = local_field[:, field_ny-bh-halo+1-off_y:field_ny-bh-off_y]
-            send_bottom_flat = copy(reshape(send_bottom, prod(size(send_bottom))))
-            recv_bottom_flat = zeros(T, prod(size(send_bottom)))
+            jr = (field_ny - bh - halo + 1 - off_y):(field_ny - bh - off_y)
+            n_y = field_nx * halo
+            send_bottom_flat = pack_halo_strip!(scratch.send_b, local_field, axes(local_field, 1), jr)
+            recv_bottom_flat = recv_halo_strip!(scratch.recv_b, n_y)
             push!(requests_y, MPI.Isend(send_bottom_flat, bottom, bottom_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_bottom_flat, bottom, top_send_tag, comm))
+            recv_bottom = reshape(recv_bottom_flat, field_nx, halo)
         end
 
         MPI.Waitall(requests_y)
-
-        recv_top = recv_top_flat === nothing ? nothing : reshape(recv_top_flat, field_nx, halo)
-        recv_bottom = recv_bottom_flat === nothing ? nothing : reshape(recv_bottom_flat, field_nx, halo)
 
         apply_halo_exchange_blends!(
             local_field,

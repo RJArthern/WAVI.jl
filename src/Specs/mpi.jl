@@ -17,7 +17,9 @@ import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filenam
                     checkpoint_path, with_cleared_stencil_scratch, is_output_step
 import WAVI.Parameters: TimesteppingParams
 import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, inner_update!, inner_update_fields!,
-                    precondition!, update_preconditioner!, update_rheological_operators!
+                    precondition!, update_preconditioner!, update_rheological_operators!,
+                    get_start_guess, get_op, get_rhs
+import WAVI.Utilities: stencil_scratch!, get_resid!
 import WAVI.Simulations: run_simulation!, timestep!, update_model_climate_forcing!
 import WAVI.Time: Clock
 
@@ -53,6 +55,39 @@ function MPIPoUScratch(ωu::Matrix{T}, ωv::Matrix{T}) where {T <: AbstractFloat
 end
 
 """
+Reusable RAS halo packs, blend weights, and L0 snapshots.
+Allocated on first `halo_exchange!`; send/recv strips grow to the largest field.
+"""
+mutable struct MPIHaloScratch{T <: AbstractFloat}
+    send_l::Vector{T}
+    recv_l::Vector{T}
+    send_r::Vector{T}
+    recv_r::Vector{T}
+    send_t::Vector{T}
+    recv_t::Vector{T}
+    send_b::Vector{T}
+    recv_b::Vector{T}
+    l0_h::Matrix{T}
+    l0_u::Matrix{T}
+    l0_v::Matrix{T}
+    W_left::Vector{T}
+    W_right::Vector{T}
+    W_top::Matrix{T}
+    W_bottom::Matrix{T}
+end
+
+function MPIHaloScratch(::Type{T}, halo::Integer, damping) where {T <: AbstractFloat}
+    empty = T[]
+    d = T(damping)
+    return MPIHaloScratch{T}(
+        copy(empty), copy(empty), copy(empty), copy(empty),
+        copy(empty), copy(empty), copy(empty), copy(empty),
+        zeros(T, 0, 0), zeros(T, 0, 0), zeros(T, 0, 0),
+        fill(d, halo), fill(d, halo), fill(d, 1, halo), fill(d, 1, halo),
+    )
+end
+
+"""
 Struct to represent the MPI parallel specification of a model.
 
 Fields:
@@ -69,6 +104,8 @@ Fields:
     niterations: Number of Schwarz iterations per Picard iteration (default=5)
     field_collector: Field collector for the model
     pou_scratch: Cached PoU weights / strip buffers (filled on first prolong)
+    halo_scratch: Cached RAS halo packs (filled on first halo_exchange!)
+    core_inner: Cached core-only inner masks for the global residual
     local_spec: Optional intraprocess ThreadedSpec for the rank-local solve (default=nothing to wavelet)
 """
 mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGrid} <: AbstractDecompSpec
@@ -97,6 +134,8 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     damping::T
     niterations::N  # Number of Schwarz iterations per Picard iteration
     pou_scratch::Union{Nothing, MPIPoUScratch}
+    halo_scratch::Union{Nothing, MPIHaloScratch}
+    core_inner::Union{Nothing, Tuple{Vector{Bool}, Vector{Bool}}}
     local_spec::Union{Nothing, ThreadedSpec}
 
     @doc """
@@ -185,6 +224,8 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             damping,
             niterations,
             nothing,  # pou_scratch filled on first PoU prolong
+            nothing,  # halo_scratch filled on first RAS exchange
+            nothing,  # core_inner filled on first Schwarz residual
             local_spec,
             )
     end
@@ -513,18 +554,22 @@ function inner_update!(model::Model{<:Any, <:Any, <:MPISpec})
 end
 
 function core_inner_masks(model::Model{<:Any, <:Any, <:MPISpec})
+    cached = model.spec.core_inner
+    cached !== nothing && return cached
+
     @unpack gu, gv = model.fields
     th, rh, bh, lh = get_halos(model.spec)
 
     u_core_mask = falses(size(gu.mask_inner))
     u_core_mask[(1+lh):(size(u_core_mask, 1)-rh), (1+th):(size(u_core_mask, 2)-bh)] .= true
-    u_core_inner = u_core_mask[gu.mask_inner]
+    u_core_inner = Vector{Bool}(u_core_mask[gu.mask_inner])
 
     v_core_mask = falses(size(gv.mask_inner))
     v_core_mask[(1+lh):(size(v_core_mask, 1)-rh), (1+th):(size(v_core_mask, 2)-bh)] .= true
-    v_core_inner = v_core_mask[gv.mask_inner]
+    v_core_inner = Vector{Bool}(v_core_mask[gv.mask_inner])
 
-    return u_core_inner, v_core_inner
+    model.spec.core_inner = (u_core_inner, v_core_inner)
+    return model.spec.core_inner
 end
 
 """
@@ -545,11 +590,16 @@ Solves the linear system using an iterative overlapping Schwarz method across th
     *   Solver exits early if the global relative residual meets the Picard tolerance.
 """
 function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
-    @unpack niterations, pou = model.spec
+    @unpack niterations, pou, global_size = model.spec
     @unpack solver_params = model
+
+    if global_size == 1
+        return local_precondition!(model)
+    end
 
     converged = false
     global_rel_resid = Inf
+    s = stencil_scratch!(model)
 
     for iteration = 1:niterations
         if (iteration > 1) && (model.spec.rank == 0)
@@ -580,7 +630,8 @@ function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
         x = get_start_guess(model)
         op = get_op(model)
         b = get_rhs(model)
-        resid = get_resid(x, op, b)
+        resid = s.picard_resid
+        get_resid!(resid, x, op, b)
 
         # Global Residual Check (core-only):
         # exclude overlap halos so each physical unknown is counted once globally.
