@@ -46,7 +46,7 @@ function get_preconditioner(model::AbstractModel{T,N}, op::LinearMap{T}) where {
         correction_coarse=correction_coarse,
         maxiter_coarse=solver_params.maxiter_coarse,
         smoother_omega=solver_params.smoother_omega,
-        colour_indices=s.gs_colour_indices[],
+        colour_indices=s.gs_colour_indices,
         resid_tmp=s.gs_resid,
         b_coarse=b_coarse,
         prolonged=s.prolonged,
@@ -173,8 +173,9 @@ function gauss_seidel_smoother!(x, op, b;
 end
 
 function ensure_colour_indices!(s, gu, gv)
-    if s.gs_colour_indices[] === nothing
-        s.gs_colour_indices[] = gs_colour_index_lists(gu, gv)
+    if !s.gs_colours_filled
+        s.gs_colour_indices = gs_colour_index_lists(gu, gv)
+        s.gs_colours_filled = true
     end
     return nothing
 end
@@ -206,30 +207,24 @@ function ensure_multigrid_ops!(model::AbstractModel{T,N}, op::LinearMap{T}, s) w
     n_wu = wu.n[]
     n_wv = wv.n[]
     n_coarse = n_wu + n_wv
-    mg = s.mg_ops[]
-    if mg !== nothing && mg.n_wu == n_wu && mg.n_wv == n_wv
-        return mg.restrict, mg.prolong, mg.op_coarse, mg.b_coarse, mg.correction_coarse
-    end
-
     ni = size(op, 1)
+    mg = s.mg_ops
+    if mg.n_wu != n_wu || mg.n_wv != n_wv
+        s.mg_ops = MultigridScratch{T}(;
+            n_wu,
+            n_wv,
+            b_coarse = zeros(T, n_coarse),
+            correction_coarse = zeros(T, n_coarse),
+        )
+        mg = s.mg_ops
+    end
     restrict_fun! = get_restrict_fun(model)
     prolong_fun! = get_prolong_fun(model)
     restrict = LinearMap{T}(restrict_fun!, n_coarse, ni; issymmetric=false, ismutating=true, ishermitian=false, isposdef=false)
     prolong = LinearMap{T}(prolong_fun!, ni, n_coarse; issymmetric=false, ismutating=true, ishermitian=false, isposdef=false)
-    op_coarse_fun! = get_op_coarse_fun(op, restrict, prolong)
+    op_coarse_fun! = get_op_coarse_fun(op, restrict, prolong, s.op_coarse_tmp1, s.op_coarse_tmp2)
     op_coarse = LinearMap{T}(op_coarse_fun!, n_coarse, n_coarse; issymmetric=true, ismutating=true, ishermitian=true, isposdef=true)
-
-    s.mg_ops[] = (
-        n_wu = n_wu,
-        n_wv = n_wv,
-        restrict = restrict,
-        prolong = prolong,
-        op_coarse = op_coarse,
-        b_coarse = zeros(T, n_coarse),
-        correction_coarse = zeros(T, n_coarse),
-    )
-    mg = s.mg_ops[]
-    return mg.restrict, mg.prolong, mg.op_coarse, mg.b_coarse, mg.correction_coarse
+    return restrict, prolong, op_coarse, mg.b_coarse, mg.correction_coarse
 end
 
 function fill_correction_coarse!(model::AbstractModel, correction_coarse)
@@ -246,20 +241,23 @@ function get_multigrid_ops(model::AbstractModel{T,N}, op::LinearMap{T}) where {T
     return restrict, prolong, op_coarse
 end
 
-function get_op_coarse_fun(op::LinearMap{T},restrict::LinearMap{T},prolong::LinearMap{T}) where {T}
+function get_op_coarse_fun(
+    op::LinearMap{T},
+    restrict::LinearMap{T},
+    prolong::LinearMap{T},
+    tmp1::AbstractVector{T},
+    tmp2::AbstractVector{T},
+) where {T}
+    mi, ni = size(op)
+    @assert mi == ni == length(tmp1) == length(tmp2)
 
-     mi,ni = size(op)
-     @assert mi == ni 
-
-     tmp1 :: Vector{T} = zeros(T, ni)
-     tmp2 :: Vector{T} = zeros(T, ni)
-     function op_coarse_fun!(out,in)
-          mul!(tmp1, prolong, in)
-          mul!(tmp2, op, tmp1)
-          mul!(out, restrict, tmp2)
-          return out
-     end
-     return op_coarse_fun!
+    function op_coarse_fun!(out, in)
+        mul!(tmp1, prolong, in)
+        mul!(tmp2, op, tmp1)
+        mul!(out, restrict, tmp2)
+        return out
+    end
+    return op_coarse_fun!
 end
 
 function set_correction_coarse!(model::AbstractModel{T,N},correction_coarse::AbstractVector{T}) where {T,N}

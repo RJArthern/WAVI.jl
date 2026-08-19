@@ -560,13 +560,13 @@ end
 """
 function get_op(model::AbstractModel{T,N}) where {T,N}
     s = stencil_scratch!(model)
-    op = s.op_map[]
-    if op !== nothing
-        return op
-    end
-    ni = model.fields.gu.ni + model.fields.gv.ni
-    s.op_map[] = LinearMap{T}(s.op_fun!, ni; issymmetric=true, ismutating=true, ishermitian=true, isposdef=true)
-    return s.op_map[]
+    @unpack gh, gu, gv, gc = model.fields
+    ni = gu.ni + gv.ni
+    return LinearMap{T}(
+        (y, x) -> apply_momentum_op!(y, x, s, gh, gu, gv, gc),
+        ni;
+        issymmetric=true, ismutating=true, ishermitian=true, isposdef=true,
+    )
 end
 
 
@@ -590,8 +590,7 @@ function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
         uvfixed[nu + i] = gv.v[i] * gv.v_isfixed[i]
     end
 
-    op_fun! = s.op_fun!
-    op_fun!(rhs_dirichlet,uvfixed,vecSampled=false)
+    apply_momentum_op!(rhs_dirichlet, uvfixed, s, model.fields.gh, gu, gv, model.fields.gc; vecSampled=false)
     
     @. rhs_dirichlet = - rhs_dirichlet
     

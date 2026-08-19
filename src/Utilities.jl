@@ -11,7 +11,7 @@ using WAVI.Stencils
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
     get_glx, glen_b, fill_glen_b!, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!,
     icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
-    stencil_scratch!
+    stencil_scratch!, StencilScratch, apply_momentum_op!
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -63,31 +63,107 @@ end
 
 
 """
+Coarse-grid work vectors for the wavelet multigrid cycle.
+Resized when the number of kept wavelet coefficients changes.
+"""
+Base.@kwdef struct MultigridScratch{T <: Real}
+    n_wu::Int
+    n_wv::Int
+    b_coarse::Vector{T}
+    correction_coarse::Vector{T}
+end
+
+"""
+Workspace for the momentum operator, Picard stencils, Haar RAP, and Gauss-Seidel.
+
+Allocated once per `GridField` and reused. Colour lists are filled on first
+preconditioner call. `op_coarse_tmp1` and `op_coarse_tmp2` are the RAP
+coarse-operator work vectors. Coarse correction vectors sit in `mg_ops` and
+are resized when the number of kept wavelets changes.
+"""
+Base.@kwdef mutable struct StencilScratch{T <: Real}
+    gu_inner_indices::Vector{Int}
+    gv_inner_indices::Vector{Int}
+    surf_crop::Array{T, 2}
+    ones_crop::Array{T, 2}
+    tmpu::Array{T, 2}
+    tmpv::Array{T, 2}
+    tmpui::Vector{T}
+    tmpvi::Vector{T}
+    u_crop::Array{T, 2}
+    v_crop::Array{T, 2}
+    u_h::Array{T, 2}
+    v_h::Array{T, 2}
+    dudx::Array{T, 2}
+    dvdy::Array{T, 2}
+    dudy_c::Array{T, 2}
+    dvdx_c::Array{T, 2}
+    shear_c::Array{T, 2}
+    shear_h::Array{T, 2}
+    β_crop::Array{T, 2}
+    gf_crop::Array{T, 2}
+    denu::Array{T, 2}
+    denv::Array{T, 2}
+    ipolgfu::Array{T, 2}
+    ipolgfv::Array{T, 2}
+    hη::Array{T, 2}
+    hη_c::Array{T, 2}
+    rhs::Vector{T}
+    f1::Vector{T}
+    f2::Vector{T}
+    f3::Vector{T}
+    sui::Vector{T}
+    hui::Vector{T}
+    dui::Vector{T}
+    svi::Vector{T}
+    hvi::Vector{T}
+    dvi::Vector{T}
+    uvfixed::Vector{T}
+    start_guess::Vector{T}
+    picard_resid::Vector{T}
+    picard_correction::Vector{T}
+    gs_resid::Vector{T}
+    prolonged::Vector{T}
+    op_coarse_tmp1::Vector{T}
+    op_coarse_tmp2::Vector{T}
+    op_diag::Vector{T}
+    r_xx::Array{T, 2}
+    r_yy::Array{T, 2}
+    r_xy::Array{T, 2}
+    extra::Array{T, 2}
+    dx_inv::T
+    dy_inv::T
+    gs_colour_indices::Vector{Vector{Int}} = [Int[], Int[], Int[], Int[]]
+    gs_colours_filled::Bool = false
+    mg_ops::MultigridScratch{T}
+    gu_inner_index_map::Array{Int, 2}
+    gv_inner_index_map::Array{Int, 2}
+    haar_u::Array{T, 2}
+    haar_u_tmp::Array{T, 2}
+    haar_v::Array{T, 2}
+    haar_v_tmp::Array{T, 2}
+end
+
+"""
     stencil_scratch!(model)
 
 Return persistent scratch for the momentum operator and Picard stencil applies.
 Allocated on first use and kept for the life of the model's `GridField`.
 """
-function stencil_scratch!(model::AbstractModel)
+function stencil_scratch!(model::AbstractModel{T, N}) where {T, N}
     ref = model.fields.stencil_scratch
     s = ref[]
     if s !== nothing
-        return s
+        return s::StencilScratch{T}
     end
-    ref[] = allocate_stencil_scratch(model)
-    return ref[]
+    allocated = allocate_stencil_scratch(model)
+    ref[] = allocated
+    return allocated
 end
 
 function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     grid = model.grid
-
-    # Rheological diagonals, updated in-place each Picard iterate
-    gh_dneghηav_diag = gh.dneghηav[].diag
-    gc_dneghηav_diag = gc.dneghηav[].diag
-    gu_dnegβeff_diag = gu.dnegβeff[].diag
-    gv_dnegβeff_diag = gv.dnegβeff[].diag
-    gh_dimplicit_diag = gh.dimplicit[].diag
 
     # Inner unknowns: 1D list for gather/scatter, 2D map for op_fun! kernels.
     gu_inner_indices = findall(vec(gu.mask_inner))
@@ -148,18 +224,14 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     picard_correction = zeros(T, ni)
     gs_resid = zeros(T, ni)
     prolonged = zeros(T, ni)
+    op_coarse_tmp1 = zeros(T, ni)
+    op_coarse_tmp2 = zeros(T, ni)
 
     # Jacobi diagonal (filled each get_op_diag from the fused stencil).
     op_diag = zeros(T, ni)
 
-    # Colour lists and LinearMaps are filled lazily in the wavelet preconditioner.
-    gs_colour_indices = Ref{Any}(nothing)
-    op_map = Ref{Any}(nothing)
-    mg_ops = Ref{Any}(nothing)
-
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
-    backend = KA.get_backend(gh.h)
 
     # Two work arrays per grid: each Haar step reads one and writes the other.
     haar_u = similar(gu.u)
@@ -167,97 +239,125 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     haar_v = similar(gv.v)
     haar_v_tmp = similar(gv.v)
 
-    D_h = reshape(gh_dneghηav_diag, gh.nxh, gh.nyh)
-    D_c = reshape(gc_dneghηav_diag, gc.nxc, gc.nyc)
-    D_u = reshape(gu_dnegβeff_diag, gu.nxu, gu.nyu)
-    D_v = reshape(gv_dnegβeff_diag, gv.nxv, gv.nyv)
-    D_imp = reshape(gh_dimplicit_diag, gh.nxh, gh.nyh)
-
-    function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
-        if vecSampled
-            @assert length(inputVector)==(gu.ni+gv.ni)
-            u_in = view(inputVector, 1:gu.ni)
-            v_in = view(inputVector, (gu.ni + 1):(gu.ni + gv.ni))
-        else
-            nu = gu.nxu * gu.nyu
-            nv = gv.nxv * gv.nyv
-            @assert length(inputVector)==(nu + nv)
-            u_in = view(inputVector, 1:nu)
-            v_in = view(inputVector, (nu + 1):(nu + nv))
-        end
-        out_u = view(opvecprod, 1:gu.ni)
-        out_v = view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni))
-
-        # Stresses on each thickness cell (Arthern et al. 2015), using neighbour u and v.
-        launch!(_op_h_stresses!, r_xx, r_yy, extra, r_xy, u_in, v_in, gu_inner_index_map, gv_inner_index_map,
-                gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, dx_inv, dy_inv, vecSampled;
-                ndrange = size(r_xx))
-
-        # Force at each inner u/v point. Skip ocean and fixed boundaries (idx == 0).
-        launch!(_op_force_u!, out_u, r_xx, r_xy, extra, u_in, gu_inner_index_map, gu.h, D_u, dx_inv, dy_inv, vecSampled;
-                ndrange = size(gu_inner_index_map), sync = false)
-        launch!(_op_force_v!, out_v, r_yy, r_xy, extra, v_in, gv_inner_index_map, gv.h, D_v, dx_inv, dy_inv, vecSampled;
-                ndrange = size(gv_inner_index_map), sync = false)
-        KA.synchronize(backend)
-
-        return opvecprod
-    end
-
-    return (
-        op_fun! = op_fun!,
-        gu_inner_indices = gu_inner_indices,
-        gv_inner_indices = gv_inner_indices,
-        surf_crop = surf_crop,
-        ones_crop = ones_crop,
-        tmpu = tmpu,
-        tmpv = tmpv,
-        tmpui = tmpui,
-        tmpvi = tmpvi,
-        u_crop = u_crop,
-        v_crop = v_crop,
-        u_h = u_h,
-        v_h = v_h,
-        dudx = dudx,
-        dvdy = dvdy,
-        dudy_c = dudy_c,
-        dvdx_c = dvdx_c,
-        shear_c = shear_c,
-        shear_h = shear_h,
-        β_crop = β_crop,
-        gf_crop = gf_crop,
-        denu = denu,
-        denv = denv,
-        ipolgfu = ipolgfu,
-        ipolgfv = ipolgfv,
-        hη = hη,
-        hη_c = hη_c,
-        rhs = rhs,
-        f1 = f1,
-        f2 = f2,
-        f3 = f3,
-        sui = sui,
-        hui = hui,
-        dui = dui,
-        svi = svi,
-        hvi = hvi,
-        dvi = dvi,
-        uvfixed = uvfixed,
-        start_guess = start_guess,
-        picard_resid = picard_resid,
-        picard_correction = picard_correction,
-        gs_resid = gs_resid,
-        prolonged = prolonged,
-        op_diag = op_diag,
-        gs_colour_indices = gs_colour_indices,
-        op_map = op_map,
-        mg_ops = mg_ops,
-        gu_inner_index_map = gu_inner_index_map,
-        gv_inner_index_map = gv_inner_index_map,
-        haar_u = haar_u,
-        haar_u_tmp = haar_u_tmp,
-        haar_v = haar_v,
-        haar_v_tmp = haar_v_tmp,
+    return StencilScratch{T}(;
+        gu_inner_indices,
+        gv_inner_indices,
+        surf_crop,
+        ones_crop,
+        tmpu,
+        tmpv,
+        tmpui,
+        tmpvi,
+        u_crop,
+        v_crop,
+        u_h,
+        v_h,
+        dudx,
+        dvdy,
+        dudy_c,
+        dvdx_c,
+        shear_c,
+        shear_h,
+        β_crop,
+        gf_crop,
+        denu,
+        denv,
+        ipolgfu,
+        ipolgfv,
+        hη,
+        hη_c,
+        rhs,
+        f1,
+        f2,
+        f3,
+        sui,
+        hui,
+        dui,
+        svi,
+        hvi,
+        dvi,
+        uvfixed,
+        start_guess,
+        picard_resid,
+        picard_correction,
+        gs_resid,
+        prolonged,
+        op_coarse_tmp1,
+        op_coarse_tmp2,
+        op_diag,
+        r_xx,
+        r_yy,
+        r_xy,
+        extra,
+        dx_inv,
+        dy_inv,
+        mg_ops = MultigridScratch{T}(;
+            n_wu = 0,
+            n_wv = 0,
+            b_coarse = T[],
+            correction_coarse = T[],
+        ),
+        gu_inner_index_map,
+        gv_inner_index_map,
+        haar_u,
+        haar_u_tmp,
+        haar_v,
+        haar_v_tmp,
     )
+end
+
+"""
+    apply_momentum_op!(out, in, s, gh, gu, gv, gc; vecSampled=true)
+
+Multiply the stacked inner (or full-grid) velocity vector by the momentum operator.
+Work arrays live on `s`. Rheology diagonals are read from the grids so Picard
+updates are seen without rebuilding scratch.
+"""
+function apply_momentum_op!(
+    opvecprod::AbstractVector,
+    inputVector::AbstractVector,
+    s::StencilScratch{T},
+    gh, gu, gv, gc;
+    vecSampled::Bool = true,
+) where {T}
+    if vecSampled
+        @assert length(inputVector) == (gu.ni + gv.ni)
+        u_in = view(inputVector, 1:gu.ni)
+        v_in = view(inputVector, (gu.ni + 1):(gu.ni + gv.ni))
+    else
+        nu = gu.nxu * gu.nyu
+        nv = gv.nxv * gv.nyv
+        @assert length(inputVector) == (nu + nv)
+        u_in = view(inputVector, 1:nu)
+        v_in = view(inputVector, (nu + 1):(nu + nv))
+    end
+    out_u = view(opvecprod, 1:gu.ni)
+    out_v = view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni))
+
+    D_h = reshape(gh.dneghηav[].diag, gh.nxh, gh.nyh)
+    D_c = reshape(gc.dneghηav[].diag, gc.nxc, gc.nyc)
+    D_u = reshape(gu.dnegβeff[].diag, gu.nxu, gu.nyu)
+    D_v = reshape(gv.dnegβeff[].diag, gv.nxv, gv.nyv)
+    D_imp = reshape(gh.dimplicit[].diag, gh.nxh, gh.nyh)
+
+    launch!(
+        _op_h_stresses!, s.r_xx, s.r_yy, s.extra, s.r_xy, u_in, v_in,
+        s.gu_inner_index_map, s.gv_inner_index_map,
+        gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.r_xx),
+    )
+    launch!(
+        _op_force_u!, out_u, s.r_xx, s.r_xy, s.extra, u_in, s.gu_inner_index_map, gu.h,
+        D_u, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.gu_inner_index_map), sync = false,
+    )
+    launch!(
+        _op_force_v!, out_v, s.r_yy, s.r_xy, s.extra, v_in, s.gv_inner_index_map, gv.h,
+        D_v, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.gv_inner_index_map), sync = false,
+    )
+    KA.synchronize(KA.get_backend(s.r_xx))
+    return opvecprod
 end
 
 """
@@ -266,7 +366,9 @@ end
 Returns a function that multiplies a vector by the momentum operator.
 """
 function get_op_fun(model::AbstractModel)
-    return stencil_scratch!(model).op_fun!
+    s = stencil_scratch!(model)
+    gh, gu, gv, gc = model.fields.gh, model.fields.gu, model.fields.gv, model.fields.gc
+    return (out, in; vecSampled = true) -> apply_momentum_op!(out, in, s, gh, gu, gv, gc; vecSampled)
 end
 
 """
