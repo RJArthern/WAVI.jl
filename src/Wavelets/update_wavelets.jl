@@ -8,9 +8,19 @@ Compute wavelet transform of velocities to define the coarse grid used in multig
 function update_wavelets!(model::AbstractModel{T}) where {T}
     @unpack wu,wv,gu,gv=model.fields
     @unpack params,solver_params=model
+    s = stencil_scratch!(model)
 
-    wu.wavelets[:] .= gu.dwt*(gu.crop*gu.u[:])
-    wv.wavelets[:] .= gv.dwt*(gv.crop*gv.v[:])
+    copyto!(wu.wavelets, gu.u)
+    @inbounds for i in eachindex(wu.wavelets, gu.mask)
+        wu.wavelets[i] *= gu.mask[i]
+    end
+    haar_dwt!(wu.wavelets, s.haar_u_tmp, wu.levels)
+
+    copyto!(wv.wavelets, gv.v)
+    @inbounds for i in eachindex(wv.wavelets, gv.mask)
+        wv.wavelets[i] *= gv.mask[i]
+    end
+    haar_dwt!(wv.wavelets, s.haar_v_tmp, wv.levels)
 
     wu.mask .= (abs.(wu.wavelets) .>= solver_params.wavelet_threshold)
     wv.mask .= (abs.(wv.wavelets) .>= solver_params.wavelet_threshold)

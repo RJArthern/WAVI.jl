@@ -122,7 +122,20 @@ end
     @test all(isfinite, model.fields.gu.u)
     @test all(isfinite, model.fields.gv.v)
 
+    WAVI.Wavelets.update_wavelets!(model)
     wu, wv, gu, gv = model.fields.wu, model.fields.wv, model.fields.gu, model.fields.gv
+    Wxu_f = WAVI.wavelet_matrix(wu.nxuw, wu.levels, "forward")
+    Wyu_f = WAVI.wavelet_matrix(wu.nyuw, wu.levels, "forward")
+    Wxv_f = WAVI.wavelet_matrix(wv.nxvw, wv.levels, "forward")
+    Wyv_f = WAVI.wavelet_matrix(wv.nyvw, wv.levels, "forward")
+    u_dwt = reshape((Wyu_f ⊗ Wxu_f) * (gu.crop * gu.u[:]), wu.nxuw, wu.nyuw)
+    v_dwt = reshape((Wyv_f ⊗ Wxv_f) * (gv.crop * gv.v[:]), wv.nxvw, wv.nyvw)
+    @test wu.wavelets ≈ u_dwt rtol = 1e-12 atol = 1e-12
+    @test wv.wavelets ≈ v_dwt rtol = 1e-12 atol = 1e-12
+    threshold = model.solver_params.wavelet_threshold
+    @test wu.mask == (abs.(u_dwt) .>= threshold)
+    @test wv.mask == (abs.(v_dwt) .>= threshold)
+
     n_wu, n_wv = wu.n[], wv.n[]
     n_fine, n_coarse = gu.ni + gv.ni, n_wu + n_wv
     Wxu = WAVI.wavelet_matrix(wu.nxuw, wu.levels, "reverse")
@@ -168,4 +181,16 @@ end
     p_sp[1:gu.ni] .= gu.samp_inner * ((Wyu ⊗ Wxu) * u_spread)
     p_sp[(gu.ni + 1):n_fine] .= gv.samp_inner * ((Wyv ⊗ Wxv) * v_spread)
     @test p_ka ≈ p_sp rtol = 1e-12 atol = 1e-12
+end
+
+@testset "Forward Haar vs Kronecker" begin
+    for (nx, ny, levels) in ((8, 6, 2), (7, 5, 2), (16, 12, 3))
+        Wx = WAVI.wavelet_matrix(nx, levels, "forward")
+        Wy = WAVI.wavelet_matrix(ny, levels, "forward")
+        dwt = Wy ⊗ Wx
+        X = reshape(collect(range(0.1; stop = 1.9, length = nx * ny)), nx, ny)
+        x = vec(X)
+        a, b = copy(X), similar(X)
+        @test vec(WAVI.Utilities.haar_dwt!(a, b, levels)) ≈ dwt * x atol = 1e-12
+    end
 end

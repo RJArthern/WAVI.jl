@@ -300,18 +300,34 @@ restrict (see `haar_idwtᵀ!`).
 function haar_idwt!(a, b, levels, transpose=false)
     steps = haar_steps(levels)
     step_iter = transpose ? steps : reverse(steps)
+    return _haar_lift_axes!(a, b, step_iter, transpose)
+end
+
+"""
+    haar_dwt!(a, b, levels) -> result
+
+Apply the forward Haar transform to the grid `a`.
+`update_wavelets!` uses this to form wavelet coefficients from velocity.
+`b` is a workspace of the same size. Matches `wavelet_matrix(..., "forward")`.
+This is not the reverse Haar used by prolong (`haar_idwt!`).
+"""
+function haar_dwt!(a, b, levels)
+    return _haar_lift_axes!(a, b, haar_steps(levels), Val{:forward}())
+end
+
+function _haar_lift_axes!(a, b, step_iter, mix)
     src, dst = a, b
     nx = size(a, 1)
     wg = _haar_workgroup()
     nwork = wg === 1 ? min(nx, Threads.nthreads()) : 1
-    launch!(_haar_lift_y_all!, src, dst, step_iter, transpose, nwork;
+    launch!(_haar_lift_y_all!, src, dst, step_iter, mix, nwork;
             ndrange = nwork, workgroupsize = wg)
-    if isodd(length(steps))
+    if isodd(length(step_iter))
         src, dst = dst, src
     end
-    launch!(_haar_lift_x_all!, src, dst, step_iter, transpose;
+    launch!(_haar_lift_x_all!, src, dst, step_iter, mix;
             ndrange = size(a, 2), workgroupsize = wg)
-    if isodd(length(steps))
+    if isodd(length(step_iter))
         src, dst = dst, src
     end
     return src

@@ -6,7 +6,7 @@ using Parameters
 using SparseArrays
 
 using WAVI: AbstractModel, MapOrMatrix, AbstractPreconditioner
-import WAVI.Utilities: fill_index_map!
+import WAVI.Utilities: fill_index_map!, stencil_scratch!, haar_dwt!
 using WAVI.Stencils
 
 include("UWavelets.jl")

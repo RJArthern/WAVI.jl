@@ -18,7 +18,6 @@ struct UGrid{T <: Real, N <: Integer}
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
                   ∂yᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                  dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
@@ -96,7 +95,7 @@ function UGrid(;
         spread = spzeros(Float64, nxu * nyu, 0)
         spread_inner = spzeros(Float64, nxu * nyu, 0)
         kron = _storage_only_kron()
-        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = dωt = kron
+        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = kron
         dnegβeff = Ref(Diagonal(Float64[]))
     else
         #construct operators
@@ -113,7 +112,6 @@ function UGrid(;
         ∂xᵀ =  sparse(spI(nyu)') ⊗ sparse(∂1d(nxu-1,dx)')
         ∂y =  ∂1d(nyu-1,dy) ⊗ χ(nxu-2)
         ∂yᵀ =  sparse(∂1d(nyu-1,dy)') ⊗ sparse(χ(nxu-2)')
-        dωt = wavelet_matrix(nyu,levels,"forward" ) ⊗ wavelet_matrix(nxu,levels,"forward")
         dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
 
         #size assertions
@@ -148,7 +146,6 @@ function UGrid(;
                 ∂y,
                 ∂yᵀ,
                 levels,
-                dωt,
                 s,
                 h,
                 grounded_fraction,

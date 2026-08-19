@@ -412,6 +412,10 @@ end
 @inline _haar_odd_slot(odd, even, transpose) = transpose ? even + odd : odd - even
 @inline _haar_even_slot(odd, even, transpose) = transpose ? even - odd : even + odd
 
+# Forward Haar, matching wavelet_matrix(..., "forward")
+@inline _haar_odd_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (odd + even)
+@inline _haar_even_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (even - odd)
+
 """
     _haar_lift_x_line!(dst, src, j, step, transpose)
 
