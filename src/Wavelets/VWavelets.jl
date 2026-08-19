@@ -6,9 +6,6 @@ struct VWavelets{T <: Real, N <: Integer}
         nyvw :: N                                       # Number of grid points in y in UWavelets (equal to UGrid)
         mask :: Array{Bool,2}                           # Model domain on the U grid
            n :: Base.RefValue{N}                        # Number of grid points in domain
-        crop :: Base.RefValue{Diagonal{T,Array{T,1}}}   # Crop matrix: diagonal matrix with mask entries on diag
-        samp :: Base.RefValue{SparseMatrixCSC{T,N}}     # Sampling matrix: take full domain to model domain 
-      spread :: Base.RefValue{SparseMatrixCSC{T,N}}     # Spread matrix: take model domain to full domain
       levels :: N                                       # Number of wavelet levels 
    index_map :: Matrix{Int}                             # Packed index of each kept wavelet coefficient; 0 if dropped
     wavelets :: Array{T,2}                              # Wavelet matrix
@@ -49,16 +46,10 @@ function VWavelets(;
 
     if storage_only
         n = Ref(0)
-        crop = Ref(Diagonal(Float64[]))
-        samp = Ref(spzeros(Float64, 0, nxvw * nyvw))
-        spread = Ref(spzeros(Float64, nxvw * nyvw, 0))
         correction_coarse = Ref(Float64[])
     else
         #compute non-inputs
         n = Ref(count(mask));  @assert n[] == count(mask)
-        crop = Ref(Diagonal(float(mask[:])))
-        samp  = Ref(sparse(1:n[],(1:(nxvw*nyvw))[mask[:]],ones(n[]),n[],nxvw*nyvw))
-        spread = Ref(sparse(samp[]'))
         fill_index_map!(index_map, mask)
         correction_coarse = Ref(zeros(n[])); @assert length(correction_coarse[])==n[]
     end
@@ -68,9 +59,6 @@ function VWavelets(;
                     nyvw,
                     mask,
                     n,
-                    crop, 
-                    samp, 
-                    spread, 
                     levels,
                     index_map,
                     wavelets,

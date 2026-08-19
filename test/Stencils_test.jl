@@ -132,15 +132,40 @@ end
     fine = collect(range(0.2; stop = 1.7, length = n_fine))
     coarse = collect(range(-0.4; stop = 0.9, length = n_coarse))
 
+    # Pack a 2D field into the short coarse vector using index_map.
+    # True cells are numbered down each column, then left to right.
+    function pack_index_map(field, index_map, n)
+        out = zeros(eltype(field), n)
+        @inbounds for j in axes(index_map, 2), i in axes(index_map, 1)
+            k = index_map[i, j]
+            k > 0 && (out[k] = field[i, j])
+        end
+        return out
+    end
+
+    # Unpack a short coarse vector onto the 2D wavelet grid using index_map.
+    function unpack_index_map(packed, index_map)
+        field = zeros(eltype(packed), size(index_map))
+        @inbounds for j in axes(index_map, 2), i in axes(index_map, 1)
+            k = index_map[i, j]
+            k > 0 && (field[i, j] = packed[k])
+        end
+        return field
+    end
+
     r_ka = WAVI.get_restrict_fun(model)(zeros(n_coarse), fine)
     r_sp = zeros(n_coarse)
-    r_sp[1:n_wu] .= wu.samp[] * ((sparse(Wyu') ⊗ sparse(Wxu')) * (gu.spread_inner * fine[1:gu.ni]))
-    r_sp[(n_wu + 1):n_coarse] .= wv.samp[] * ((sparse(Wyv') ⊗ sparse(Wxv')) * (gv.spread_inner * fine[(gu.ni + 1):n_fine]))
+    u_idwtT = reshape((sparse(Wyu') ⊗ sparse(Wxu')) * (gu.spread_inner * fine[1:gu.ni]), wu.nxuw, wu.nyuw)
+    v_idwtT = reshape((sparse(Wyv') ⊗ sparse(Wxv')) * (gv.spread_inner * fine[(gu.ni + 1):n_fine]), wv.nxvw, wv.nyvw)
+    r_sp[1:n_wu] .= pack_index_map(u_idwtT, wu.index_map, n_wu)
+    r_sp[(n_wu + 1):n_coarse] .= pack_index_map(v_idwtT, wv.index_map, n_wv)
     @test r_ka ≈ r_sp rtol = 1e-12 atol = 1e-12
 
     p_ka = WAVI.get_prolong_fun(model)(zeros(n_fine), coarse)
     p_sp = zeros(n_fine)
-    p_sp[1:gu.ni] .= gu.samp_inner * ((Wyu ⊗ Wxu) * (wu.spread[] * coarse[1:n_wu]))
-    p_sp[(gu.ni + 1):n_fine] .= gv.samp_inner * ((Wyv ⊗ Wxv) * (wv.spread[] * coarse[(n_wu + 1):n_coarse]))
+    u_spread = vec(unpack_index_map(coarse[1:n_wu], wu.index_map))
+    v_spread = vec(unpack_index_map(coarse[(n_wu + 1):n_coarse], wv.index_map))
+    p_sp[1:gu.ni] .= gu.samp_inner * ((Wyu ⊗ Wxu) * u_spread)
+    p_sp[(gu.ni + 1):n_fine] .= gv.samp_inner * ((Wyv ⊗ Wxv) * v_spread)
     @test p_ka ≈ p_sp rtol = 1e-12 atol = 1e-12
 end
