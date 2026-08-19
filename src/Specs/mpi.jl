@@ -95,8 +95,8 @@ Fields:
     halo: Number of halo cells on each side of the subgrid
     rank: MPI rank of the current process
     comm: MPI communicator for the current process
-    coords: Cartesian coordinates of the current process
-    top, right, bottom, left: Neighbouring processes in the x and y directions
+    coords: Cartesian coordinates of the current process as (x, y)
+    top, right, bottom, left: Neighbouring processes in the x and y directions; MPI_PROC_NULL if none
     global_size: Total number of processes
     global_comm: MPI communicator for the global grid
     global_grid: Global grid to be used for the model
@@ -123,18 +123,18 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
 
     rank::N
     comm::M
-    coords::Array{N, 1}
+    coords::NTuple{2,N}
 
-    # Neighbourhood information
-    top::Union{N, Nothing}
-    right::Union{N, Nothing}
-    bottom::Union{N, Nothing}
-    left::Union{N, Nothing}
+    # Neighbourhood information (MPI_PROC_NULL if no neighbour)
+    top::N
+    right::N
+    bottom::N
+    left::N
     pou::Bool
     damping::T
     niterations::N  # Number of Schwarz iterations per Picard iteration
-    pou_scratch::Union{Nothing, MPIPoUScratch}
-    halo_scratch::Union{Nothing, MPIHaloScratch}
+    pou_scratch::Union{Nothing, MPIPoUScratch{T}}
+    halo_scratch::Union{Nothing, MPIHaloScratch{T}}
     core_inner::Union{Nothing, Tuple{Vector{Bool}, Vector{Bool}}}
     local_spec::Union{Nothing, ThreadedSpec}
 
@@ -148,9 +148,17 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     pou: Whether to use partition of unity for halo exchange (default=true)
     damping: Damping factor for halo exchange (default=0.0)
     local_spec: Optional ThreadedSpec for the intraprocess local solve (default=nothing)
-    """
-    function MPISpec(px::Integer, py::Integer, halo::Integer, grid::AbstractGrid; pou::Bool=true, damping::AbstractFloat=0.0, niterations::Integer=5, local_spec::Union{Nothing,ThreadedSpec}=nothing)
-        (px < 1 || py < 1 || halo < 0) && 
+    """ function MPISpec(
+        px::Integer,
+        py::Integer,
+        halo::Integer,
+        grid::G;
+        pou::Bool = true,
+        damping::AbstractFloat = 0.0,
+        niterations::Integer = 5,
+        local_spec::Union{Nothing, ThreadedSpec} = nothing,
+    ) where {G <: AbstractGrid}
+        (px < 1 || py < 1 || halo < 0) &&
             throw(ArgumentError("Invalid parameters specified for MPISpec"))
 
         MPI.Initialized() || MPI.Init()
@@ -207,9 +215,9 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             validate_dimension("ny", grid.ny, py, halo)
         end
 
-        return new{Int, Float64, MPI.Comm, AbstractGrid}(
-            px, 
-            py, 
+        return new{Int, Float64, MPI.Comm, G}(
+            px,
+            py,
             halo,
             size,
             comm,
@@ -218,8 +226,11 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             Collector(),
             rank,
             cart_comm,
-            [x_coord, y_coord],
-            top, right, bottom, left,
+            (Int(x_coord), Int(y_coord)),
+            Int(top),
+            Int(right),
+            Int(bottom),
+            Int(left),
             pou,
             damping,
             niterations,
@@ -227,7 +238,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             nothing,  # halo_scratch filled on first RAS exchange
             nothing,  # core_inner filled on first Schwarz residual
             local_spec,
-            )
+        )
     end
 end
 
