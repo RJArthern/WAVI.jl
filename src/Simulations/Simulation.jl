@@ -2,13 +2,13 @@ module Simulations
 
 export Simulation
 
-using JLD2
 using Parameters
 using Setfield
 using ImageFiltering: centered, imfilter, reflect, Fill
 
 using WAVI: AbstractModel, AbstractSimulation, AbstractSpec
-using WAVI.Outputs: OutputParams, load_checkpoint
+using WAVI.Outputs: OutputParams, load_checkpoint_state, restore_checkpoint_state!,
+    finalise_checkpoint_restore!
 using WAVI.Parameters: TimesteppingParams
 using WAVI.Time
 
@@ -29,8 +29,8 @@ Construct a WAVI.jl Simulation object.
 
 Keyword arguments
 =================
-- `model`: (required) an instance of a `Model` object. When `timestepping_params.niter0 > 0`, the model and clock are
-  loaded from the checkpoint file; the passed-in `model` is replaced after pickup.
+- `model`: (required) an instance of a `Model` object. When `timestepping_params.niter0 > 0`,
+  restart arrays are copied into this model from the checkpoint; physics objects stay as built.
 - `timestepping_params`: (required) an instance of a `TimesteppingParams` object, which stores information relating to timestepping
 - `output_params`: an instance of an `OutputParams` object, which stores information relating to outputting of solutions.
   Also used with `timestepping_params` to locate checkpoint files for pickup (see `checkpoint_path` in `Outputs`).
@@ -41,20 +41,16 @@ function Simulation(;
                     output_params::OutputParams = OutputParams())
     isnothing(timestepping_params) && throw(ArgumentError("You must specify a timestepping parameters"))
 
-    @unpack spec = model
-
     #compute number of timesteps per output (should be robust for Inf output frequency)
     output_params = set_n_iter_out!(output_params, timestepping_params.dt, timestepping_params.n_iter_total)
-    pickup_model, pickup_clock = pickup!(spec, timestepping_params, output_params)
+    #set the timestep in model parameters
+    model = set_dt_in_model!(model, timestepping_params.dt)
 
-    if ~isnothing(pickup_model)
-        spec == pickup_model.spec || error("Model Spec does not match spec from pickup file")
-        model, clock = pickup_model, pickup_clock
+    if timestepping_params.niter0 > 0
+        model, clock = pickup_model(model, timestepping_params, output_params)
     else
         # TODO: is the change from the default relevant - time is now type-variant (Real not Int)
         clock = Clock(n_iter = 0, time = 0.0, ref_time = timestepping_params.ref_time)
-        #set the timestep in model parameters (fudge to allow model to see the timestep in velocity solve)
-        model = set_dt_in_model!(model, timestepping_params.dt)
     end
 
     return Simulation(model, timestepping_params, output_params, clock)
@@ -78,19 +74,28 @@ function set_n_iter_out!(output_params, dt, n_iter_total)
     return output_params
 end
 
-function pickup!(spec::AbstractSpec,timestepping_params::TimesteppingParams, output_params::OutputParams)::Union{Tuple{Model, Clock}, Tuple{Nothing, Nothing}}
-    model, clock = nothing, nothing
-    if timestepping_params.niter0 > 0
-        @info "detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup..."
-        try
-            model, clock = load_checkpoint(spec,timestepping_params, output_params)
-            println("Pickup successful")
-        catch e
-            @error "Pickup error: $e"
-            error("Pickup error, terminating run")
-        end
+function pickup_model(model::AbstractModel, timestepping_params::TimesteppingParams, output_params::OutputParams)
+    return pickup_model(model.spec, model, timestepping_params, output_params)
+end
+
+function pickup_model(
+    ::AbstractSpec,
+    model::AbstractModel,
+    timestepping_params::TimesteppingParams,
+    output_params::OutputParams,
+)
+    @info "detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup..."
+    try
+        state = load_checkpoint_state(timestepping_params, output_params)
+        restore_checkpoint_state!(model, state)
+        update_model_climate_forcing!(model, last_completed_climate_forcing_clock(state.clock, timestepping_params))
+        finalise_checkpoint_restore!(model, state.clock)
+        println("Pickup successful")
+        return (model, state.clock)
+    catch e
+        @error "Pickup error" exception = (e, catch_backtrace())
+        rethrow()
     end
-    return (model, clock)
 end
     
 end

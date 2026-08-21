@@ -24,9 +24,19 @@ TimesteppingParams()
 Large simulations are computationally expensive, and may take a long time to run. To permit simulations to run for longer than maximum runtime limits which are imposed on many machines, WAVI.jl is equipped with a checkpoint-pickup system that allows the state to be outputted frequently, and the simulation to be picked again from that point.
 
 ### Checkpoints
-Checkpoints contain a snapshot of the model state, simulation clock, and the `TimesteppingParams` in use when the file was written. They can be large, so writing them very frequently is discouraged except for short test runs (see [Simulation tips](../simulation_tips.md)).
+Checkpoints contain a snapshot of the evolving ice state and the simulation clock. They can be large, so writing them very frequently is discouraged except for short test runs (see [Simulation tips](../simulation_tips.md)).
 
 Permanent checkpoints are written in `jld2` format. Each file is named `Chkpt_NNNNNNNNNN.jld2`, where `NNNNNNNNNN` is the iteration number zero-padded to ten digits (for example, iteration `1000` gives `Chkpt_0000001000.jld2`).
+
+The snapshot stores:
+
+- **Clock:** `n_iter`, `time`, `ref_time`
+- **Grid geometry:** `nx`, `ny`, `nσ`, `dx`, `dy`, `x0`, `y0`
+- **Bed**
+- **`InitialConditions` arrays:** thickness, grounded fraction, velocities, viscosity, temperature, damage, strain history, basal water, hydraulic potential, effective pressure, depth-averaged temperature, and `preBfactor`
+- **Basal drag** `β` (not part of `InitialConditions`, but needed for restart)
+
+Wavelets and other physics objects are not in the file.
 
 Checkpoints are written when all of the following hold:
 
@@ -36,7 +46,7 @@ Checkpoints are written when all of the following hold:
 
 So the checkpoint interval is set in model time via `chkpt_freq`, but the trigger uses the iteration count; the actual spacing may differ slightly from `chkpt_freq` if `chkpt_freq / dt` is not an integer.
 
-Each file stores top-level variables `model`, `clock`, and `timestepping_params`. Older checkpoints that store a single `simulation` object can still be loaded for pickup.
+New runs write a `CheckpointState` (clock, grid geometry, bed, ice arrays as a dict, and basal drag `β`). Clock, grid, and ice arrays are stored as dictionaries, so extra keys are ignored and a field added later does not break reading older snapshots. A stored ice array whose shape does not match the live model is an error. Older serial files that store a `model` or `simulation` object can still be read under `BasicSpec` and `ThreadedSpec`; ice arrays are copied from the file and physics objects in the file are ignored. `MPISpec` pickup requires this snapshot format - Per-rank `Chkpt_*_Rank*` files from an earlier dev branch are not loaded.
 
 ### Checkpoint location
 The directory used for both writing and reading checkpoints is resolved as follows:
@@ -58,9 +68,11 @@ output_params = OutputParams(..., output_path = folder)
 ### Pickups
 To continue from a checkpoint, set `niter0` to the iteration number in the filename you want to load. For example, to pick up from `Chkpt_0000001000.jld2`, use `niter0 = 1000`.
 
-When `niter0 > 0`, `Simulation` loads `Chkpt_<niter0>.jld2` from the checkpoint directory (see above), and replaces the passed-in `model` and initial clock with the `model` and `clock` stored in that file. The run then continues from iteration `niter0 + 1` up to the new `n_iter_total`.
+When `niter0 > 0`, `Simulation` applies `timestepping_params.dt` to the live model first, then loads `Chkpt_<niter0>.jld2` from the checkpoint directory (see above) and copies the snapshot into the `model` you passed in. The same object is kept for `BasicSpec`, `ThreadedSpec`, and `MPISpec`. Rebuild the same grid, bed, and physics as the run that wrote the file. After restore, WAVI reloads climate forcing from the last completed climate-update time on the restored clock, rebuilds surface geometry from the restored thickness, refreshes basal hydrology diagnostics without advancing water thickness, rebuilds Glen B from the restored temperature without advancing ice temperature, and rebuilds wavelets and rheological operators using that `dt`. The run then continues from iteration `niter0 + 1` up to the new `n_iter_total`.
 
-You must still pass a `model` to `Simulation` when picking up (to construct the simulation object), but the state used for time stepping comes from the checkpoint.
+`MPISpec` writes one checkpoint file covering the entire domain by the main rank gathering all the split data into itself before saving. For picking up from the checkpoint, it scatters into each rank's local fields, so `px`/`py` does not need to match the run that wrote the file. The same `MPISpec` snapshot can be picked up and continued with`BasicSpec`, and vice versa.
 
 !!! note
-    After a pickup, **`model` and `clock` come from the checkpoint file**. **`TimesteppingParams` and `OutputParams` come from the arguments you pass to the new `Simulation`**—for example, a new `end_time` or `n_iter_total` controls how much further the run continues, and `output_params` controls where and how subsequent field output is written. Ensure the checkpoint file exists at the resolved checkpoint path before starting a pickup run.
+    After a pickup, **`clock` comes from the checkpoint file** and ice arrays are copied into the **driver-built `model`**. **`TimesteppingParams` and `OutputParams` come from the arguments you pass to the new `Simulation`**. For example, a new `end_time` or `n_iter_total` controls how much further the run continues, and `output_params` controls where and how subsequent field output is written. Ensure the checkpoint file exists at the resolved checkpoint path before starting a pickup run.
+
+    This differs from older serial checkpoints that stored a full `Model` and replaced the driver-built object on pickup. Melt, and other physics fields are no longer restored from the file; they always come from the `Model` you build in the driver.

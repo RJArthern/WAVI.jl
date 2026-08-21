@@ -3,6 +3,7 @@ module Fields
 import WAVI.Grids: reconstruct_on_grid, reconstruct_on_subdomain
 export reconstruct_on_grid, reconstruct_on_subdomain
 export GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, SigmaGrid
+export initial_conditions_from_fields, copy_initial_conditions_to_fields!
 
 using LinearAlgebra
 using LinearMaps
