@@ -32,6 +32,7 @@ end
 
 if group == "utils" || group == "all"
     include("test_utils.jl")
+    include("test_architectures.jl")
 end
 
 if group == "kronecker" || group == "all"

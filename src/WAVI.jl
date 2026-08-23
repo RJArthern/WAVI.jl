@@ -48,6 +48,7 @@ const MapOrMatrix{T} = Union{LinearMap{T}, AbstractMatrix{T}}
 
 ##################################################################################
 #include all of the code
+include("Architectures.jl")
 include("Deferred.jl")
 include("Time.jl")
 include("Grids.jl")
@@ -77,6 +78,10 @@ export AbstractField, AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance
   AbstractFracture, AbstractSlidingLaw , AbstractBasalHydrology,
    AbstractThermoDynamics, AbstractModel, AbstractPreconditioner,
    AbstractSpec,AbstractClimateForcing
+
+using .Architectures
+export AbstractArchitecture, CPU, GPU
+export array_type, on_architecture, child_architecture, synchronise, gpu_device
 
 using .Deferred
 export Collector, clear!, collect!, register_field!
