@@ -418,6 +418,19 @@ function haar_dwt!(a, b, levels)
 end
 
 function _haar_lift_axes!(a, b, step_iter, mix)
+    if KA.get_backend(a) isa KA.CPU
+        return _haar_lift_axes_line!(a, b, step_iter, mix)
+    end
+    return _haar_lift_axes_2d!(a, b, step_iter, mix)
+end
+
+"""
+    _haar_lift_axes_line!(a, b, step_iter, mix)
+
+Apply every Haar spacing along y, then along x, with one fused line kernel
+per axis. Used on CPU so RAP does not launch a full-grid kernel per level.
+"""
+function _haar_lift_axes_line!(a, b, step_iter, mix)
     src, dst = a, b
     nx = size(a, 1)
     wg = _haar_workgroup()
@@ -430,6 +443,26 @@ function _haar_lift_axes!(a, b, step_iter, mix)
     launch!(_haar_lift_x_all!, src, dst, step_iter, mix;
             ndrange = size(a, 2), workgroupsize = wg)
     if isodd(length(step_iter))
+        src, dst = dst, src
+    end
+    return src
+end
+
+"""
+    _haar_lift_axes_2d!(a, b, step_iter, mix)
+
+Apply each Haar spacing as a 2D kernel (`ndrange = (nx, ny)`).
+Used on GPU so each pairing fills the device. CPU keeps `_haar_lift_axes_line!`.
+"""
+function _haar_lift_axes_2d!(a, b, step_iter, mix)
+    src, dst = a, b
+    ndrange = size(a)
+    for step in step_iter
+        launch!(_haar_lift_y!, dst, src, step, mix; ndrange = ndrange)
+        src, dst = dst, src
+    end
+    for step in step_iter
+        launch!(_haar_lift_x!, dst, src, step, mix; ndrange = ndrange)
         src, dst = dst, src
     end
     return src

@@ -194,3 +194,19 @@ end
         @test vec(WAVI.Utilities.haar_dwt!(a, b, levels)) ≈ dwt * x atol = 1e-12
     end
 end
+
+@testset "2D Haar matches line Haar" begin
+    for (nx, ny, levels) in ((8, 6, 2), (7, 5, 2))
+        X = reshape(collect(range(0.1; stop = 1.9, length = nx * ny)), nx, ny)
+        steps = WAVI.Utilities.haar_steps(levels)
+        mixes = (false, true, Val{:forward}())
+        iters = (reverse(steps), steps, steps)
+        for (mix, step_iter) in zip(mixes, iters)
+            a_line, b_line = copy(X), similar(X)
+            a_2d, b_2d = copy(X), similar(X)
+            r_line = WAVI.Utilities._haar_lift_axes_line!(a_line, b_line, step_iter, mix)
+            r_2d = WAVI.Utilities._haar_lift_axes_2d!(a_2d, b_2d, step_iter, mix)
+            @test r_line ≈ r_2d atol = 1e-12
+        end
+    end
+end

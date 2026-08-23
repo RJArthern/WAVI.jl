@@ -24,6 +24,8 @@ export _diff_x!,
     _scatter!,
     _scatter_mapped!,
     _gather_mapped!,
+    _haar_lift_x!,
+    _haar_lift_y!,
     _haar_lift_x_all!,
     _haar_lift_y_all!,
     _op_h_stresses!,
@@ -415,6 +417,58 @@ end
 # Forward Haar, matching wavelet_matrix(..., "forward")
 @inline _haar_odd_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (odd + even)
 @inline _haar_even_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (even - odd)
+
+"""
+    _haar_lift_x!(out, inp, step, transpose)
+
+One Haar pairing along x at spacing `step` (2, 4, 8, ...), one grid point
+per work item. Same even/odd split as `_haar_lift_x_line!`.
+`ndrange` is `(nx, ny)`. Used on device; CPU keeps the fused line kernels.
+"""
+@kernel function _haar_lift_x!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        n = size(inp, 1)
+        half = div(step, 2)
+        rem = (i - 1) % step
+        if rem == 0 && i + half <= n
+            odd = inp[i, j]
+            even = inp[i + half, j]
+            out[i, j] = _haar_odd_slot(odd, even, transpose)
+        elseif rem == half && i > half
+            odd = inp[i - half, j]
+            even = inp[i, j]
+            out[i, j] = _haar_even_slot(odd, even, transpose)
+        else
+            out[i, j] = inp[i, j]
+        end
+    end
+end
+
+"""
+    _haar_lift_y!(out, inp, step, transpose)
+
+Same as `_haar_lift_x!`, but along y.
+"""
+@kernel function _haar_lift_y!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    @inbounds begin
+        n = size(inp, 2)
+        half = div(step, 2)
+        rem = (j - 1) % step
+        if rem == 0 && j + half <= n
+            odd = inp[i, j]
+            even = inp[i, j + half]
+            out[i, j] = _haar_odd_slot(odd, even, transpose)
+        elseif rem == half && j > half
+            odd = inp[i, j - half]
+            even = inp[i, j]
+            out[i, j] = _haar_even_slot(odd, even, transpose)
+        else
+            out[i, j] = inp[i, j]
+        end
+    end
+end
 
 """
     _haar_lift_x_line!(dst, src, j, step, transpose)
