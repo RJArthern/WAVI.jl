@@ -1,7 +1,7 @@
 struct CGrid{T <: Real, N <: Integer}
         nxc :: N
         nyc :: N
-      mask :: Array{Bool,2} 
+      mask :: AbstractArray{Bool,2}
          n :: N 
       crop :: Diagonal{T,Array{T,1}}
       samp :: SparseMatrixCSC{T,N} 

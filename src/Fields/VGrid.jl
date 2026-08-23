@@ -1,9 +1,9 @@
 struct VGrid{T <: Real, N <: Int}
                   nxv :: N                                     # Number of frid cells in x-direction in UGrid
                   nyv :: N                                     # Number of grid cells in y-direction in UGrid 
-                 mask :: Array{Bool,2}                         # Mask specifying model domain wrt V grid 
-           mask_inner :: Array{Bool,2}                         # Mask specifying interior of model domain wrt V grid 
-            v_isfixed :: Array{Bool,2}                         # Mask specifying location of fixed v-velocity 
+                 mask :: AbstractArray{Bool,2}                 # Mask specifying model domain wrt V grid
+           mask_inner :: AbstractArray{Bool,2}                 # Mask specifying interior of model domain wrt V grid
+            v_isfixed :: AbstractArray{Bool,2}                 # Mask specifying location of fixed v-velocity
                     n :: N                                     # Total number of cells in model domain 
                    ni :: N                                     # Total number of cells in interior of model domain 
                  crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
@@ -18,15 +18,15 @@ struct VGrid{T <: Real, N <: Int}
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
                   ∂yᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                    s :: Array{T,2}                            # Ice surface elevation
-                    h :: Array{T,2}                            # Ice thickness
-    grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
-                 βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
+                    s :: AbstractArray{T,2}                    # Ice surface elevation
+                    h :: AbstractArray{T,2}                    # Ice thickness
+    grounded_fraction :: AbstractArray{T,2}                    # Grid cell grounded fraction
+                 βeff :: AbstractArray{T,2}                    # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
              dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
-                    v :: Array{T,2}                            # Ice velocity in the y-direction
-             residual :: Array{T,2}                            # Residuals in the y-direction
-                τsurf :: Array{T,2}                            # TauSurf Dirichlet calculated in inversion (see in Arthern 2015 JGeophysRes)
-                   vs :: Array{T,2}                            # Surface Ice velocity in the y-direction
+                    v :: AbstractArray{T,2}                    # Ice velocity in the y-direction
+             residual :: AbstractArray{T,2}                    # Residuals in the y-direction
+                τsurf :: AbstractArray{T,2}                    # TauSurf Dirichlet calculated in inversion (see in Arthern 2015 JGeophysRes)
+                   vs :: AbstractArray{T,2}                    # Surface Ice velocity in the y-direction
    
         end
 

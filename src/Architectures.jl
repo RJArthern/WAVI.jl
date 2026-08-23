@@ -1,5 +1,9 @@
 module Architectures
 
+using Adapt
+using LinearAlgebra: Diagonal
+using LinearMaps: LinearMap
+using SparseArrays: SparseMatrixCSC
 using KernelAbstractions: KernelAbstractions as KA
 
 export AbstractArchitecture, CPU, GPU
@@ -102,5 +106,44 @@ end
 
 Base.summary(::CPU) = "CPU"
 Base.summary(arch::GPU) = "GPU{$(typeof(arch.device))}"
+
+"""
+    adapt_device_array(to, x)
+
+Copy `x` onto the array type described by `to`, or leave it unchanged.
+
+Arguments:
+- `to`: Adapt target, typically an array type such as `Array` or `CuArray`.
+- `x`: Value to consider. Dense `AbstractArray`s are adapted. Sparse matrices,
+  `Diagonal`s, Kronecker `LinearMap`s, `Ref`s, and scalars stay as they are so
+  host operators are not copied onto the device.
+
+TODO: Consider copying operators onto the device in a future optimisation.
+We really do not want a lot of host <-> device data transfers, but, for an
+initial implementation, this will do.
+"""
+adapt_device_array(to, x::SparseMatrixCSC) = x
+adapt_device_array(to, x::Diagonal) = x
+adapt_device_array(to, x::LinearMap) = x
+adapt_device_array(to, x::Base.RefValue) = x
+adapt_device_array(to, x::AbstractArray) = Adapt.adapt(to, x)
+adapt_device_array(to, x) = x
+
+"""
+    adapt_structure_fields(to, obj)
+
+Rebuild `obj` with `adapt_device_array(to, field)` applied to every field.
+
+Arguments:
+- `to`: Adapt target, passed through to `adapt_device_array`.
+- `obj`: Struct whose fields should be adapted (grid or wavelet storage).
+
+The returned value has the same concrete type as `obj`. Used by
+`Adapt.adapt_structure` for `HGrid`, `UGrid`, `VGrid`, `CGrid`, `SigmaGrid`,
+and the wavelet structs.
+"""
+function adapt_structure_fields(to, obj::T) where {T}
+    return T(ntuple(i -> adapt_device_array(to, getfield(obj, i)), fieldcount(T))...)
+end
 
 end

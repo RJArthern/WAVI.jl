@@ -1,4 +1,4 @@
-using Test, WAVI, LinearAlgebra
+using Test, WAVI, LinearAlgebra, Adapt
 
 using WAVI.Fields: HGrid, UGrid, VGrid, CGrid, SigmaGrid
 
@@ -76,6 +76,24 @@ using WAVI.Fields: HGrid, UGrid, VGrid, CGrid, SigmaGrid
         @test sigmagridirregular isa SigmaGrid
         @test dot(sigmagridirregular.quadrature_weights,ones(eltype(sigmagridirregular.quadrature_weights),size(sigmagridirregular.quadrature_weights))) ≈ 1.0
         @test dot(sigmagridirregular.quadrature_weights,sigmagridirregular.σ) ≈ 0.5
+    end
+
+    @testset "Adapt keeps CPU Arrays and host operators" begin
+        @info "Testing Adapt of grid fields..."
+        hgrid = HGrid(nxh = 8, nyh = 8, mask = trues(8,8), h_isfixed = falses(8,8),
+                      b = ones(8,8), h = ones(8,8), ηav = ones(8,8),
+                      grounded_fraction = ones(8,8), preBfactor = ones(8,8))
+        adapted = Adapt.adapt(Array, hgrid)
+        @test adapted.h isa Array
+        @test adapted.h == hgrid.h
+        @test adapted.samp === hgrid.samp
+        @test adapted.crop === hgrid.crop
+        @test adapted.cent_xy === hgrid.cent_xy
+
+        ugrid = UGrid(nxu = 8, nyu = 8, mask = trues(8,8), levels = 3, dx = 10.0, dy = 10.0)
+        u_adapted = Adapt.adapt(Array, ugrid)
+        @test u_adapted.u isa Array
+        @test u_adapted.samp === ugrid.samp
     end
 
 end

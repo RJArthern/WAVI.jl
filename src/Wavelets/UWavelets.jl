@@ -4,11 +4,11 @@ export UWavelets
 struct UWavelets{T <: Real, N <: Integer} 
           nxuw :: N                                     # Number of grid points in x in UWavelets (equal to UGrid)
           nyuw :: N                                     # Number of grid points in y in UWavelets (equal to UGrid)
-        mask :: Array{Bool,2}                           # Model domain on the U grid
+        mask :: AbstractArray{Bool,2}                   # Model domain on the U grid
            n :: Base.RefValue{N}                        # Number of grid points in domain
       levels :: N                                       # Number of wavelet levels 
-   index_map :: Matrix{Int}                             # Packed index of each kept wavelet coefficient; 0 if dropped
-    wavelets :: Array{T,2}                              # Wavelet matrix
+   index_map :: AbstractMatrix{Int}                     # Packed index of each kept wavelet coefficient; 0 if dropped
+    wavelets :: AbstractArray{T,2}                      # Wavelet coefficients
     correction_coarse::Base.RefValue{Vector{T} }        # cache to store coarse correction for multigrid                           
 end
 

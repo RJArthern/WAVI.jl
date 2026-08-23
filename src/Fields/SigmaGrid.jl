@@ -37,12 +37,12 @@ Keyword arguments
         nxs :: N
         nys :: N
         nσs :: N
-        σ :: Vector{T} 
-        ζ :: Vector{T} = one(eltype(σ)) .- σ ; @assert length(ζ) == nσs
-        quadrature_weights :: Vector{T} = 0.5*[ σ[2] .- σ[1] ; σ[3:end] .- σ[1:end-2] ; σ[end] .- σ[end-1] ] ; @assert length(quadrature_weights) == nσs
-        η :: Array{T,3}; @assert size(η)==(nxs,nys,nσs) || size(η)==(0,0,0)
-        θ :: Array{T,3}; @assert size(θ)==(nxs,nys,nσs) || size(θ)==(0,0,0)
-        Φ :: Array{T,3}; @assert size(Φ)==(nxs,nys,nσs) || size(Φ)==(0,0,0)
-        strain_history :: Array{T,3}; @assert size(strain_history)==(nxs,nys,nσs) || size(strain_history)==(0,0,0)
-        glen_b :: Array{T,3} = glen_b.(θ,Φ); @assert size(glen_b)==(nxs,nys,nσs) || size(glen_b)==(0,0,0)
+        σ :: AbstractVector{T}
+        ζ :: AbstractVector{T} = one(eltype(σ)) .- σ ; @assert length(ζ) == nσs
+        quadrature_weights :: AbstractVector{T} = 0.5*[ σ[2] .- σ[1] ; σ[3:end] .- σ[1:end-2] ; σ[end] .- σ[end-1] ] ; @assert length(quadrature_weights) == nσs
+        η :: AbstractArray{T,3}; @assert size(η)==(nxs,nys,nσs) || size(η)==(0,0,0)
+        θ :: AbstractArray{T,3}; @assert size(θ)==(nxs,nys,nσs) || size(θ)==(0,0,0)
+        Φ :: AbstractArray{T,3}; @assert size(Φ)==(nxs,nys,nσs) || size(Φ)==(0,0,0)
+        strain_history :: AbstractArray{T,3}; @assert size(strain_history)==(nxs,nys,nσs) || size(strain_history)==(0,0,0)
+        glen_b :: AbstractArray{T,3} = glen_b.(θ,Φ); @assert size(glen_b)==(nxs,nys,nσs) || size(glen_b)==(0,0,0)
 end

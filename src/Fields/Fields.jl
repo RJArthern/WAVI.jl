@@ -4,12 +4,14 @@ import WAVI.Grids: reconstruct_on_grid, reconstruct_on_subdomain
 export reconstruct_on_grid, reconstruct_on_subdomain
 export GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, SigmaGrid
 
+using Adapt
 using LinearAlgebra
 using LinearMaps
 using Parameters
 using Setfield          # TODO: InitialConditions using this, bit of an anti-pattern?
 using SparseArrays
 
+using WAVI.Architectures: adapt_structure_fields
 using WAVI: AbstractField, AbstractGrid
 using WAVI.Grids
 using WAVI.KroneckerProducts
@@ -245,5 +247,10 @@ function GridField(grid::AbstractGrid, bed_array;
     wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
     return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Union{Nothing, StencilScratch{eltype(gh.h)}}}(nothing))
 end
+
+# Dense fields move; sparse crop/samp/spread and Kronecker operators stay on the host.
+# Do not Adapt GridField as a whole: MPI spec.global_fields must remain rank-0 CPU.
+Adapt.adapt_structure(to, grid::Union{HGrid, UGrid, VGrid, CGrid, SigmaGrid}) =
+    adapt_structure_fields(to, grid)
 
 end
