@@ -6,7 +6,7 @@ struct UGrid{T <: Real, N <: Integer}
             u_isfixed :: AbstractArray{Bool,2}                 # Mask specifying location of fixed u-velocity
                     n :: N                                     # Total number of cells in model domain 
                    ni :: N                                     # Total number of cells in interior of model domain 
-                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
+                 crop :: Diagonal{T, <:AbstractVector{T}}      # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
            samp_inner :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to interior of model domain 
                spread :: SparseMatrixCSC{T,N}                  # Spread matrix: take model domain to full domain
@@ -22,7 +22,7 @@ struct UGrid{T <: Real, N <: Integer}
                     h :: AbstractArray{T,2}                    # Ice thickness
     grounded_fraction :: AbstractArray{T,2}                    # Grid cell grounded fraction
                  βeff :: AbstractArray{T,2}                    # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
-             dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
+             dnegβeff :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (diagonal of βeff)
                     u :: AbstractArray{T,2}                    # Ice velocities in x direction
              residual :: AbstractArray{T,2}                    # Residuals in x direction
                 τsurf :: AbstractArray{T,2}                    # TauSurf Dirichlet calculated in inversion (see in Arthern 2015 JGeophysRes)

@@ -82,6 +82,7 @@ export AbstractField, AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance
 using .Architectures
 export AbstractArchitecture, CPU, GPU
 export array_type, on_architecture, child_architecture, synchronise, gpu_device
+export architecture, zeros_on
 
 using .Deferred
 export Collector, clear!, collect!, register_field!
@@ -133,7 +134,7 @@ export Simulation, run_simulation!, timestep!,
     update_clock!, update_thickness!, write_vel
 
 using .Specs
-export BasicSpec, ThreadedSpec, MPISpec
+export BasicSpec, ThreadedSpec, GPUSpec, MPISpec
 
 using .Fracture
 export ConstantDamage, DruckerPragerPhaseField, ISMIP7Hydrofracture

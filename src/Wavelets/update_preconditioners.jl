@@ -163,9 +163,8 @@ function gauss_seidel_smoother!(x, op, b;
         for j in sweep_order
             idx = colour_indices[j]
             isempty(idx) && continue
-            @inbounds for k in idx
-                x[k] += smoother_omega * resid[k] / op_diag[k]
-            end
+            launch!(_gs_colour_update!, x, resid, op_diag, idx, smoother_omega;
+                    ndrange = length(idx))
             get_resid!(resid, x, op, b)
         end
     end
@@ -174,7 +173,8 @@ end
 
 function ensure_colour_indices!(s, gu, gv)
     if !s.gs_colours_filled
-        s.gs_colour_indices = gs_colour_index_lists(gu, gv)
+        lists = gs_colour_index_lists(gu, gv)
+        s.gs_colour_indices = AbstractVector{Int}[copy_like(s.rhs, v) for v in lists]
         s.gs_colours_filled = true
     end
     return nothing
@@ -185,16 +185,18 @@ Packed red-black colours for Gauss-Seidel: u on 1–2, v on 3–4.
 Order is column-major over `mask_inner`, matching packed `samp_inner`.
 """
 function gs_colour_index_lists(gu, gv)
+    mask_u = Array(gu.mask_inner)
+    mask_v = Array(gv.mask_inner)
     lists = [Int[] for _ in 1:4]
     k = 0
     for j in 1:gu.nyu, i in 1:gu.nxu
-        if gu.mask_inner[i, j]
+        if mask_u[i, j]
             k += 1
             push!(lists[1 + mod(i - j, 2)], k)
         end
     end
     for j in 1:gv.nyv, i in 1:gv.nxv
-        if gv.mask_inner[i, j]
+        if mask_v[i, j]
             k += 1
             push!(lists[3 + mod(i - j, 2)], k)
         end
@@ -213,8 +215,8 @@ function ensure_multigrid_ops!(model::AbstractModel{T,N}, op::LinearMap{T}, s) w
         s.mg_ops = MultigridScratch{T}(;
             n_wu,
             n_wv,
-            b_coarse = zeros(T, n_coarse),
-            correction_coarse = zeros(T, n_coarse),
+            b_coarse = zeros_like(s.rhs, n_coarse),
+            correction_coarse = zeros_like(s.rhs, n_coarse),
         )
         mg = s.mg_ops
     end

@@ -8,6 +8,7 @@ using KernelAbstractions: KernelAbstractions as KA
 
 export AbstractArchitecture, CPU, GPU
 export device, synchronise, array_type, on_architecture, child_architecture, gpu_device
+export architecture, zeros_on
 
 """
     AbstractArchitecture
@@ -68,9 +69,33 @@ child_architecture(arch::AbstractArchitecture) = arch
 
 array_type(::CPU) = Array
 
+"""
+    architecture(x)
+
+Architecture that should own local arrays for `x`.
+
+Architectures return themselves. Specs without an architecture field
+(for example `BasicSpec`) return `CPU()`. `GPUSpec` returns its GPU.
+"""
+architecture(arch::AbstractArchitecture) = arch
+architecture(_) = CPU()
+
 on_architecture(::AbstractArchitecture, x::Number) = x
 on_architecture(::AbstractArchitecture, ::Nothing) = nothing
 on_architecture(::CPU, a::Array) = a
+
+"""
+    zeros_on(arch, T, dims...)
+
+Allocate a zero array of type `array_type(arch){T}` with size `dims`.
+
+`zeros(CuArray, nx, ny)` is not defined. Call this (or `similar` of an
+existing device array) instead.
+"""
+function zeros_on(arch::AbstractArchitecture, ::Type{T}, dims::Integer...) where {T}
+    AT = array_type(arch)
+    return fill!(similar(AT{T}, dims...), zero(T))
+end
 
 function register_gpu_backend!(arch::AbstractArchitecture)
     push!(LOADED_GPU_BACKENDS, arch)
@@ -114,18 +139,18 @@ Copy `x` onto the array type described by `to`, or leave it unchanged.
 
 Arguments:
 - `to`: Adapt target, typically an array type such as `Array` or `CuArray`.
-- `x`: Value to consider. Dense `AbstractArray`s are adapted. Sparse matrices,
-  `Diagonal`s, Kronecker `LinearMap`s, `Ref`s, and scalars stay as they are so
-  host operators are not copied onto the device.
+- `x`: Value to consider. Dense `AbstractArray`s and `Diagonal`s are adapted
+  so stencil diagonals can live next to the fields. Sparse matrices,
+  Kronecker `LinearMap`s, and scalars stay as they are. `Ref`s are rebuilt.
 
-TODO: Consider copying operators onto the device in a future optimisation.
-We really do not want a lot of host <-> device data transfers, but, for an
-initial implementation, this will do.
+TODO: Consider creating/transferring sparse operators onto the device in a
+future optimisation. We really do not want a lot of host <-> device data
+transfers, but, for an initial implementation, this will do.
 """
 adapt_device_array(to, x::SparseMatrixCSC) = x
-adapt_device_array(to, x::Diagonal) = x
 adapt_device_array(to, x::LinearMap) = x
-adapt_device_array(to, x::Base.RefValue) = x
+adapt_device_array(to, x::Diagonal) = Diagonal(adapt_device_array(to, x.diag))
+adapt_device_array(to, x::Base.RefValue) = Ref(adapt_device_array(to, x[]))
 adapt_device_array(to, x::AbstractArray) = Adapt.adapt(to, x)
 adapt_device_array(to, x) = x
 

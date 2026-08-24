@@ -143,6 +143,7 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
                 # Populate the variable by iterating through filenames
                 for i = 1:length(filenames)
                     data_i = get_output_as_dict(filenames[i], format)[key]
+                    data_i = data_i isa Array ? data_i : Array(data_i)
                     var_nc[:,:,i] = eltype(first_file_data) <: Bool ? UInt8.(data_i) : data_i
                 end
             else

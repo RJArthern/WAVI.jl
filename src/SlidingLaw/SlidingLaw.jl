@@ -10,6 +10,7 @@ using Parameters
 using WAVI: AbstractSlidingLaw, AbstractModel
 using WAVI.Grids
 using WAVI.Time
+using WAVI.Utilities: copy_onto!
 
 
 #add each of the individual sliding laws
@@ -33,7 +34,8 @@ acounts for migration of grounding line.
 function update_drag_coefficient!(model::AbstractModel)
     @unpack gh=model.fields
     @unpack sliding_law=model
-    gh.drag_coefficient .= sliding_law.drag_coefficient .* gh.grounded_fraction
+    copy_onto!(gh.drag_coefficient, sliding_law.drag_coefficient)
+    gh.drag_coefficient .*= gh.grounded_fraction
     return model
 end
 

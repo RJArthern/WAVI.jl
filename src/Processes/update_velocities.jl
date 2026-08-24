@@ -137,15 +137,17 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
     KA.synchronize(backend)
     launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui), sync = false)
     launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi), sync = false)
+    launch!(_gather!, hui, gu.h, gu_inner_indices; ndrange = length(hui), sync = false)
+    launch!(_gather!, hvi, gv.h, gv_inner_indices; ndrange = length(hvi), sync = false)
+    launch!(_gather!, sui, gu.s, gu_inner_indices; ndrange = length(sui), sync = false)
+    launch!(_gather!, svi, gv.s, gv_inner_indices; ndrange = length(svi), sync = false)
     KA.synchronize(backend)
-    @. tmpui = (params.density_ice*params.g*gu.h[gu.mask_inner]).* tmpui
-    @. tmpvi = (params.density_ice*params.g*gv.h[gv.mask_inner]).*tmpvi
+    @. tmpui = (params.density_ice*params.g*hui).* tmpui
+    @. tmpvi = (params.density_ice*params.g*hvi).*tmpvi
 
     f1[1:gu.ni] .= tmpui
     f1[(gu.ni+1):(gu.ni+gv.ni)] .= tmpvi
 
-    sui .= gu.s[gu.mask_inner]
-    hui .= gu.h[gu.mask_inner]
     dui .= icedraft.(sui,hui,params.sea_level_wrt_geoid)
     launch!(_diff_xT!, tmpu, ones_crop, -dx_inv; ndrange = size(tmpu))
     launch!(_gather!, tmpui, tmpu, gu_inner_indices; ndrange = length(tmpui))
@@ -153,8 +155,6 @@ function get_rhs(model::AbstractModel{T,N}) where {T,N}
                             - 0.5*params.density_ocean*dui^2
                             - params.density_ice*hui*sui)
 
-    svi .= gv.s[gv.mask_inner]
-    hvi .= gv.h[gv.mask_inner]
     dvi .= icedraft.(svi,hvi,params.sea_level_wrt_geoid)
     launch!(_diff_yT!, tmpv, ones_crop, -dy_inv; ndrange = size(tmpv))
     launch!(_gather!, tmpvi, tmpv, gv_inner_indices; ndrange = length(tmpvi))
@@ -189,9 +189,13 @@ end
 Set velocities to particular values. Input vector x represents stacked u and v components at valid grid points.
 """
 function set_velocities!(model::AbstractModel,x)
-    @unpack gh,gu,gv,gc=model.fields
-    @views gu.u[gu.mask_inner] .= x[1:gu.ni]
-    @views gv.v[gv.mask_inner] .= x[(gu.ni+1):(gu.ni+gv.ni)]
+    @unpack gu,gv=model.fields
+    s = stencil_scratch!(model)
+    xu = view(x, 1:gu.ni)
+    xv = view(x, (gu.ni + 1):(gu.ni + gv.ni))
+    launch!(_scatter!, gu.u, xu, s.gu_inner_indices; ndrange = length(xu), sync = false)
+    launch!(_scatter!, gv.v, xv, s.gv_inner_indices; ndrange = length(xv), sync = false)
+    KA.synchronize(KA.get_backend(gu.u))
     return model
 end
 
@@ -499,18 +503,16 @@ function update_βeff_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     KA.synchronize(backend)
 
     launch!(_avg_xT!, tmpu, β_crop; ndrange = size(tmpu))
-    @views gu.βeff[gu.mask] .= tmpu[gu.mask] ./ denu[gu.mask]
+    @. gu.βeff = ifelse(gu.mask, tmpu / denu, gu.βeff)
     launch!(_avg_xT!, tmpu, gf_crop; ndrange = size(tmpu))
-    @views ipolgfu[gu.mask] .= tmpu[gu.mask] ./ denu[gu.mask]
-    gu.βeff[ipolgfu .> zero(T)] .= gu.βeff[ipolgfu .> zero(T)].*gu.grounded_fraction[ipolgfu .> zero(T)]./
-                                                        ipolgfu[ipolgfu .> zero(T)]
+    @. ipolgfu = ifelse(gu.mask, tmpu / denu, ipolgfu)
+    @. gu.βeff = ifelse(ipolgfu > zero(T), gu.βeff * gu.grounded_fraction / ipolgfu, gu.βeff)
 
     launch!(_avg_yT!, tmpv, β_crop; ndrange = size(tmpv))
-    @views gv.βeff[gv.mask] .= tmpv[gv.mask] ./ denv[gv.mask]
+    @. gv.βeff = ifelse(gv.mask, tmpv / denv, gv.βeff)
     launch!(_avg_yT!, tmpv, gf_crop; ndrange = size(tmpv))
-    @views ipolgfv[gv.mask] .= tmpv[gv.mask] ./ denv[gv.mask]
-    gv.βeff[ipolgfv .> zero(T)] .= gv.βeff[ipolgfv .> zero(T)].*gv.grounded_fraction[ipolgfv .> zero(T)]./
-                                                 ipolgfv[ipolgfv .> zero(T)];
+    @. ipolgfv = ifelse(gv.mask, tmpv / denv, ipolgfv)
+    @. gv.βeff = ifelse(ipolgfv > zero(T), gv.βeff * gv.grounded_fraction / ipolgfv, gv.βeff)
 
     return model
 end
@@ -583,12 +585,10 @@ function get_rhs_dirichlet!(rhs_dirichlet,model::AbstractModel{T,N}) where {T,N}
     uvfixed = s.uvfixed
     nu = length(gu.u)
     nv = length(gv.v)
-    @inbounds for i in 1:nu
-        uvfixed[i] = gu.u[i] * gu.u_isfixed[i]
-    end
-    @inbounds for i in 1:nv
-        uvfixed[nu + i] = gv.v[i] * gv.v_isfixed[i]
-    end
+    uu = reshape(view(uvfixed, 1:nu), size(gu.u))
+    vv = reshape(view(uvfixed, (nu + 1):(nu + nv)), size(gv.v))
+    @. uu = gu.u * gu.u_isfixed
+    @. vv = gv.v * gv.v_isfixed
 
     apply_momentum_op!(rhs_dirichlet, uvfixed, s, model.fields.gh, gu, gv, model.fields.gc; vecSampled=false)
     
@@ -604,7 +604,11 @@ Set residuals to particular values. Input vector residual represents stacked u a
 """
 function set_residual!(model::AbstractModel,residual)
     @unpack gu,gv=model.fields
-    @views gu.residual[gu.mask_inner] .= residual[1:gu.ni]
-    @views gv.residual[gv.mask_inner] .= residual[(gu.ni+1):(gu.ni+gv.ni)]
+    s = stencil_scratch!(model)
+    ru = view(residual, 1:gu.ni)
+    rv = view(residual, (gu.ni + 1):(gu.ni + gv.ni))
+    launch!(_scatter!, gu.residual, ru, s.gu_inner_indices; ndrange = length(ru), sync = false)
+    launch!(_scatter!, gv.residual, rv, s.gv_inner_indices; ndrange = length(rv), sync = false)
+    KA.synchronize(KA.get_backend(gu.u))
     return model
 end

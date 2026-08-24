@@ -13,6 +13,17 @@ using WAVI.ThermoDynamics
 using WAVI.Time
 using WAVI.Utilities
 using WAVI.Wavelets
+using LinearAlgebra: Diagonal
+
+# Sparse samp/spread and Kronecker maps (cent, ∂x, ∂y) stay on the host, and
+# CuArray does not support boolean indexing such as dest[mask] .= packed.
+# Copy dense fields to Array, apply those operators, then write back.
+function _copy_masked!(dest, mask, packed)
+    dest_h = _host(dest)
+    dest_h[_host(mask)] .= packed
+    dest_h === dest || copyto!(dest, dest_h)
+    return dest
+end
 
 """
 update_state!(model::AbstractModel, clock)
@@ -103,8 +114,9 @@ Adjust surface elevation to hydrostatic equilibrium.
 function update_surface_elevation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
-    gh.s[gh.mask] .= max.(gh.b[gh.mask]+gh.h[gh.mask],
-                          params.sea_level_wrt_geoid .+ gh.h[gh.mask]*(1-params.density_ice./params.density_ocean))
+    sea = params.sea_level_wrt_geoid
+    ρ = params.density_ice / params.density_ocean
+    @. gh.s = ifelse(gh.mask, max(gh.b + gh.h, sea + gh.h * (1 - ρ)), gh.s)
     return model
 end
 
@@ -116,11 +128,17 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 """
 function update_geometry_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
-    onesvec=ones(T,gh.nxh*gh.nyh)
-    gu.h[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.h[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
-    gu.s[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.s[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
-    gv.h[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.h[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
-    gv.s[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.s[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
+    # samp and centᵀ are host sparse/Kronecker operators; see _host / _copy_masked! above.
+    h = _host(gh.h)
+    s = _host(gh.s)
+    crop = Diagonal(_host(gh.crop.diag))
+    onesvec = ones(T, length(h))
+    denu = gu.samp * (gu.centᵀ * (crop * onesvec))
+    denv = gv.samp * (gv.centᵀ * (crop * onesvec))
+    _copy_masked!(gu.h, gu.mask, (gu.samp * (gu.centᵀ * (crop * vec(h)))) ./ denu)
+    _copy_masked!(gu.s, gu.mask, (gu.samp * (gu.centᵀ * (crop * vec(s)))) ./ denu)
+    _copy_masked!(gv.h, gv.mask, (gv.samp * (gv.centᵀ * (crop * vec(h)))) ./ denv)
+    _copy_masked!(gv.s, gv.mask, (gv.samp * (gv.centᵀ * (crop * vec(s)))) ./ denv)
     return model
 end
 
@@ -132,7 +150,10 @@ Update height above floatation. Zero value is used to define location of groundi
 function update_height_above_floatation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
-    gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
+    # Do not broadcast `params`: it holds host Matrix fields and cannot enter a GPU kernel.
+    ρ = params.density_ocean / params.density_ice
+    sea = params.sea_level_wrt_geoid
+    @. gh.haf = gh.h - ρ * (sea - gh.b)
     return model
 end
 
@@ -143,10 +164,11 @@ Update grounded area fraction on h-, u-, and v-grids for use in subgrid paramete
 """
 function update_grounded_fraction_on_huv_grids!(model::AbstractModel)
     @unpack gh,gu,gv = model.fields
-    (gfh,gfu,gfv)=pos_fraction(gh.haf;mask=gh.mask)
-    gh.grounded_fraction[:] .= gfh[:]
-    gu.grounded_fraction[:] .= gfu[:]
-    gv.grounded_fraction[:] .= gfv[:]
+    # pos_fraction uses host boolean indexing; copyto! writes back to device arrays.
+    (gfh,gfu,gfv)=pos_fraction(_host(gh.haf);mask=_host(gh.mask))
+    copyto!(gh.grounded_fraction, gfh)
+    copyto!(gu.grounded_fraction, gfu)
+    copyto!(gv.grounded_fraction, gfv)
     return model
 end
 
@@ -236,8 +258,8 @@ Update the velocities (depth averaged, surface and bed) on the h grid
 function update_velocities_on_h_grid!(model::AbstractModel{T,N,S}) where {T,N,S<:AbstractSpec}
     @unpack gh,gu,gv = model.fields
     #depth averaged velocities
-    gh.u[:] .= gu.cent*gu.u[:] #(gu.u[1:end-1,:] + gu.u[2:end,:])./2
-    gh.v[:] .= gv.cent*gv.v[:] #(gv.v[:,1:end-1] + gv.v[:, 2:end])./2
+    copyto!(gh.u, reshape(gu.cent * vec(_host(gu.u)), size(gh.u)))
+    copyto!(gh.v, reshape(gv.cent * vec(_host(gv.v)), size(gh.v)))
 
     #bed velocities
     gh.ub .= gh.u ./ (1 .+ (gh.β .* gh.quad_f2))
@@ -267,8 +289,15 @@ Evaluate rate of change of thickness using mass conservation.
 """
 function update_dhdt!(model::AbstractModel)
     @unpack gh,gu,gv=model.fields
-    gh.dhdt[gh.mask].=gh.samp*(gh.accumulation[:] .- gh.basal_melt[:] .-
-             (  (gu.∂x*(gu.crop*(gu.h[:].*gu.u[:]))) .+ (gv.∂y*(gv.crop*(gv.h[:].*gv.v[:]))) ) )
+    crop_u = Diagonal(_host(gu.crop.diag))
+    crop_v = Diagonal(_host(gv.crop.diag))
+    packed = gh.samp * (
+        vec(_host(gh.accumulation)) .- vec(_host(gh.basal_melt)) .- (
+            (gu.∂x * (crop_u * (vec(_host(gu.h)) .* vec(_host(gu.u))))) .+
+            (gv.∂y * (crop_v * (vec(_host(gv.h)) .* vec(_host(gv.v)))))
+        )
+    )
+    _copy_masked!(gh.dhdt, gh.mask, packed)
     return model
 end
 
@@ -285,8 +314,11 @@ end
 function update_surface_velocities_on_uv_grid!(model)
     @unpack gh,gu,gv = model.fields
     #surface  velocities
-    gu.us[:].=gu.crop*(gu.centᵀ*gh.crop*(gh.us[:]))
-    gv.vs[:].=gv.crop*(gv.centᵀ*gh.crop*(gh.vs[:]))
+    crop_h = Diagonal(_host(gh.crop.diag))
+    crop_u = Diagonal(_host(gu.crop.diag))
+    crop_v = Diagonal(_host(gv.crop.diag))
+    copyto!(gu.us, reshape(crop_u * (gu.centᵀ * (crop_h * vec(_host(gh.us)))), size(gu.us)))
+    copyto!(gv.vs, reshape(crop_v * (gv.centᵀ * (crop_h * vec(_host(gh.vs)))), size(gv.vs)))
     return model
 end
 

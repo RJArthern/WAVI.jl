@@ -9,7 +9,7 @@ struct UWavelets{T <: Real, N <: Integer}
       levels :: N                                       # Number of wavelet levels 
    index_map :: AbstractMatrix{Int}                     # Packed index of each kept wavelet coefficient; 0 if dropped
     wavelets :: AbstractArray{T,2}                      # Wavelet coefficients
-    correction_coarse::Base.RefValue{Vector{T} }        # cache to store coarse correction for multigrid                           
+    correction_coarse::Base.RefValue{<:AbstractVector{T}}      # cache to store coarse correction for multigrid
 end
 
 """

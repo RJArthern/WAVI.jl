@@ -13,6 +13,8 @@ using WAVI: AbstractField,
             AbstractThermoDynamics,
             AbstractModel, 
             AbstractSpec
+using WAVI.Architectures: on_architecture, CPU
+import WAVI.Architectures: architecture
 using WAVI.Fields
 using WAVI.Grids
 using WAVI.MeltRates
@@ -26,8 +28,17 @@ using WAVI.Parameters
 export Model, update_state!
 
 """
-Struct to represent the basic specification for a model
+    BasicSpec()
 
+Default specification: one process, arrays on the CPU.
+
+If no `spec` is passed to Model, a `BasicSpec` is used. Stencil
+kernels still use Julia threads when you launch with `julia -t N`. This
+is different to `ThreadedSpec`, which splits the domain into overlapping
+Schwarz subdomains which I think should be removed (or, not advertised
+in the docs) in the future.
+
+TODO: Remove ThreadedSpec in a future optimisation.
 """
 struct BasicSpec <: AbstractSpec 
     function BasicSpec()
@@ -113,7 +124,10 @@ function Model(grid::G,
 
     # TODO: the passthrough of arguments like this is smelly - Configuration should be a type
     fields = GridField(grid, bed_array; initial_conditions, params, solver_params)
-    
+    arch = architecture(spec)
+    if !(arch isa CPU)
+        fields = on_architecture(arch, fields)
+    end
 
     model = Model(
                grid, 
@@ -134,6 +148,8 @@ end
 
 Model(grid, bed_elev; kw...) = Model(grid, bed_elev, BasicSpec(); kw...)
 Model(; grid, bed_elevation, spec = BasicSpec(), kw...) = Model(grid, bed_elevation, spec; kw...)
+
+architecture(model::AbstractModel) = architecture(model.spec)
 
 # This is to enable use of Setfield, which derives a parameter setup from the fields of an existing structure via JuliaObjects
 # FIXME: this wasn't required in the original WAVI codebase. 

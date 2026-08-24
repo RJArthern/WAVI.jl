@@ -11,7 +11,7 @@ using WAVI.Stencils
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
     get_glx, glen_b, fill_glen_b!, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!,
     icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
-    stencil_scratch!, StencilScratch, apply_momentum_op!
+    stencil_scratch!, StencilScratch, apply_momentum_op!, copy_like, copy_onto!, zeros_like, _host
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -28,6 +28,18 @@ True cells are numbered 1, 2, 3, ... down each column, then left to right
 Returns how many cells were true.
 """
 function fill_index_map!(idx::AbstractMatrix{<:Integer}, mask::AbstractMatrix{Bool})
+    if _is_host_array(idx) && _is_host_array(mask)
+        return _fill_index_map_serial!(idx, mask)
+    end
+    idx_h = Array(idx)
+    n = _fill_index_map_serial!(idx_h, Array(mask))
+    copyto!(idx, idx_h)
+    return n
+end
+
+_is_host_array(x) = x isa Array || x isa BitArray
+
+function _fill_index_map_serial!(idx, mask)
     k = 0
     @inbounds for j in axes(mask, 2), i in axes(mask, 1)
         if mask[i, j]
@@ -69,8 +81,8 @@ Resized when the number of kept wavelet coefficients changes.
 Base.@kwdef struct MultigridScratch{T <: Real}
     n_wu::Int
     n_wv::Int
-    b_coarse::Vector{T}
-    correction_coarse::Vector{T}
+    b_coarse::AbstractVector{T}
+    correction_coarse::AbstractVector{T}
 end
 
 """
@@ -82,66 +94,66 @@ coarse-operator work vectors. Coarse correction vectors sit in `mg_ops` and
 are resized when the number of kept wavelets changes.
 """
 Base.@kwdef mutable struct StencilScratch{T <: Real}
-    gu_inner_indices::Vector{Int}
-    gv_inner_indices::Vector{Int}
-    surf_crop::Array{T, 2}
-    ones_crop::Array{T, 2}
-    tmpu::Array{T, 2}
-    tmpv::Array{T, 2}
-    tmpui::Vector{T}
-    tmpvi::Vector{T}
-    u_crop::Array{T, 2}
-    v_crop::Array{T, 2}
-    u_h::Array{T, 2}
-    v_h::Array{T, 2}
-    dudx::Array{T, 2}
-    dvdy::Array{T, 2}
-    dudy_c::Array{T, 2}
-    dvdx_c::Array{T, 2}
-    shear_c::Array{T, 2}
-    shear_h::Array{T, 2}
-    β_crop::Array{T, 2}
-    gf_crop::Array{T, 2}
-    denu::Array{T, 2}
-    denv::Array{T, 2}
-    ipolgfu::Array{T, 2}
-    ipolgfv::Array{T, 2}
-    hη::Array{T, 2}
-    hη_c::Array{T, 2}
-    rhs::Vector{T}
-    f1::Vector{T}
-    f2::Vector{T}
-    f3::Vector{T}
-    sui::Vector{T}
-    hui::Vector{T}
-    dui::Vector{T}
-    svi::Vector{T}
-    hvi::Vector{T}
-    dvi::Vector{T}
-    uvfixed::Vector{T}
-    start_guess::Vector{T}
-    picard_resid::Vector{T}
-    picard_correction::Vector{T}
-    gs_resid::Vector{T}
-    prolonged::Vector{T}
-    op_coarse_tmp1::Vector{T}
-    op_coarse_tmp2::Vector{T}
-    op_diag::Vector{T}
-    r_xx::Array{T, 2}
-    r_yy::Array{T, 2}
-    r_xy::Array{T, 2}
-    extra::Array{T, 2}
+    gu_inner_indices::AbstractVector{Int}
+    gv_inner_indices::AbstractVector{Int}
+    surf_crop::AbstractArray{T, 2}
+    ones_crop::AbstractArray{T, 2}
+    tmpu::AbstractArray{T, 2}
+    tmpv::AbstractArray{T, 2}
+    tmpui::AbstractVector{T}
+    tmpvi::AbstractVector{T}
+    u_crop::AbstractArray{T, 2}
+    v_crop::AbstractArray{T, 2}
+    u_h::AbstractArray{T, 2}
+    v_h::AbstractArray{T, 2}
+    dudx::AbstractArray{T, 2}
+    dvdy::AbstractArray{T, 2}
+    dudy_c::AbstractArray{T, 2}
+    dvdx_c::AbstractArray{T, 2}
+    shear_c::AbstractArray{T, 2}
+    shear_h::AbstractArray{T, 2}
+    β_crop::AbstractArray{T, 2}
+    gf_crop::AbstractArray{T, 2}
+    denu::AbstractArray{T, 2}
+    denv::AbstractArray{T, 2}
+    ipolgfu::AbstractArray{T, 2}
+    ipolgfv::AbstractArray{T, 2}
+    hη::AbstractArray{T, 2}
+    hη_c::AbstractArray{T, 2}
+    rhs::AbstractVector{T}
+    f1::AbstractVector{T}
+    f2::AbstractVector{T}
+    f3::AbstractVector{T}
+    sui::AbstractVector{T}
+    hui::AbstractVector{T}
+    dui::AbstractVector{T}
+    svi::AbstractVector{T}
+    hvi::AbstractVector{T}
+    dvi::AbstractVector{T}
+    uvfixed::AbstractVector{T}
+    start_guess::AbstractVector{T}
+    picard_resid::AbstractVector{T}
+    picard_correction::AbstractVector{T}
+    gs_resid::AbstractVector{T}
+    prolonged::AbstractVector{T}
+    op_coarse_tmp1::AbstractVector{T}
+    op_coarse_tmp2::AbstractVector{T}
+    op_diag::AbstractVector{T}
+    r_xx::AbstractArray{T, 2}
+    r_yy::AbstractArray{T, 2}
+    r_xy::AbstractArray{T, 2}
+    extra::AbstractArray{T, 2}
     dx_inv::T
     dy_inv::T
-    gs_colour_indices::Vector{Vector{Int}} = [Int[], Int[], Int[], Int[]]
+    gs_colour_indices::Vector{AbstractVector{Int}} = AbstractVector{Int}[Int[], Int[], Int[], Int[]]
     gs_colours_filled::Bool = false
     mg_ops::MultigridScratch{T}
-    gu_inner_index_map::Array{Int, 2}
-    gv_inner_index_map::Array{Int, 2}
-    haar_u::Array{T, 2}
-    haar_u_tmp::Array{T, 2}
-    haar_v::Array{T, 2}
-    haar_v_tmp::Array{T, 2}
+    gu_inner_index_map::AbstractArray{Int, 2}
+    gv_inner_index_map::AbstractArray{Int, 2}
+    haar_u::AbstractArray{T, 2}
+    haar_u_tmp::AbstractArray{T, 2}
+    haar_v::AbstractArray{T, 2}
+    haar_v_tmp::AbstractArray{T, 2}
 end
 
 """
@@ -161,15 +173,48 @@ function stencil_scratch!(model::AbstractModel{T, N}) where {T, N}
     return allocated
 end
 
+zeros_like(prototype::AbstractArray{T}, dims::Integer...) where {T} =
+    fill!(similar(prototype, T, dims...), zero(T))
+
+function copy_like(prototype::AbstractArray, x::AbstractArray)
+    y = similar(prototype, eltype(x), size(x)...)
+    copyto!(y, x)
+    return y
+end
+
+"""
+    copy_onto!(dest, src)
+
+Write `src` into `dest`. `src` may be a scalar or a host array.
+
+Do not use `dest .= host_matrix` when `dest` is a GPU array: that broadcast
+tries to launch a kernel with a `Matrix`, which is not allowed.
+"""
+copy_onto!(dest::AbstractArray, src::Number) = (fill!(dest, src); dest)
+copy_onto!(dest::AbstractArray, src::AbstractArray) = (copyto!(dest, src); dest)
+
+"""
+    _host(x)
+
+Copy `x` to a host `Array` if needed. `_host(::Array)` is a no-copy so the
+CPU path does not duplicate every field.
+"""
+_host(x) = Array(x)
+_host(x::Array) = x
+
 function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     @unpack gh,gu,gv,gc=model.fields
     grid = model.grid
+    proto = gh.h
 
-    # Inner unknowns: 1D list for gather/scatter, 2D map for op_fun! kernels.
-    gu_inner_indices = findall(vec(gu.mask_inner))
-    gv_inner_indices = findall(vec(gv.mask_inner))
-    gu_inner_index_map = inner_index_map(gu.mask_inner)
-    gv_inner_index_map = inner_index_map(gv.mask_inner)
+    # Index maps are built on the host (findall / column-major numbering),
+    # then copied onto the same backend as `gh.h`.
+    mask_u = Array(gu.mask_inner)
+    mask_v = Array(gv.mask_inner)
+    gu_inner_indices = copy_like(vec(proto), findall(vec(mask_u)))
+    gv_inner_indices = copy_like(vec(proto), findall(vec(mask_v)))
+    gu_inner_index_map = copy_like(proto, inner_index_map(mask_u))
+    gv_inner_index_map = copy_like(proto, inner_index_map(mask_v))
 
     # Preallocate intermediate variables used by op_fun and Picard applies
     dudx = similar(gh.h)
@@ -199,36 +244,36 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     gf_crop = similar(gh.h)
     denu = similar(gu.u)
     denv = similar(gv.v)
-    ipolgfu = zeros(T, gu.nxu, gu.nyu)
-    ipolgfv = zeros(T, gv.nxv, gv.nyv)
+    ipolgfu = zeros_like(gu.u, gu.nxu, gu.nyu)
+    ipolgfv = zeros_like(gv.v, gv.nxv, gv.nyv)
     hη = similar(gh.h)
     hη_c = similar(gh.h, T, gc.nxc, gc.nyc)
-    rhs = zeros(T, gu.ni + gv.ni)
-    f1 = zeros(T, gu.ni + gv.ni)
-    f2 = zeros(T, gu.ni + gv.ni)
-    f3 = zeros(T, gu.ni + gv.ni)
-    sui = zeros(T, gu.ni)
-    hui = zeros(T, gu.ni)
-    dui = zeros(T, gu.ni)
-    svi = zeros(T, gv.ni)
-    hvi = zeros(T, gv.ni)
-    dvi = zeros(T, gv.ni)
-    uvfixed = zeros(T, gu.nxu * gu.nyu + gv.nxv * gv.nyv)
+    rhs = zeros_like(vec(proto), gu.ni + gv.ni)
+    f1 = zeros_like(vec(proto), gu.ni + gv.ni)
+    f2 = zeros_like(vec(proto), gu.ni + gv.ni)
+    f3 = zeros_like(vec(proto), gu.ni + gv.ni)
+    sui = zeros_like(vec(proto), gu.ni)
+    hui = zeros_like(vec(proto), gu.ni)
+    dui = zeros_like(vec(proto), gu.ni)
+    svi = zeros_like(vec(proto), gv.ni)
+    hvi = zeros_like(vec(proto), gv.ni)
+    dvi = zeros_like(vec(proto), gv.ni)
+    uvfixed = zeros_like(vec(proto), gu.nxu * gu.nyu + gv.nxv * gv.nyv)
 
     # Inner velocity length (free u-points, then free v-points).
     ni = gu.ni + gv.ni
 
     # Picard / smoother vectors. Reused every iterate instead of similar/zero.
-    start_guess = zeros(T, ni)
-    picard_resid = zeros(T, ni)
-    picard_correction = zeros(T, ni)
-    gs_resid = zeros(T, ni)
-    prolonged = zeros(T, ni)
-    op_coarse_tmp1 = zeros(T, ni)
-    op_coarse_tmp2 = zeros(T, ni)
+    start_guess = zeros_like(vec(proto), ni)
+    picard_resid = zeros_like(vec(proto), ni)
+    picard_correction = zeros_like(vec(proto), ni)
+    gs_resid = zeros_like(vec(proto), ni)
+    prolonged = zeros_like(vec(proto), ni)
+    op_coarse_tmp1 = zeros_like(vec(proto), ni)
+    op_coarse_tmp2 = zeros_like(vec(proto), ni)
 
     # Jacobi diagonal (filled each get_op_diag from the fused stencil).
-    op_diag = zeros(T, ni)
+    op_diag = zeros_like(vec(proto), ni)
 
     dx_inv = one(T) / grid.dx
     dy_inv = one(T) / grid.dy
@@ -814,12 +859,17 @@ function fill_glen_b!(
     glen_temperature_ref,
     gas_const,
 )
+    a_ref = glen_a_ref
+    if !_is_host_array(glen_b_arr) && _is_host_array(glen_a_ref)
+        a_ref = similar(glen_b_arr, eltype(glen_a_ref), size(glen_a_ref))
+        copyto!(a_ref, glen_a_ref)
+    end
     launch!(
         _update_glen_b_kernel!,
         glen_b_arr,
         θ,
         Φ,
-        glen_a_ref,
+        a_ref,
         glen_n,
         glen_a_activation_energy,
         glen_temperature_ref,

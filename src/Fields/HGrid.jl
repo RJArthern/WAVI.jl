@@ -5,7 +5,7 @@ struct HGrid{T <: Real, N  <: Integer}
             h_isfixed :: AbstractArray{Bool,2}                 # Mask specifying locations of fixed thickness
 hyd_potential_isfixed :: AbstractArray{Bool,2}                 # Mask specifying locations of fixed hydraulic potential at the bed
                     n :: N                                     # Total number of cells in the model domain
-                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
+                 crop :: Diagonal{T, <:AbstractVector{T}}      # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
               cent_xy :: KronType{T,N}                         # Centering operator from H-grid to C-grid
@@ -35,8 +35,8 @@ hyd_potential_isfixed :: AbstractArray{Bool,2}                 # Mask specifying
               quad_f0 :: AbstractArray{T,2}                    # F0 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
               quad_f1 :: AbstractArray{T,2}                    # F1 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
               quad_f2 :: AbstractArray{T,2}                    # F2 quadrature field (eqn 7 in Arthern 2015 JGeophysRes)
-             dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-h × ηav)
-            dimplicit :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-ρi × g × dt × dshs)
+             dneghηav :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (-h × ηav)
+            dimplicit :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (-ρi × g × dt × dshs)
 basal_water_thickness :: AbstractArray{T,2}                    # basal water thickness
 hydraulic_potential_b :: AbstractArray{T,2}                    # hydraulic potential at the bed
    effective_pressure :: AbstractArray{T,2}                    # effective pressure

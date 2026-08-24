@@ -24,6 +24,7 @@ export _diff_x!,
     _scatter!,
     _scatter_mapped!,
     _gather_mapped!,
+    _gs_colour_update!,
     _haar_lift_x!,
     _haar_lift_y!,
     _haar_lift_x_all!,
@@ -406,6 +407,20 @@ Equivalent to `out = samp * inp`.
         if k != 0
             out_vec[k] = inp_2d[i, j]
         end
+    end
+end
+
+"""
+    _gs_colour_update!(x, resid, op_diag, idx, omega)
+
+Add `omega * resid[k] / op_diag[k]` to `x[k]` for each packed index `idx[i]`.
+Used by colour Gauss-Seidel so the sweep does not scalar-index a device array.
+"""
+@kernel function _gs_colour_update!(x, resid, op_diag, idx, omega)
+    i = @index(Global, Linear)
+    @inbounds begin
+        k = idx[i]
+        x[k] += omega * resid[k] / op_diag[k]
     end
 end
 

@@ -52,6 +52,7 @@ function write_output(model::M, output_params::OutputParams, clock::Clock) where
     if ~haskey(output_dict, :t); output_dict["t"] = round(clock.time, digits = 3); end
     if ~haskey(output_dict, :x); output_dict["x"] = model.grid.xxh; end
     if ~haskey(output_dict, :y); output_dict["y"] = model.grid.yyh; end
+    _host_copy_output!(output_dict)
 
     fname = string(output_params.output_path, output_params.prefix, name)
     if output_params.output_format == "jld2"
@@ -64,6 +65,17 @@ function write_output(model::M, output_params::OutputParams, clock::Clock) where
     
     @info "Output at timestep number $(clock.n_iter) - $(fname)"
     clear!(output_params)
+end
+
+# NetCDF and MAT writers index arrays on the host. Copy device fields once here
+# so JLD2 dumps are also CPU-readable found by error on me testing outputs.
+function _host_copy_output!(d::AbstractDict)
+    for (k, v) in d
+        if v isa AbstractArray && !(v isa Array || v isa BitArray)
+            d[k] = Array(v)
+        end
+    end
+    return d
 end
 
 """

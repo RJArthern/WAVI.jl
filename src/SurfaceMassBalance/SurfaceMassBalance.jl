@@ -9,6 +9,7 @@ using WAVI: AbstractSurfaceMassBalance, AbstractModel, AbstractClimateForcing
 using Parameters
 using WAVI.Time
 using WAVI.Grids
+using WAVI.Utilities: copy_onto!
 
 #return the sceme used to compute surface mass balance
 get_surface_mass_balance(model::AbstractModel) = model.surface_mass_balance

@@ -11,15 +11,11 @@ function update_wavelets!(model::AbstractModel{T}) where {T}
     s = stencil_scratch!(model)
 
     copyto!(wu.wavelets, gu.u)
-    @inbounds for i in eachindex(wu.wavelets, gu.mask)
-        wu.wavelets[i] *= gu.mask[i]
-    end
+    @. wu.wavelets *= gu.mask
     haar_dwt!(wu.wavelets, s.haar_u_tmp, wu.levels)
 
     copyto!(wv.wavelets, gv.v)
-    @inbounds for i in eachindex(wv.wavelets, gv.mask)
-        wv.wavelets[i] *= gv.mask[i]
-    end
+    @. wv.wavelets *= gv.mask
     haar_dwt!(wv.wavelets, s.haar_v_tmp, wv.levels)
 
     wu.mask .= (abs.(wu.wavelets) .>= solver_params.wavelet_threshold)
@@ -28,8 +24,8 @@ function update_wavelets!(model::AbstractModel{T}) where {T}
     wu.n[] = count(wu.mask)
     wv.n[] = count(wv.mask)
 
-    wu.correction_coarse[] = zeros(T,wu.n[])
-    wv.correction_coarse[] = zeros(T,wv.n[])
+    wu.correction_coarse[] = zeros_like(vec(wu.wavelets), wu.n[])
+    wv.correction_coarse[] = zeros_like(vec(wv.wavelets), wv.n[])
 
     fill_index_map!(wu.index_map, wu.mask)
     fill_index_map!(wv.index_map, wv.mask)

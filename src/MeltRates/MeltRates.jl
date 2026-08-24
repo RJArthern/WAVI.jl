@@ -63,7 +63,13 @@ Update the melt rate under ice shelves for the UniformMeltRate type
 """
 function update_shelf_melt_rate!(shelf_melt_rate::UniformMeltRate, fields, grid, clock)
     @unpack gh = fields
-    gh.shelf_basal_melt[gh.mask] .= shelf_melt_rate.m_floating .* (1. .- gh.grounded_fraction[gh.mask])
+    # Note: CuArray does not support boolean indexing (`dest[mask] .= ...`). Using ifelse instead.
+    # Had to use this approach across the codebase where boolean indexing is used.
+    @. gh.shelf_basal_melt = ifelse(
+        gh.mask,
+        shelf_melt_rate.m_floating * (1 - gh.grounded_fraction),
+        gh.shelf_basal_melt,
+    )
     return nothing
 end
 

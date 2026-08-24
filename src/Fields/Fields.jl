@@ -11,7 +11,8 @@ using Parameters
 using Setfield          # TODO: InitialConditions using this, bit of an anti-pattern?
 using SparseArrays
 
-using WAVI.Architectures: adapt_structure_fields
+using WAVI.Architectures: adapt_structure_fields, AbstractArchitecture, array_type
+import WAVI.Architectures: on_architecture
 using WAVI: AbstractField, AbstractGrid
 using WAVI.Grids
 using WAVI.KroneckerProducts
@@ -246,6 +247,28 @@ function GridField(grid::AbstractGrid, bed_array;
     #Wavelet-grid, v-component.
     wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
     return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Union{Nothing, StencilScratch{eltype(gh.h)}}}(nothing))
+end
+
+"""
+    on_architecture(arch, fields::GridField)
+
+Copy dense grid and wavelet fields onto `arch`. Sparse operators stay on
+the host. Scratch is dropped so it is rebuilt on the new array type.
+Do not call this on MPI `spec.global_fields`.
+"""
+function on_architecture(arch::AbstractArchitecture, fields::GridField)
+    to = array_type(arch)
+    T = eltype(fields.gh.h)
+    return GridField(
+        Adapt.adapt(to, fields.gh),
+        Adapt.adapt(to, fields.gu),
+        Adapt.adapt(to, fields.gv),
+        Adapt.adapt(to, fields.gc),
+        Adapt.adapt(to, fields.g3d),
+        Adapt.adapt(to, fields.wu),
+        Adapt.adapt(to, fields.wv),
+        Ref{Union{Nothing, StencilScratch{T}}}(nothing),
+    )
 end
 
 # Dense fields move; sparse crop/samp/spread and Kronecker operators stay on the host.

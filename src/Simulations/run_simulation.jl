@@ -11,6 +11,7 @@ using WAVI.Fracture
 using WAVI.SlidingLaw
 using WAVI.BasalHydrology
 using WAVI.ThermoDynamics
+using WAVI.Utilities: _host
 
 
 """
@@ -69,28 +70,44 @@ update_thickness!(model::AbstractModel)
 Update thickness using rate of change of thickness and apply minimum thickness constraint. Includes an option for not evolving shelf thickness.
 """
 function update_thickness!(model::AbstractModel, timestepping_params)
-    hUpdate = zeros(model.grid.nx,model.grid.ny)
-    aground = zeros(model.grid.nx,model.grid.ny)
-    hUpdate[model.fields.gh.mask] = max.(
-        model.params.minimum_thickness .- model.fields.gh.h[model.fields.gh.mask],
-        timestepping_params.dt * model.fields.gh.dhdt[model.fields.gh.mask])
-    
-    #Specify whether to evolve the shelves:
-    if !model.params.evolveShelves
-        hUpdate[model.fields.gh.mask] = max.(
-            model.params.smallHAF .- (
-                model.params.density_ocean ./ model.params.density_ice
-            ) .* model.fields.gh.b[model.fields.gh.mask] .- model.fields.gh.h[model.fields.gh.mask], 
-            hUpdate[model.fields.gh.mask])
-        aground=(model.fields.gh.haf.>=0)
-        wc=[1 1 1; 1 1 1; 1 1 1]
-        w=centered(wc)
-        nearfloat_mask = imfilter(model.fields.gh.mask.&.!aground,reflect(w),Fill(0,w))
-        nearfloat_mask = iszero.(iszero.(nearfloat_mask))
-        hUpdate[nearfloat_mask].=0
+    gh = model.fields.gh
+    min_h = model.params.minimum_thickness
+    dt = timestepping_params.dt
+
+    if model.params.evolveShelves
+        @. gh.h = ifelse(
+            gh.mask & !gh.h_isfixed,
+            gh.h + max(min_h - gh.h, dt * gh.dhdt),
+            gh.h,
+        )
+        return nothing
     end
-    hUpdate[model.fields.gh.h_isfixed] .= 0
-    model.fields.gh.h[model.fields.gh.mask] = model.fields.gh.h[model.fields.gh.mask] .+ hUpdate[model.fields.gh.mask]
+
+    h = _host(gh.h)
+    mask = _host(gh.mask)
+    dhdt = _host(gh.dhdt)
+    h_isfixed = _host(gh.h_isfixed)
+    b = _host(gh.b)
+    haf = _host(gh.haf)
+
+    hUpdate = zeros(eltype(h), size(h))
+    hUpdate[mask] .= max.(min_h .- h[mask], dt .* dhdt[mask])
+    hUpdate[mask] .= max.(
+        model.params.smallHAF .- (
+            model.params.density_ocean ./ model.params.density_ice
+        ) .* b[mask] .- h[mask],
+        hUpdate[mask],
+    )
+    aground = (haf .>= 0)
+    wc = [1 1 1; 1 1 1; 1 1 1]
+    w = centered(wc)
+    nearfloat_mask = imfilter(mask .& .!aground, reflect(w), Fill(0, w))
+    nearfloat_mask = iszero.(iszero.(nearfloat_mask))
+    hUpdate[nearfloat_mask] .= 0
+    hUpdate[h_isfixed] .= 0
+    h[mask] .+= hUpdate[mask]
+    h === gh.h || copyto!(gh.h, h)
+    return nothing
 end
 update_thickness!(simulation::Simulation) = update_thickness!(s.model, s.timestepping_params)
 

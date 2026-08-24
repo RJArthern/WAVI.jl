@@ -33,6 +33,7 @@ end
 if group == "utils" || group == "all"
     include("test_utils.jl")
     include("test_architectures.jl")
+    include("test_gpuspec.jl")
 end
 
 if group == "kronecker" || group == "all"
