@@ -79,6 +79,26 @@ using WAVI
         end
     end
 
+    # Halo and PoU MPI buffers stay host `Vector`/`Matrix` (not CUDA-aware MPI).
+    @testset "RAS and PoU scratch stay host Array" begin
+        model = build_model(halo = 2, pou = true)
+        WAVI.Specs.halo_exchange!(model; fields = [:h])
+        hs = model.spec.halo_scratch
+        @test hs !== nothing
+        @test hs.send_l isa Vector
+        @test hs.recv_l isa Vector
+        @test hs.l0_h isa Matrix
+        @test hs.W_left isa Vector
+
+        WAVI.Specs.mpi_velocity_pou_weights(model)
+        ps = model.spec.pou_scratch
+        @test ps !== nothing
+        @test ps.ωu isa Matrix
+        @test ps.work_u isa Matrix
+        @test ps.send_l isa Vector
+        @test ps.recv_l isa Vector
+    end
+
     # With partition of unity, thickness sync must not overwrite assembled u and v halos.
     @testset "mpi_sync_halos_after_thickness! preserves u/v when pou=true" begin
         model = build_model(halo = 2, pou = true)

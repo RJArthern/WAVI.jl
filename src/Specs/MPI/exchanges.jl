@@ -11,6 +11,15 @@ import WAVI.Models: BasicSpec, Model, get_bed_elevation
 import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, update_velocities_on_h_grid!
 import WAVI.Wavelets: UWavelets, VWavelets
 
+# MPI send/recv, Gatherv, and scalar halo blends use host memory on purpose
+# (not CUDA-aware MPI). `_host(::Array)` is a no-copy so the CPU path is unchanged.
+# TODO: Will leave CUDA-aware MPI for future work.
+function _mpi_copy_back!(dest, host)
+    dest === host && return dest
+    copyto!(dest, host)
+    return dest
+end
+
 ##
 # Additional MPI functionality
 #
@@ -183,6 +192,7 @@ function ensure_mpi_pou_scratch!(model::AbstractModel{<:Any, <:Any, <:MPISpec})
     o = 2 * halo
     ωu = partition_of_unity(mu, nu, leavei1, leaveim, leavej1, leavejn, o, o - 1)
     ωv = partition_of_unity(mv, nv, leavei1, leaveim, leavej1, leavejn, o - 1, o)
+    # Host `Matrix` on purpose; MPI strips are not CUDA-aware.
     scratch = MPIPoUScratch(Matrix{T}(ωu), Matrix{T}(ωv))
     spec.pou_scratch = scratch
     return scratch
@@ -222,13 +232,15 @@ function copy_ras_l0!(scratch::MPIHaloScratch{T}, field_data, local_field, field
 end
 
 function _copy_ras_l0_matrix!(buf::Matrix{T}, src) where {T}
-    if size(buf) != size(src)
-        buf = similar(src)
+    src_h = _host(src)
+    if size(buf) != size(src_h)
+        buf = Matrix{T}(undef, size(src_h)...)
     end
-    copyto!(buf, src)
+    copyto!(buf, src_h)
     return buf
 end
 
+# `buf` is a host `Vector`. `field` must already be on the host (see `_host` in `halo_exchange!`).
 function pack_halo_strip!(buf::Vector{T}, field, irange, jrange) where {T}
     ni, nj = length(irange), length(jrange)
     n = ni * nj
@@ -254,7 +266,8 @@ Communication happens in the X direction first, and the values received are imme
 added to the `field`. When the Y direction is then exchanged, it propagates
 any diagonal corner contributions without requiring an explicit corner message.
 
-Send/recv packs are reused via `scratch` (`MPIPoUScratch`).
+Send/recv packs are reused via `scratch` (`MPIPoUScratch`). `field` is the host
+work array; device velocities are copied onto it before this call.
 """
 function mpi_pou_add_neighbour_strips!(
     field::AbstractMatrix{T},
@@ -360,19 +373,25 @@ function mpi_pou_weighted_prolong_velocities!(
 )
     @unpack gu, gv = model.fields
     @unpack halo, top, right, bottom, left, comm, damping = model.spec
-    d = oftype(gu.u[1], damping)
+    d = convert(eltype(gu.u), damping)
     od = one(d) - d
 
     scratch = ensure_mpi_pou_scratch!(model)
     ωu, ωv = scratch.ωu, scratch.ωv
     contrib_u, contrib_v = scratch.work_u, scratch.work_v
 
+    # PoU work arrays stay on the host. Copy device velocities here, then MPI
+    # the host strips (see MPIPoUScratch).
+    u_h = _host(gu.u)
+    v_h = _host(gv.v)
     # Combined local contribution (ThreadedSpec: damp*old*ω + (1-damp)*new*ω)
-    @. contrib_u = od * ωu * gu.u
-    @. contrib_v = od * ωv * gv.v
+    @. contrib_u = od * ωu * u_h
+    @. contrib_v = od * ωv * v_h
     if !iszero(d)
-        @. contrib_u += d * ωu * u0
-        @. contrib_v += d * ωv * v0
+        u0_h = _host(u0)
+        v0_h = _host(v0)
+        @. contrib_u += d * ωu * u0_h
+        @. contrib_v += d * ωv * v0_h
     end
 
     # Geometric patch overlap (h-overlap = 2*halo), plus one extra face on the
@@ -387,12 +406,21 @@ function mpi_pou_weighted_prolong_velocities!(
         left, right, top, bottom, comm, tag_base = 200, scratch,
     )
 
-    gu.u .= contrib_u
-    gv.v .= contrib_v
+    copyto!(gu.u, contrib_u)
+    copyto!(gv.v, contrib_v)
     update_velocities_on_h_grid!(model)
     return nothing
 end
 
+"""
+    halo_exchange!(model; fields=[:h, :u, :v])
+
+Exchange halo strips with cardinal MPI neighbours, then blend into the local field.
+
+Pack, MPI, and blend run on host arrays. Device fields are copied onto the host
+for the exchange and copied back afterwards. This is not CUDA-aware MPI, just 
+running out of time to implement CUDA-aware MPI.
+"""
 function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
     @unpack halo, rank, comm, top, right, bottom, left, damping = model.spec
     @unpack gh, gu, gv = model.fields
@@ -439,7 +467,9 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         length(size(local_field)) != 2 && continue
 
         field_nx, field_ny = size(local_field)
-        L0 = skip_l0 ? local_field : copy_ras_l0!(scratch, field_data, local_field, model.fields)
+        # Pack, MPI, and blend on the host. Copy back if `local_field` is a device array.
+        field_h = _host(local_field)
+        L0 = skip_l0 ? field_h : copy_ras_l0!(scratch, field_data, field_h, model.fields)
 
         # --- Phase 1: X-Direction Exchange (Left/Right) ---
         requests_x = MPI.RequestSet()
@@ -452,7 +482,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         if left > -1
             ir = (lh + 1 + off_x):(lh + halo + off_x)
             n_x = halo * field_ny
-            send_left_flat = pack_halo_strip!(scratch.send_l, local_field, ir, axes(local_field, 2))
+            send_left_flat = pack_halo_strip!(scratch.send_l, field_h, ir, axes(field_h, 2))
             recv_left_flat = recv_halo_strip!(scratch.recv_l, n_x)
             push!(requests_x, MPI.Isend(send_left_flat, left, left_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_left_flat, left, right_send_tag, comm))
@@ -461,7 +491,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         if right > -1
             ir = (field_nx - rh - halo + 1 - off_x):(field_nx - rh - off_x)
             n_x = halo * field_ny
-            send_right_flat = pack_halo_strip!(scratch.send_r, local_field, ir, axes(local_field, 2))
+            send_right_flat = pack_halo_strip!(scratch.send_r, field_h, ir, axes(field_h, 2))
             recv_right_flat = recv_halo_strip!(scratch.recv_r, n_x)
             push!(requests_x, MPI.Isend(send_right_flat, right, right_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_right_flat, right, left_send_tag, comm))
@@ -479,7 +509,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         if top > -1
             jr = (th + 1 + off_y):(th + halo + off_y)
             n_y = field_nx * halo
-            send_top_flat = pack_halo_strip!(scratch.send_t, local_field, axes(local_field, 1), jr)
+            send_top_flat = pack_halo_strip!(scratch.send_t, field_h, axes(field_h, 1), jr)
             recv_top_flat = recv_halo_strip!(scratch.recv_t, n_y)
             push!(requests_y, MPI.Isend(send_top_flat, top, top_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_top_flat, top, bottom_send_tag, comm))
@@ -488,7 +518,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         if bottom > -1
             jr = (field_ny - bh - halo + 1 - off_y):(field_ny - bh - off_y)
             n_y = field_nx * halo
-            send_bottom_flat = pack_halo_strip!(scratch.send_b, local_field, axes(local_field, 1), jr)
+            send_bottom_flat = pack_halo_strip!(scratch.send_b, field_h, axes(field_h, 1), jr)
             recv_bottom_flat = recv_halo_strip!(scratch.recv_b, n_y)
             push!(requests_y, MPI.Isend(send_bottom_flat, bottom, bottom_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_bottom_flat, bottom, top_send_tag, comm))
@@ -498,7 +528,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
         MPI.Waitall(requests_y)
 
         apply_halo_exchange_blends!(
-            local_field,
+            field_h,
             L0,
             recv_left,
             recv_right,
@@ -519,6 +549,7 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
             top,
             bottom,
         )
+        _mpi_copy_back!(local_field, field_h)
     end
 end
 
@@ -567,7 +598,11 @@ function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) w
     # Send/Gather the remote copies from the other nodes into the full field.
     # We provide the local core size and positioning in the target global field.
     field_sz = MPI.Gather(((x_sz - lh - rh, y_sz - th - bh), sx, ex, sy, ey), 0, comm)
-    
+
+    # MPI gather needs the core cells (halo stripped) as one packed host array.
+    # A 2D interior view is not packed in memory, and a GPU field is not on the host.
+    sendbuf = _host(@view local_field[(1 + lh):(end - rh), (1 + th):(end - bh)])
+
     if rank == 0
         global_field = model.spec.global_fields # Not named correctly
         for path_el in path[2:end]
@@ -576,11 +611,11 @@ function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) w
         # We calculate the global grid coordinates for all ranks 
         # based on the received sizes of their core domain (ie. no halo)
         count_sizes = map(x -> prod(x[1]), field_sz)
-        field_type = eltype(local_field)
+        field_type = eltype(sendbuf)
         recv_data = Vector{field_type}(undef, sum(count_sizes))
         recv_buffer = MPI.VBuffer(recv_data, count_sizes)
         @debug "[$(rank+1)/$(global_size) ", join(string.(path), "."), "] Gathering field $((1+lh, size(local_field)[1]-rh, 1+th, size(local_field)[2]-bh)) to buffer $(size(recv_data))"
-        MPI.Gatherv!(local_field[1+lh:end-rh, 1+th:end-bh], recv_buffer, comm)
+        MPI.Gatherv!(sendbuf, recv_buffer, comm)
 
         idxer = collect(cumsum(count_sizes))
 
@@ -594,7 +629,7 @@ function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) w
         return global_field
     else
         @debug "[$(rank+1)/$(global_size)] Sending ", join(string.(path), "."), " data"
-        MPI.Gatherv!(local_field[1+lh:end-rh, 1+th:end-bh], nothing, comm)
+        MPI.Gatherv!(sendbuf, nothing, comm)
         MPI.Barrier(comm)
         return nothing
     end
