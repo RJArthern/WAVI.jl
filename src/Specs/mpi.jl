@@ -610,13 +610,17 @@ function core_inner_masks(model::Model{<:Any, <:Any, <:MPISpec})
     @unpack gu, gv = model.fields
     th, rh, bh, lh = get_halos(model.spec)
 
-    u_core_mask = falses(size(gu.mask_inner))
-    u_core_mask[(1+lh):(size(u_core_mask, 1)-rh), (1+th):(size(u_core_mask, 2)-bh)] .= true
-    u_core_inner = Vector{Bool}(u_core_mask[gu.mask_inner])
+    # Host copies: `mask_inner` lives on the child architecture (GPU ranks).
+    mask_u = _host(gu.mask_inner)
+    mask_v = _host(gv.mask_inner)
 
-    v_core_mask = falses(size(gv.mask_inner))
+    u_core_mask = falses(size(mask_u))
+    u_core_mask[(1+lh):(size(u_core_mask, 1)-rh), (1+th):(size(u_core_mask, 2)-bh)] .= true
+    u_core_inner = Vector{Bool}(u_core_mask[mask_u])
+
+    v_core_mask = falses(size(mask_v))
     v_core_mask[(1+lh):(size(v_core_mask, 1)-rh), (1+th):(size(v_core_mask, 2)-bh)] .= true
-    v_core_inner = Vector{Bool}(v_core_mask[gv.mask_inner])
+    v_core_inner = Vector{Bool}(v_core_mask[mask_v])
 
     model.spec.core_inner = (u_core_inner, v_core_inner)
     return model.spec.core_inner
@@ -685,14 +689,17 @@ function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
 
         # Global Residual Check (core-only):
         # exclude overlap halos so each physical unknown is counted once globally.
+        # Packed vectors may be on GPU; masks and the reduction stay on the host.
         @unpack gu, gv = model.fields
         u_core_inner, v_core_inner = core_inner_masks(model)
+        resid_h = _host(resid)
+        b_h = _host(b)
 
         # Calculate squared norms locally on core unknowns only
-        local_resid_sq = sum(abs2, @view resid[1:gu.ni][u_core_inner]) +
-                         sum(abs2, @view resid[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
-        local_rhs_sq = sum(abs2, @view b[1:gu.ni][u_core_inner]) +
-                       sum(abs2, @view b[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
+        local_resid_sq = sum(abs2, @view resid_h[1:gu.ni][u_core_inner]) +
+                         sum(abs2, @view resid_h[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
+        local_rhs_sq = sum(abs2, @view b_h[1:gu.ni][u_core_inner]) +
+                       sum(abs2, @view b_h[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
 
         # Sum squared norms across all ranks
         global_resid_sq = MPI.Allreduce(local_resid_sq, MPI.SUM, model.spec.comm)

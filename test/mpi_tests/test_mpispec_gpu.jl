@@ -72,6 +72,17 @@ end
         @test 11.0 in vals
         @test gathered isa Array
     end
+
+    u_core, v_core = WAVI.Specs.core_inner_masks(model)
+    @test u_core isa Vector{Bool}
+    @test v_core isa Vector{Bool}
+    @test length(u_core) == model.fields.gu.ni
+    @test length(v_core) == model.fields.gv.ni
+
+    # Hits the Schwarz residual check (host masks vs GPU packed residual).
+    update_velocities!(model)
+    @test all(isfinite, Array(model.fields.gu.u))
+    @test all(isfinite, Array(model.fields.gv.v))
 end
 
 MPI.Finalize()
