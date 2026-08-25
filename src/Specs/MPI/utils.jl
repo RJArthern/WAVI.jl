@@ -26,6 +26,14 @@ function get_halos(spec::MPISpec)::Tuple{Int, Int, Int, Int}
 end
 
 """
+True when this rank has a cardinal MPI neighbour.
+
+One-rank runs have no neighbours, so halo, PoU, and Schwarz stay uncompiled.
+"""
+mpi_has_neighbours(spec::MPISpec) =
+    spec.left > -1 || spec.right > -1 || spec.top > -1 || spec.bottom > -1
+
+"""
     Get the bounds of a given MPISpec
 
     The bounds are calculated based on the global grid size and the number of processes in each direction.

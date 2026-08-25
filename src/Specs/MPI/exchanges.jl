@@ -422,16 +422,19 @@ for the exchange and copied back afterwards. This is not CUDA-aware MPI, just
 running out of time to implement CUDA-aware MPI.
 """
 function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
-    @unpack halo, rank, comm, top, right, bottom, left, damping = model.spec
-    @unpack gh, gu, gv = model.fields
-
+    @unpack halo, rank = model.spec
     if halo == 0
         rank == 0 && @warn "No halo exchange to take place, returning"
         return
     end
-    if left < 0 && right < 0 && top < 0 && bottom < 0
-        return
-    end
+    mpi_has_neighbours(model.spec) || return
+    _halo_exchange_neighbours!(model; fields)
+    return nothing
+end
+
+function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
+    @unpack halo, comm, top, right, bottom, left, damping = model.spec
+    @unpack gh, gu, gv = model.fields
 
     th, rh, bh, lh = get_halos(model.spec)
 
@@ -553,6 +556,15 @@ function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:
     end
 end
 
+function _collect_mpi_field_one_rank!(model, path, local_field)
+    global_field = model.spec.global_fields
+    for path_el in path[2:end]
+        global_field = getproperty(global_field, path_el)
+    end
+    copyto!(global_field, local_field)
+    return global_field
+end
+
 function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) where {T,N,S<:MPISpec}
     @unpack comm, coords, global_size, rank = model.spec
 
@@ -566,12 +578,16 @@ function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) w
         local_field = getproperty(local_field, path_el)
     end
 
-    # Establish the local grid information, with full grid information available already from global_grid
-    th, rh, bh, lh = get_halos(model.spec)
     # We only handle 2D fields!
     if length(size(local_field)) != 2
         error("Trying to exchange a field ",join(string.(path), ".")," that is not 2D, this is not possible")
     end
+    if global_size == 1
+        return _collect_mpi_field_one_rank!(model, path, local_field)
+    end
+
+    # Establish the local grid information, with full grid information available already from global_grid
+    th, rh, bh, lh = get_halos(model.spec)
     x_sz, y_sz = size(local_field)
     x_start, x_end, y_start, y_end = get_bounds(model.spec)
 

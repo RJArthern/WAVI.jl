@@ -585,14 +585,24 @@ end
     inner_update!(model::Model{<:Any, <:Any, <:MPISpec})
 
 Overload for the inner update of the velocity solve.
-We need to sync halos before performing the update so that the viscosity and other
-calculations have correct boundary information from neighbouring procs.
 
-Note: `update_rheological_operators!` is called after the halo sync because the field
-update runs before we have correct cross-rank rheology values (β, βeff, ηav). The
-operators must be built from that halo data.
+One-rank (no neighbours) uses the same local path as GPUSpec. With neighbours,
+sync halos so viscosity and other calculations have boundary data from
+neighbouring ranks. `update_rheological_operators!` runs after that halo
+sync because β, βeff, and ηav must include cross-rank values.
 """
 function inner_update!(model::Model{<:Any, <:Any, <:MPISpec})
+    mpi_has_neighbours(model.spec) || return _inner_update_local!(model)
+    return _inner_update_mpi_neighbours!(model)
+end
+
+function _inner_update_local!(model::Model{<:Any, <:Any, <:MPISpec})
+    inner_update_fields!(model)
+    update_rheological_operators!(model)
+    return model
+end
+
+function _inner_update_mpi_neighbours!(model::Model{<:Any, <:Any, <:MPISpec})
     # RAS ghost sync for velocities; AS-PoU keeps overlap values from the last prolongation.
     if !model.spec.pou
         halo_exchange!(model; fields=[:u, :v])
@@ -644,12 +654,13 @@ Solves the linear system using an iterative overlapping Schwarz method across th
     *   Solver exits early if the global relative residual meets the Picard tolerance.
 """
 function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
-    @unpack niterations, pou, global_size = model.spec
-    @unpack solver_params = model
+    model.spec.global_size == 1 && return local_precondition!(model)
+    return _schwarz_precondition!(model)
+end
 
-    if global_size == 1
-        return local_precondition!(model)
-    end
+function _schwarz_precondition!(model::Model{<:Any, <:Any, <:MPISpec})
+    @unpack niterations, pou = model.spec
+    @unpack solver_params = model
 
     converged = false
     global_rel_resid = Inf
