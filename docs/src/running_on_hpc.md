@@ -1,6 +1,6 @@
 # Running on HPC Clusters
 
-WAVI.jl is designed to be highly scalable and can be run efficiently on High-Performance Computing (HPC) clusters. Below are examples of how to submit jobs using the SLURM workload manager for serial, multi-threaded, and MPI configurations.
+WAVI.jl is designed to be highly scalable and can be run efficiently on High-Performance Computing (HPC) clusters. Below are examples of how to submit jobs using the SLURM workload manager for serial, multi-threaded, MPI, and GPU configurations.
 
 These examples are based on the `MISMIP_PLUS` driver provided in the `example_drivers/MISMIP_PLUS` directory for running on the British Antarctic Survey's HPC.
 
@@ -44,3 +44,7 @@ path = joinpath(pkgdir(WAVI), "example_drivers", "MISMIP_PLUS", "submit-driver.m
 content = read(path, String)
 Markdown.MD(Markdown.Code("bash", content))
 ```
+
+## GPU execution
+
+See the [GPU setup](./gpu_setup.md) section to understand how to request GPUs, load vendor packages (CUDA, ... more in the future), run on individual GPUs using `GPUSpec`, and a combination of `MPISpec` and `GPUSpec` to run on multiple GPUs.

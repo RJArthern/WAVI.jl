@@ -141,7 +141,7 @@ cd example_drivers/MISMIP_PLUS
 mpiexecjl -n 4 --project=../.. julia MISMIP_PLUS.jl
 ```
 
-Alternatively, you can use the bundled sweep script, which tests serial, threaded, and several MPI process counts:
+Alternatively, `./run_mismip_plus.sh` in that directory sweeps serial, threaded, MPI, one GPU, and MPI+GPU if more than one GPU is present. The script launches `mpiexecjl` itself, so a scheduler job must be **one task** with enough CPUs for `-t 7` / `-n 7` (for example `--ntasks=1 --cpus-per-task=8`). GPU steps skip when there is no device.
 
 ```bash
 ./run_mismip_plus.sh

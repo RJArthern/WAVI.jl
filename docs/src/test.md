@@ -36,7 +36,7 @@ MPISpec tests follow the [MPI.jl recommended pattern](https://juliaparallel.org/
 
 | Driver | What runs |
 |--------|-----------|
-| `test/runtests_mpi_unit.jl` | Fast checks: halo exchange and global collect on a small `MPISpec` grid (two MPI ranks). |
+| `test/runtests_mpi_unit.jl` | Fast checks: halo exchange and global collect on a small `MPISpec` grid (two MPI ranks). MPI+GPU (`child_architecture = GPU()`) runs only if CUDA.jl is in the active project *and* a device is visible. `julia --project=test` skips it; on a GPU node use `--project=benchmarks`. |
 | `test/runtests_mpi_integration.jl` | Short Iceberg-style run comparing `MPISpec` to `BasicSpec` on two ranks (slower than unit). |
 
 From the repository root (after `Pkg.instantiate()` in the `test` project):
@@ -44,6 +44,12 @@ From the repository root (after `Pkg.instantiate()` in the `test` project):
 ```bash
 julia --project=test test/runtests_mpi_unit.jl
 julia --project=test test/runtests_mpi_integration.jl
+```
+
+MPI+GPU unit tests need CUDA.jl, which is not in `test/Project.toml`. On a GPU node:
+
+```bash
+julia --project=benchmarks test/runtests_mpi_unit.jl
 ```
 
 To debug a single MPI test script directly under MPI (optional), use [`mpiexecjl`](https://juliaparallel.org/MPI.jl/stable/usage/#Julia-wrapper-for-mpiexec) as described in [Model specifications](./model_specifications.md):

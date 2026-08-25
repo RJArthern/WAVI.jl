@@ -72,3 +72,7 @@ At this time, updating should be done with care, as WAVI is under rapid developm
 ## MPI
 
 Distributed runs use [MPI.jl](https://juliaparallel.org/MPI.jl/) and [`MPISpec`](./model_specifications.md#mpispec). On a new machine you must [configure MPI](./mpi_setup.md) before running WAVI on multiple processes.
+
+## GPU
+
+Single-GPU runs use [CUDA.jl](https://cuda.juliagpu.org/) and [`GPUSpec`](./model_specifications.md#gpuspec). CUDA is not a WAVI dependency: add it to your driver project, then [set up the GPU](./gpu_setup.md).
