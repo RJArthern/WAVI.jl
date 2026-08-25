@@ -1,4 +1,4 @@
-# WAVIBenchmarks — benchmark harness for WAVI.jl (BasicSpec / ThreadedSpec / MPISpec).
+# WAVIBenchmarks: benchmark harness for WAVI.jl (BasicSpec / ThreadedSpec / MPISpec / GPUSpec).
 #
 # To install dependencies the first time, or on Project.toml changes, run:
 #   cd benchmarks
@@ -33,7 +33,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
 
 # Arguments
 
-- `mode`: `basic`, `threaded`, or `mpi`
+- `mode`: `basic`, `threaded`, `mpi`, or `gpu`
 - `driver`: registered adaptor name (e.g. `mismip_plus`)
 
 # Options
@@ -96,7 +96,7 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
 
 # Options
 
-- `--mode <mode>`: `basic` (default), `threaded`, or `mpi`
+- `--mode <mode>`: `basic` (default), `threaded`, `mpi`, or `gpu`
 - `--niterations <n>`: [ThreadedSpec, MPISpec] Schwarz/PoU iterations (default: 2)
 - `--ngridsx <n>`: [ThreadedSpec] x domain decomposition (default: 2)
 - `--ngridsy <n>`: [ThreadedSpec] y domain decomposition (default: 2)

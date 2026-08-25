@@ -1,5 +1,6 @@
 #!/bin/bash
-# WAVI Scaling Benchmark Sweep
+# WAVI Scaling Benchmark Sweep (CPU only: BasicSpec threads and MPISpec ranks).
+# For a single-GPU GPUSpec trial run on BAS HPC node: bsl-node-s22, use benchmarks/run_gpu.sh.
 #
 # This script is configured for the British Antarctic Survey (BAS) HPC.
 # It assumes submission to the 'medium' partition on a node with 36

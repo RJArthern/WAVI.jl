@@ -4,7 +4,25 @@ using LinearAlgebra
 using MPI
 using WAVI
 
-const _VALID_MODES = (:basic, :threaded, :mpi)
+const _VALID_MODES = (:basic, :threaded, :mpi, :gpu)
+
+"""
+Check that CUDA.jl was loaded before WAVI, so `GPUSpec` methods exist.
+
+Do not `using CUDA` in this module: CPU benchmark runs must not require it.
+`benchmarks/run.jl` loads CUDA at top level when `gpu` is in ARGS.
+"""
+function load_cuda!()
+    if Base.get_extension(WAVI, :WAVICUDAExt) === nothing
+        error(
+            "GPU mode needs CUDA.jl loaded before WAVI. " *
+            "Use: julia --project=benchmarks benchmarks/run.jl run gpu <driver>. " *
+            "If CUDA is missing from the benchmarks project: " *
+            "julia --project=benchmarks -e 'using Pkg; Pkg.add(\"CUDA\")'.",
+        )
+    end
+    return nothing
+end
 
 # # Configuration
 
@@ -15,7 +33,7 @@ Configuration for a benchmark run.
 
 # Fields
 
-- `mode`: execution mode: `:basic`, `:threaded`, or `:mpi`
+- `mode`: execution mode: `:basic`, `:threaded`, `:mpi`, or `:gpu`
 - `driver`: registered adaptor name (e.g. `"mismip_plus"`)
 - `ngridsx`, `ngridsy`, `overlap`, `niterations`: ThreadedSpec / Schwarz parameters
 - `px`, `py`: MPI process grid dimensions (`px == 0` means use `Comm_size`; `py` defaults to `1`, i.e. an `N×1` layout)
@@ -107,12 +125,15 @@ How many cores this benchmark is meant to use, for normalising CPU samples
 - `:basic`: `Threads.nthreads()`
 - `:threaded`: `ngridsx * ngridsy`
 - `:mpi`: `mpi_world_size` if given, else `SLURM_NTASKS`, else `1`
+- `:gpu`: `1` (one process, one device)
 """
 function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
     if opts.mode == :threaded
         return opts.ngridsx * opts.ngridsy
     elseif opts.mode == :mpi
         return something(mpi_world_size, 1)
+    elseif opts.mode == :gpu
+        return 1
     else
         return Threads.nthreads()
     end
@@ -127,7 +148,7 @@ Load the requested driver adaptor, build appropriate WAVI spec, and run
 `benchmark_main` for monitoring.
 """
 function run_benchmark(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, or mpi.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, or gpu.")
 
     pin_blas_threads!()
 
@@ -155,6 +176,12 @@ function run_benchmark(opts::BenchmarkOptions)
             nx, ny, ov, ni = opts.ngridsx, opts.ngridsy, opts.overlap, opts.niterations
             spec_kwargs[:spec] = ThreadedSpec(; ngridsx = nx, ngridsy = ny, overlap = ov, niterations = ni)
             run_id = "threaded.$(nx)x$(ny)_o$(ov)_i$(ni)"
+
+        elseif opts.mode == :gpu
+            # GPU: GPUSpec setup
+            load_cuda!()
+            spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
+            run_id = "gpu"
 
         elseif opts.mode == :mpi
             # Distributed: MPISpec setup
@@ -235,7 +262,7 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
 (slow; not part of this subcommand).
 """
 function run_profile(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, or mpi.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, or gpu.")
 
     pin_blas_threads!()
     opts.mode == :mpi && !MPI.Initialized() && MPI.Init()
@@ -253,6 +280,11 @@ function run_profile(opts::BenchmarkOptions)
             nx, ny, ov, ni = opts.ngridsx, opts.ngridsy, opts.overlap, opts.niterations
             spec_kwargs[:spec] = ThreadedSpec(; ngridsx = nx, ngridsy = ny, overlap = ov, niterations = ni)
             run_id = "threaded.$(nx)x$(ny)_o$(ov)_i$(ni)"
+
+        elseif opts.mode == :gpu
+            load_cuda!()
+            spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
+            run_id = "gpu"
 
         elseif opts.mode == :mpi
             sz = MPI.Comm_size(MPI.COMM_WORLD)

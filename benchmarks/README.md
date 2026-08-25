@@ -4,7 +4,9 @@ This directory contains the benchmarking suite for WAVI.jl, allowing you to trac
 
 ## Running on BAS HPC (SLURM)
 
-The `run_scaling.sh` script is tailored for running multi-core scaling sweeps on the British Antarctic Survey (BAS) HPC using SLURM. It is configured for the compute node with 36 physical cores and using the `medium` partition.
+### CPU scaling (`run_scaling.sh`)
+
+The `run_scaling.sh` script is for CPU-only multi-core scaling sweeps (BasicSpec thread counts and MPISpec ranks) on the British Antarctic Survey (BAS) HPC. It is configured for a compute node with 36 physical cores on the `medium` partition.
 
 ### Usage
 
@@ -32,9 +34,31 @@ To run a simple single-core baseline on a compute node directly from a login nod
 srun -A short -p short -N 1 -n 1 --time=00:30:00 julia -t 1 --project=benchmarks benchmarks/run.jl run basic ismip7_16km_synthetic --tag "baseline_sparse"
 ```
 
+### GPU trial run (`run_gpu.sh`)
+
+`run_gpu.sh` is a one-GPU `GPUSpec` job (not a thread or MPI sweep). The script defaults to `bsl-node-s22` (which currently has 8 x V100S). CUDA.jl vendors its own toolkit (So, you must not do a `module load cuda`), the NVIDIA driver on the GPU node is enough. It requests `--gres=gpu:1` and does not use `mpiexec`. CUDA.jl is added to the benchmarks project on first run if it is missing. `sbatch --nodelist=` overrides the default node.
+
+```bash
+sbatch benchmarks/run_gpu.sh "ka.jl_gpuspec" "ismip7_16km_synthetic"
+sbatch --nodelist=bsl-node-s20 benchmarks/run_gpu.sh "ka.jl_gpuspec"   # Currently has 2 A40 GPUs
+sbatch --nodelist=bsl-node-s21 benchmarks/run_gpu.sh "ka.jl_gpuspec"   # Currently has 2 T4 GPUs
+```
+
+If you are already on the GPU node:
+
+```bash
+bash benchmarks/run_gpu.sh "ka.jl_gpuspec"
+```
+
+Or, without the script:
+
+```bash
+julia --project=benchmarks -t 1 benchmarks/run.jl run gpu ismip7_16km_synthetic --tag "ka.jl_gpuspec_gpu1"
+```
+
 ### Outputs
 
-The script runs a scaling sweep (1, 2, 4, 8, 16, and 36 cores) using the `ismip7_16km_synthetic` driver. All telemetry data and outputs are saved to `benchmarks/output/ismip7_16km_synthetic/`.
+The CPU script runs a scaling sweep (1, 2, 4, 8, 16, and 36 cores) using the `ismip7_16km_synthetic` driver. The GPU script runs the same driver once with `GPUSpec`. Telemetry is saved under `benchmarks/output/<driver>/`.
 
 Each run generates:
 - `resource_timeseries.csv`: CPU and memory (RSS) usage sampled at 0.5s intervals.

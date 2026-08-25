@@ -4,9 +4,23 @@ using MPI
 using Printf
 using Profile
 using Logging
-using LoggingExtras
 
 const BENCHMARK_OUTPUT_DIR = normpath(@__DIR__, "..", "output")
+
+# Logging updates mimics the behaviour of LoggingExtras.TeeLogger (Trying to get working with GPU case where it failed).
+struct TeeIO{A <: IO, B <: IO} <: IO
+    a::A
+    b::B
+end
+Base.write(io::TeeIO, x::UInt8) = (write(io.a, x); write(io.b, x))
+function Base.unsafe_write(io::TeeIO, p::Ptr{UInt8}, n::UInt)
+    unsafe_write(io.a, p, n)
+    return unsafe_write(io.b, p, n)
+end
+Base.flush(io::TeeIO) = (flush(io.a); flush(io.b); nothing)
+Base.isopen(io::TeeIO) = isopen(io.a) && isopen(io.b)
+Base.iswritable(::TeeIO) = true
+Base.get(io::TeeIO, key::Symbol, default) = get(io.a, key, default)
 
 """
     BenchmarkResults
@@ -169,7 +183,7 @@ function benchmark_main(id::String,
     log_io = nothing
     if rank == 0
         log_io = open(joinpath(output_dir, "run.log"), "w")
-        global_logger(TeeLogger(old_logger, SimpleLogger(log_io)))
+        global_logger(ConsoleLogger(TeeIO(stderr, log_io)))
         @async begin
             while isopen(log_io)
                 flush(log_io)
@@ -261,6 +275,16 @@ function benchmark_main(id::String,
     end
 
     return result, benchmark_results
+    catch e
+        if rank == 0 && log_io !== nothing
+            bt = catch_backtrace()
+            showerror(stderr, e, bt)
+            println(stderr)
+            showerror(log_io, e, bt)
+            println(log_io)
+            flush(log_io)
+        end
+        rethrow()
     finally
         if rank == 0 && log_io !== nothing
             global_logger(old_logger)
