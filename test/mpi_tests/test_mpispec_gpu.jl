@@ -83,6 +83,75 @@ end
     update_velocities!(model)
     @test all(isfinite, Array(model.fields.gu.u))
     @test all(isfinite, Array(model.fields.gv.v))
+
+    @testset "MPISpec GPU checkpoint pickup and resume" begin
+        dt = 0.1
+        t_mid = 0.2
+        t_end = 0.4
+        mktempdir() do dir
+            function gpu_mpi_model()
+                spec = MPISpec(nprocs, 1, 2, grid; pou = true, niterations = 2, child_architecture = GPU())
+                return Model(
+                    grid = grid,
+                    bed_elevation = -500.0 .* ones(grid.nx, grid.ny),
+                    params = Params(accumulation_rate = 0.1),
+                    solver_params = SolverParams(maxiter_picard = 1),
+                    initial_conditions = InitialConditions(initial_thickness = 100.0 .* ones(grid.nx, grid.ny)),
+                    spec = spec,
+                    verbose = false,
+                )
+            end
+            sim_write = Simulation(
+                model = gpu_mpi_model(),
+                timestepping_params = TimesteppingParams(
+                    dt = dt,
+                    end_time = t_mid,
+                    chkpt_freq = t_mid,
+                    chkpt_path = dir,
+                ),
+                output_params = OutputParams(output_path = dir),
+            )
+            run_simulation!(sim_write)
+            n_iter = sim_write.clock.n_iter
+            @test isfile(joinpath(dir, WAVI.Outputs.checkpoint_filename(sim_write.model.spec, n_iter)))
+            h0 = Array(sim_write.model.fields.gh.h)
+            u0 = Array(sim_write.model.fields.gu.u)
+
+            sim_pick = Simulation(
+                model = gpu_mpi_model(),
+                timestepping_params = TimesteppingParams(
+                    dt = dt,
+                    end_time = t_end,
+                    niter0 = n_iter,
+                    chkpt_path = dir,
+                ),
+                output_params = OutputParams(output_path = dir),
+            )
+            @test sim_pick.clock.n_iter == n_iter
+            @test sim_pick.model.fields.gh.h isa AT
+            @test sim_pick.model.fields.stencil_scratch[] === nothing
+            @test Array(sim_pick.model.fields.gh.h) ≈ h0
+            @test Array(sim_pick.model.fields.gu.u) ≈ u0
+
+            run_simulation!(sim_pick)
+            @test sim_pick.clock.time ≈ t_end
+            @test sim_pick.model.fields.gh.h isa AT
+            @test all(isfinite, Array(sim_pick.model.fields.gu.u))
+
+            sim_ctrl = Simulation(
+                model = gpu_mpi_model(),
+                timestepping_params = TimesteppingParams(
+                    dt = dt,
+                    end_time = t_end,
+                    chkpt_path = dir,
+                ),
+                output_params = OutputParams(output_path = dir),
+            )
+            run_simulation!(sim_ctrl)
+            @test Array(sim_pick.model.fields.gh.h) ≈ Array(sim_ctrl.model.fields.gh.h)
+            @test Array(sim_pick.model.fields.gu.u) ≈ Array(sim_ctrl.model.fields.gu.u)
+        end
+    end
 end
 
 MPI.Finalize()

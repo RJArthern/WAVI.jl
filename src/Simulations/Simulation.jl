@@ -8,6 +8,7 @@ using Setfield
 using ImageFiltering: centered, imfilter, reflect, Fill
 
 using WAVI: AbstractModel, AbstractSimulation, AbstractSpec
+using WAVI.Models: restore_pickup_architecture!
 using WAVI.Outputs: OutputParams, load_checkpoint
 using WAVI.Parameters: TimesteppingParams
 using WAVI.Time
@@ -84,6 +85,7 @@ function pickup!(spec::AbstractSpec,timestepping_params::TimesteppingParams, out
         @info "detected niter0 > 0 (niter0 = $(timestepping_params.niter0)). Looking for pickup..."
         try
             model, clock = load_checkpoint(spec,timestepping_params, output_params)
+            model = restore_pickup_architecture!(model)
             println("Pickup successful")
         catch e
             @error "Pickup error: $e"

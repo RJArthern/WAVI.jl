@@ -160,12 +160,14 @@ end
     stencil_scratch!(model)
 
 Return persistent scratch for the momentum operator and Picard stencil applies.
-Allocated on first use and kept for the life of the model's `GridField`.
+Allocated on first use. Rebuilt if the cached buffer is on a different
+backend to `gh.h`, which happens after a GPU checkpoint pickup.
 """
 function stencil_scratch!(model::AbstractModel{T, N}) where {T, N}
     ref = model.fields.stencil_scratch
     s = ref[]
-    if s !== nothing
+    proto = model.fields.gh.h
+    if s !== nothing && KA.get_backend(s.rhs) === KA.get_backend(proto)
         return s::StencilScratch{T}
     end
     allocated = allocate_stencil_scratch(model)

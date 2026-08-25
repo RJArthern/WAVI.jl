@@ -25,7 +25,7 @@ using WAVI.BasalHydrology
 using WAVI.ThermoDynamics
 using WAVI.Parameters
 
-export Model, update_state!
+export Model, update_state!, restore_pickup_architecture!
 
 """
     BasicSpec()
@@ -150,6 +150,25 @@ Model(grid, bed_elev; kw...) = Model(grid, bed_elev, BasicSpec(); kw...)
 Model(; grid, bed_elevation, spec = BasicSpec(), kw...) = Model(grid, bed_elevation, spec; kw...)
 
 architecture(model::AbstractModel) = architecture(model.spec)
+
+"""
+    restore_pickup_architecture!(model)
+
+Put dense fields on the spec's architecture and drop stencil scratch.
+
+Call this after loading a checkpoint, before the next velocity solve.
+JLD2 may restore mixed host and device arrays, or a host scratch buffer,
+while the spec says the run is on the GPU. The file format is left
+unchanged, so later checkpoint layouts can keep calling this hook.
+Do not use this on MPI `spec.global_fields`; those stay on the host.
+"""
+function restore_pickup_architecture!(model::AbstractModel)
+    model.fields.stencil_scratch[] = nothing
+    arch = architecture(model)
+    arch isa CPU && return model
+    fields = on_architecture(arch, model.fields)
+    return @set model.fields = fields
+end
 
 # This is to enable use of Setfield, which derives a parameter setup from the fields of an existing structure via JuliaObjects
 # FIXME: this wasn't required in the original WAVI codebase. 

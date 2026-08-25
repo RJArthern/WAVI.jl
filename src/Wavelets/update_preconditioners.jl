@@ -211,7 +211,7 @@ function ensure_multigrid_ops!(model::AbstractModel{T,N}, op::LinearMap{T}, s) w
     n_coarse = n_wu + n_wv
     ni = size(op, 1)
     mg = s.mg_ops
-    if mg.n_wu != n_wu || mg.n_wv != n_wv
+    if mg.n_wu != n_wu || mg.n_wv != n_wv || !(mg.b_coarse isa typeof(s.rhs))
         s.mg_ops = MultigridScratch{T}(;
             n_wu,
             n_wv,
