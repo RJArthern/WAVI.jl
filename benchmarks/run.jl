@@ -12,8 +12,9 @@
 #   mpiexecjl --project=benchmarks -n 4 julia -t 1 benchmarks/run.jl run mpi mismip_plus \
 #     --px 4 --py 1
 #
-#   julia --project=benchmarks -t 1 benchmarks/run.jl run gpu ismip7_16km_synthetic
-#   (Needs CUDA.jl in the benchmarks project and a GPU node. Do not run `module load cuda`.)
+#   mpiexecjl --project=benchmarks -n 4 julia -t 1 benchmarks/run.jl run mpi_gpu ismip7_16km_synthetic \
+#     --px 4 --py 1
+#   (Needs CUDA.jl, a GPU node, and one GPU per rank. Do not run `module load cuda`.)
 #
 #   (Avoid --px 2 --py 2 on MISMIP+: the y-patches are too thin for efficient PoU.)
 
@@ -21,7 +22,7 @@
 ENV["GKSwstype"] = "100"
 
 # Load CUDA at top-level WAVI, else, getting `CUDA.functional()` (and GPUSpec) is too new for the current world age warnings.
-if "gpu" in ARGS
+if "gpu" in ARGS || "mpi_gpu" in ARGS
     using CUDA
 end
 

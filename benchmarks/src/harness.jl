@@ -4,19 +4,20 @@ using LinearAlgebra
 using MPI
 using WAVI
 
-const _VALID_MODES = (:basic, :threaded, :mpi, :gpu)
+const _VALID_MODES = (:basic, :threaded, :mpi, :gpu, :mpi_gpu)
 
 """
 Check that CUDA.jl was loaded before WAVI, so `GPUSpec` methods exist.
 
 Do not `using CUDA` in this module: CPU benchmark runs must not require it.
-`benchmarks/run.jl` loads CUDA at top level when `gpu` is in ARGS.
+`benchmarks/run.jl` loads CUDA at top level when `gpu` or `mpi_gpu` is in ARGS.
 """
 function load_cuda!()
     if Base.get_extension(WAVI, :WAVICUDAExt) === nothing
         error(
             "GPU mode needs CUDA.jl loaded before WAVI. " *
-            "Use: julia --project=benchmarks benchmarks/run.jl run gpu <driver>. " *
+            "Use: julia --project=benchmarks benchmarks/run.jl run gpu <driver> " *
+            "(or run mpi_gpu <driver> under mpiexec). " *
             "If CUDA is missing from the benchmarks project: " *
             "julia --project=benchmarks -e 'using Pkg; Pkg.add(\"CUDA\")'.",
         )
@@ -33,7 +34,7 @@ Configuration for a benchmark run.
 
 # Fields
 
-- `mode`: execution mode: `:basic`, `:threaded`, `:mpi`, or `:gpu`
+- `mode`: execution mode: `:basic`, `:threaded`, `:mpi`, `:gpu`, or `:mpi_gpu`
 - `driver`: registered adaptor name (e.g. `"mismip_plus"`)
 - `ngridsx`, `ngridsy`, `overlap`, `niterations`: ThreadedSpec / Schwarz parameters
 - `px`, `py`: MPI process grid dimensions (`px == 0` means use `Comm_size`; `py` defaults to `1`, i.e. an `N×1` layout)
@@ -126,11 +127,12 @@ How many cores this benchmark is meant to use, for normalising CPU samples
 - `:threaded`: `ngridsx * ngridsy`
 - `:mpi`: `mpi_world_size` if given, else `SLURM_NTASKS`, else `1`
 - `:gpu`: `1` (one process, one device)
+- `:mpi_gpu`: `mpi_world_size` if given (one GPU per rank)
 """
 function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
     if opts.mode == :threaded
         return opts.ngridsx * opts.ngridsy
-    elseif opts.mode == :mpi
+    elseif opts.mode in (:mpi, :mpi_gpu)
         return something(mpi_world_size, 1)
     elseif opts.mode == :gpu
         return 1
@@ -148,15 +150,16 @@ Load the requested driver adaptor, build appropriate WAVI spec, and run
 `benchmark_main` for monitoring.
 """
 function run_benchmark(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, or gpu.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, gpu, or mpi_gpu.")
 
     pin_blas_threads!()
 
+    mpi_mode = opts.mode in (:mpi, :mpi_gpu)
     # Initialise MPI up front so the entire setup is covered by finalisation.
-    opts.mode == :mpi && !MPI.Initialized() && MPI.Init()
+    mpi_mode && !MPI.Initialized() && MPI.Init()
 
-    rank = opts.mode == :mpi ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
-    mpi_world_size = opts.mode == :mpi ? MPI.Comm_size(MPI.COMM_WORLD) : nothing
+    rank = mpi_mode ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
+    mpi_world_size = mpi_mode ? MPI.Comm_size(MPI.COMM_WORLD) : nothing
     metadata = benchmark_metadata(opts; mpi_world_size = mpi_world_size)
 
 
@@ -183,8 +186,9 @@ function run_benchmark(opts::BenchmarkOptions)
             spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
             run_id = "gpu"
 
-        elseif opts.mode == :mpi
-            # Distributed: MPISpec setup
+        elseif opts.mode == :mpi || opts.mode == :mpi_gpu
+            opts.mode == :mpi_gpu && load_cuda!()
+            # Distributed: MPISpec setup (CPU ranks, or one GPU per rank)
             comm = MPI.COMM_WORLD
             sz = MPI.Comm_size(comm)
 
@@ -205,11 +209,14 @@ function run_benchmark(opts::BenchmarkOptions)
                           "for PoU on narrow domains such as MISMIP+."
                 end
             end
-            spec = MPISpec(px, py, halo, grid; pou = true, niterations = opts.niterations)
+            child = opts.mode == :mpi_gpu ? Base.invokelatest(GPU) : CPU()
+            spec = MPISpec(px, py, halo, grid; pou = true, niterations = opts.niterations,
+                           child_architecture = child)
 
             spec_kwargs[:grid] = grid
             spec_kwargs[:spec] = spec
-            run_id = "mpi.$(px)x$(py)_sz$(sz)"
+            prefix = opts.mode == :mpi_gpu ? "mpi_gpu" : "mpi"
+            run_id = "$(prefix).$(px)x$(py)_sz$(sz)"
         end
 
         benchmark_main(run_id, driver.run, spec_kwargs, driver.plot_vars, rank;
@@ -218,7 +225,7 @@ function run_benchmark(opts::BenchmarkOptions)
                        no_plots = opts.no_plots,
                        warmup = opts.warmup)
     finally
-        opts.mode == :mpi && MPI.Initialized() && MPI.Finalize()
+        opts.mode in (:mpi, :mpi_gpu) && MPI.Initialized() && MPI.Finalize()
     end
 
     return nothing
@@ -262,12 +269,13 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
 (slow; not part of this subcommand).
 """
 function run_profile(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, or gpu.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, gpu, or mpi_gpu.")
 
     pin_blas_threads!()
-    opts.mode == :mpi && !MPI.Initialized() && MPI.Init()
+    mpi_mode = opts.mode in (:mpi, :mpi_gpu)
+    mpi_mode && !MPI.Initialized() && MPI.Init()
 
-    rank = opts.mode == :mpi ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
+    rank = mpi_mode ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
     rank == 0 && !isnothing(BENCHMARK_COMMAND[]) && @info "Command: $(BENCHMARK_COMMAND[])"
 
     driver = load_driver(opts.driver)
@@ -286,7 +294,8 @@ function run_profile(opts::BenchmarkOptions)
             spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
             run_id = "gpu"
 
-        elseif opts.mode == :mpi
+        elseif opts.mode == :mpi || opts.mode == :mpi_gpu
+            opts.mode == :mpi_gpu && load_cuda!()
             sz = MPI.Comm_size(MPI.COMM_WORLD)
             px = opts.px == 0 ? sz : opts.px
             py = opts.py
@@ -303,9 +312,12 @@ function run_profile(opts::BenchmarkOptions)
                           "for PoU on narrow domains such as MISMIP+."
                 end
             end
+            child = opts.mode == :mpi_gpu ? Base.invokelatest(GPU) : CPU()
             spec_kwargs[:grid] = grid
-            spec_kwargs[:spec] = MPISpec(px, py, halo, grid; pou = false, niterations = opts.niterations)
-            run_id = "mpi.$(px)x$(py)_sz$(sz)"
+            spec_kwargs[:spec] = MPISpec(px, py, halo, grid; pou = false, niterations = opts.niterations,
+                                         child_architecture = child)
+            prefix = opts.mode == :mpi_gpu ? "mpi_gpu" : "mpi"
+            run_id = "$(prefix).$(px)x$(py)_sz$(sz)"
         end
 
         output_dir = joinpath(
@@ -336,7 +348,7 @@ function run_profile(opts::BenchmarkOptions)
             @info "Flat profile saved to: $profile_file"
         end
     finally
-        opts.mode == :mpi && MPI.Initialized() && MPI.Finalize()
+        opts.mode in (:mpi, :mpi_gpu) && MPI.Initialized() && MPI.Finalize()
     end
 
     return nothing

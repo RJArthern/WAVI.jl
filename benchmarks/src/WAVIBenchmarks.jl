@@ -33,7 +33,7 @@ Run a timed benchmark for the given execution mode and driver adaptor.
 
 # Arguments
 
-- `mode`: `basic`, `threaded`, `mpi`, or `gpu`
+- `mode`: `basic`, `threaded`, `mpi`, `gpu`, or `mpi_gpu`
 - `driver`: registered adaptor name (e.g. `mismip_plus`)
 
 # Options
@@ -96,7 +96,7 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
 
 # Options
 
-- `--mode <mode>`: `basic` (default), `threaded`, `mpi`, or `gpu`
+- `--mode <mode>`: `basic` (default), `threaded`, `mpi`, `gpu`, or `mpi_gpu`
 - `--niterations <n>`: [ThreadedSpec, MPISpec] Schwarz/PoU iterations (default: 2)
 - `--ngridsx <n>`: [ThreadedSpec] x domain decomposition (default: 2)
 - `--ngridsy <n>`: [ThreadedSpec] y domain decomposition (default: 2)

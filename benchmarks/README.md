@@ -56,9 +56,25 @@ Or, without the script:
 julia --project=benchmarks -t 1 benchmarks/run.jl run gpu ismip7_16km_synthetic --tag "ka.jl_gpuspec_gpu1"
 ```
 
+### MPI + GPU (`run_mpi_gpu.sh`)
+
+`run_mpi_gpu.sh` runs `MPISpec` with `child_architecture = GPU()`: one rank, one GPU. Default node is `bsl-node-s22` (currently has 8 x V100S). It requests `--gres=gpu:4` (leaving the rest of that node free) and sweeps 1..N ranks for the N GPUs Slurm allocated. `bsl-node-s20` and `bsl-node-s21` only have two GPUs: override `--gres` and `--ntasks` (the sweep then runs 1 and 2). Halo copies go through the host (it is not yet optimised for CUDA-aware MPI). Do not `module load cuda`, and do not set `CUDA_VISIBLE_DEVICES`.
+
+```bash
+sbatch benchmarks/run_mpi_gpu.sh "ka.jl_mpi_gpu_v1" "ismip7_16km_synthetic"
+sbatch --nodelist=bsl-node-s20 --gres=gpu:2 --ntasks=2 benchmarks/run_mpi_gpu.sh "ka.jl_mpi_gpu_v1"
+sbatch --nodelist=bsl-node-s21 --gres=gpu:2 --ntasks=2 benchmarks/run_mpi_gpu.sh "ka.jl_mpi_gpu_v1"
+```
+
+Or, without the script:
+
+```bash
+mpiexecjl --project=benchmarks -n 4 julia -t 1 benchmarks/run.jl run mpi_gpu ismip7_16km_synthetic --px 4 --py 1
+```
+
 ### Outputs
 
-The CPU script runs a scaling sweep (1, 2, 4, 8, 16, and 36 cores) using the `ismip7_16km_synthetic` driver. The GPU script runs the same driver once with `GPUSpec`. Telemetry is saved under `benchmarks/output/<driver>/`.
+The CPU script runs a scaling sweep (1, 2, 4, 8, 16, and 36 cores) using the `ismip7_16km_synthetic` driver. The GPU script runs the same driver once with `GPUSpec`. The MPI+GPU script sweeps 1 to N ranks for the N GPUs allocated to the job (4 on s22 by default, 2 if you override `--gres` on bsl-node-s20/s21). Telemetry is saved under `benchmarks/output/<driver>/`.
 
 Each run generates:
 - `resource_timeseries.csv`: CPU and memory (RSS) usage sampled at 0.5s intervals.

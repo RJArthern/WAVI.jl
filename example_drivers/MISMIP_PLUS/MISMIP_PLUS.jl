@@ -89,45 +89,49 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     # GPU is opt-in so this script can still run BasicSpec / ThreadedSpec /
     # MPISpec on a GPU node. Example: `WAVI_USE_GPU=1 julia --project=<project_dir> MISMIP_PLUS.jl`.
-    if get(ENV, "WAVI_USE_GPU", "") == "1"
+    # Multiple GPUs: `WAVI_USE_GPU=1 mpiexecjl -n N julia --project=<project_dir> MISMIP_PLUS.jl`.
+    use_gpu = get(ENV, "WAVI_USE_GPU", "") == "1"
+
+    # Initialise MPI before CUDA. Some MPI stacks reshuffle visible GPUs if
+    # CUDA is already initialised, which breaks one-GPU-per-rank pinning.
+    MPI.Init()
+    if use_gpu
         try
             using CUDA
         catch
-            println("CUDA.jl is not in this project; skipping GPUSpec.")
+            println("CUDA.jl is not in this project; skipping GPUSpec / MPI+GPU.")
             println("Add CUDA to the active project (not to WAVI [deps]). See docs/src/gpu_setup.md.")
             exit(0)
         end
         if !(gpu_device() isa GPU)
-            println("No functional GPU; skipping GPUSpec.")
+            println("No functional GPU; skipping GPUSpec / MPI+GPU.")
             exit(0)
         end
+    end
+
+    if MPI.Comm_size(MPI.COMM_WORLD) > 1
+        grid = MISMIP_PLUS_GRID()
+        child = use_gpu ? GPU() : CPU()
+        mpi_spec = MPISpec(
+            MPI.Comm_size(MPI.COMM_WORLD), 1, 2, grid;
+            pou = true,
+            niterations = 5,
+            child_architecture = child,
+        )
+        folder = use_gpu ? "outputs/mpi_gpu" : "outputs/mpi"
+        MISMIP_PLUS(folder = folder, grid = grid, spec = mpi_spec)
+    elseif use_gpu
         grid = MISMIP_PLUS_GRID()
         MISMIP_PLUS(folder = "outputs/gpu", grid = grid, spec = GPUSpec())
+    elseif Threads.nthreads() > 1
+        grid = MISMIP_PLUS_GRID()
+        threaded_spec = ThreadedSpec(ngridsx=Threads.nthreads(), ngridsy=1, overlap=2, niterations=5)
+        MISMIP_PLUS(
+            folder = "outputs/thread",
+            grid = grid,
+            spec = threaded_spec,
+        )
     else
-        # A little bootstrapping way of running the MISMIP+ experiment
-        MPI.Init()
-        if MPI.Comm_size(MPI.COMM_WORLD) > 1
-            grid = MISMIP_PLUS_GRID()
-            # MPISpec(ngridsx, ngridsy, halo, ...)
-            mpi_spec = MPISpec(MPI.Comm_size(MPI.COMM_WORLD), 1, 2, grid; pou=true, niterations=5)
-
-            MISMIP_PLUS(
-                folder = "outputs/mpi",
-                grid = grid,
-                spec = mpi_spec,
-            )
-        elseif Threads.nthreads() > 1
-            # Run with:
-            # julia --project -t 2 example_drivers/MISMIP_PLUS/MISMIP_PLUS.jl
-            grid = MISMIP_PLUS_GRID()
-            threaded_spec = ThreadedSpec(ngridsx=Threads.nthreads(), ngridsy=1, overlap=2, niterations=5)
-            MISMIP_PLUS(
-                folder = "outputs/thread",
-                grid = grid,
-                spec = threaded_spec,
-            )
-        else
-            MISMIP_PLUS(folder = "outputs/serial")
-        end
+        MISMIP_PLUS(folder = "outputs/serial")
     end
 end
