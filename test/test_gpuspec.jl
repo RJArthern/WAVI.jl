@@ -2,7 +2,6 @@ using Test
 using WAVI
 using SparseArrays
 using WAVI.Architectures: architecture, zeros_on, array_type
-using KernelAbstractions: KernelAbstractions as KA
 
 @testset "GPUSpec" begin
     @testset "CPU helpers" begin
@@ -23,6 +22,45 @@ using KernelAbstractions: KernelAbstractions as KA
         @test restored.fields.stencil_scratch[] === nothing
         update_state!(restored)
         @test all(isfinite, restored.fields.gu.u)
+
+        @testset "update_state stencils match Kronecker" begin
+            grid = Grid(nx = 8, ny = 8, dx = 1.0e3, dy = 1.0e3)
+            model = Model(grid = grid, bed_elevation = zeros(grid.nx, grid.ny), verbose = false)
+            WAVI.Processes.update_surface_elevation!(model)
+            gh, gu, gv = model.fields.gh, model.fields.gu, model.fields.gv
+            onesvec = ones(length(gh.h))
+            denu = gu.samp * (gu.centᵀ * (gh.crop * onesvec))
+            denv = gv.samp * (gv.centᵀ * (gh.crop * onesvec))
+            h_u = (gu.samp * (gu.centᵀ * (gh.crop * vec(gh.h)))) ./ denu
+            h_v = (gv.samp * (gv.centᵀ * (gh.crop * vec(gh.h)))) ./ denv
+            WAVI.Processes.update_geometry_on_uv_grids!(model)
+            @test gu.h[gu.mask] ≈ h_u
+            @test gv.h[gv.mask] ≈ h_v
+
+            gu.u[gu.mask] .= 50.0
+            gv.v[gv.mask] .= -30.0
+
+            u_h = reshape(gu.cent * vec(gu.u), size(gh.u))
+            v_h = reshape(gv.cent * vec(gv.v), size(gh.v))
+            WAVI.Processes.update_velocities_on_h_grid!(model)
+            @test gh.u ≈ u_h
+            @test gh.v ≈ v_h
+
+            us_u = reshape(gu.crop * (gu.centᵀ * (gh.crop * vec(gh.us))), size(gu.us))
+            vs_v = reshape(gv.crop * (gv.centᵀ * (gh.crop * vec(gh.vs))), size(gv.vs))
+            WAVI.Processes.update_surface_velocities_on_uv_grid!(model)
+            @test gu.us ≈ us_u
+            @test gv.vs ≈ vs_v
+
+            dhdt_packed = gh.samp * (
+                vec(gh.accumulation) .- vec(gh.basal_melt) .- (
+                    (gu.∂x * (gu.crop * (vec(gu.h) .* vec(gu.u)))) .+
+                    (gv.∂y * (gv.crop * (vec(gv.h) .* vec(gv.v))))
+                )
+            )
+            WAVI.Processes.update_dhdt!(model)
+            @test gh.dhdt[gh.mask] ≈ dhdt_packed
+        end
     end
 
     cuda_ext = Base.get_extension(WAVI, :WAVICUDAExt)
@@ -52,8 +90,8 @@ using KernelAbstractions: KernelAbstractions as KA
                 @test model.fields.gh.samp isa SparseMatrixCSC
 
                 s = WAVI.Utilities.stencil_scratch!(model)
-                @test KA.get_backend(s.haar_u) === KA.get_backend(model.fields.gu.u)
-                @test KA.get_backend(s.rhs) === KA.get_backend(model.fields.gh.h)
+                @test s.haar_u isa AT
+                @test s.rhs isa AT
 
                 update_state!(model)
                 u_gpu = Array(model.fields.gu.u)
@@ -63,6 +101,8 @@ using KernelAbstractions: KernelAbstractions as KA
                 update_state!(cpu_model)
                 @test u_gpu ≈ cpu_model.fields.gu.u rtol = 1e-8 atol = 1e-8
                 @test v_gpu ≈ cpu_model.fields.gv.v rtol = 1e-8 atol = 1e-8
+                @test Array(model.fields.gh.dhdt) ≈ cpu_model.fields.gh.dhdt rtol = 1e-8 atol = 1e-8
+                @test Array(model.fields.gu.us) ≈ cpu_model.fields.gu.us rtol = 1e-8 atol = 1e-8
 
                 @testset "GPUSpec checkpoint pickup and resume" begin
                     dt = 0.1

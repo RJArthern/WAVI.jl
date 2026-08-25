@@ -3,7 +3,6 @@ export update_state!, update_velocities_on_h_grid!, update_state_novelocity!
 using Parameters
 
 using WAVI: AbstractModel
-using WAVI.KroneckerProducts
 using WAVI.MeltRates
 using WAVI.SurfaceMassBalance
 using WAVI.Fracture
@@ -13,17 +12,8 @@ using WAVI.ThermoDynamics
 using WAVI.Time
 using WAVI.Utilities
 using WAVI.Wavelets
-using LinearAlgebra: Diagonal
-
-# Sparse samp/spread and Kronecker maps (cent, ∂x, ∂y) stay on the host, and
-# CuArray does not support boolean indexing such as dest[mask] .= packed.
-# Copy dense fields to Array, apply those operators, then write back.
-function _copy_masked!(dest, mask, packed)
-    dest_h = _host(dest)
-    dest_h[_host(mask)] .= packed
-    dest_h === dest || copyto!(dest, dest_h)
-    return dest
-end
+using WAVI.Stencils
+using KernelAbstractions: KernelAbstractions as KA
 
 """
 update_state!(model::AbstractModel, clock)
@@ -127,19 +117,41 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 
 """
 function update_geometry_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
-    @unpack gh,gu,gv,gc=model.fields
-    # samp and centᵀ are host sparse/Kronecker operators; see _host / _copy_masked! above.
-    h = _host(gh.h)
-    s = _host(gh.s)
-    crop = Diagonal(_host(gh.crop.diag))
-    onesvec = ones(T, length(h))
-    denu = gu.samp * (gu.centᵀ * (crop * onesvec))
-    denv = gv.samp * (gv.centᵀ * (crop * onesvec))
-    _copy_masked!(gu.h, gu.mask, (gu.samp * (gu.centᵀ * (crop * vec(h)))) ./ denu)
-    _copy_masked!(gu.s, gu.mask, (gu.samp * (gu.centᵀ * (crop * vec(s)))) ./ denu)
-    _copy_masked!(gv.h, gv.mask, (gv.samp * (gv.centᵀ * (crop * vec(h)))) ./ denv)
-    _copy_masked!(gv.s, gv.mask, (gv.samp * (gv.centᵀ * (crop * vec(s)))) ./ denv)
+    @unpack gh, gu, gv = model.fields
+    backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
+    ones_crop = s.ones_crop
+    src_crop = s.β_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+    denu = s.denu
+    denv = s.denv
+
+    fill!(ones_crop, one(T))
+    launch!(_apply_mask!, ones_crop, gh.mask; ndrange = size(ones_crop), sync = false)
+    KA.synchronize(backend)
+    launch!(_avg_xT!, denu, ones_crop; ndrange = size(denu), sync = false)
+    launch!(_avg_yT!, denv, ones_crop; ndrange = size(denv), sync = false)
+    KA.synchronize(backend)
+
+    _interp_h_to_uv!(gu.h, gv.h, gh.h, gh.mask, gu.mask, gv.mask, src_crop, tmpu, tmpv, denu, denv)
+    _interp_h_to_uv!(gu.s, gv.s, gh.s, gh.mask, gu.mask, gv.mask, src_crop, tmpu, tmpv, denu, denv)
     return model
+end
+
+"""
+Crop an H-grid field, average onto U and V, and keep ice faces only.
+
+Matches `samp * centᵀ * crop * vec(src) ./ (samp * centᵀ * crop * ones)`.
+"""
+function _interp_h_to_uv!(dest_u, dest_v, src_h, mask_h, mask_u, mask_v, src_crop, tmpu, tmpv, denu, denv)
+    copyto!(src_crop, src_h)
+    launch!(_apply_mask!, src_crop, mask_h; ndrange = size(src_crop))
+    launch!(_avg_xT!, tmpu, src_crop; ndrange = size(tmpu))
+    @. dest_u = ifelse(mask_u, tmpu / denu, dest_u)
+    launch!(_avg_yT!, tmpv, src_crop; ndrange = size(tmpv))
+    @. dest_v = ifelse(mask_v, tmpv / denv, dest_v)
+    return nothing
 end
 
 """
@@ -257,9 +269,9 @@ Update the velocities (depth averaged, surface and bed) on the h grid
 """
 function update_velocities_on_h_grid!(model::AbstractModel{T,N,S}) where {T,N,S<:AbstractSpec}
     @unpack gh,gu,gv = model.fields
-    #depth averaged velocities
-    copyto!(gh.u, reshape(gu.cent * vec(_host(gu.u)), size(gh.u)))
-    copyto!(gh.v, reshape(gv.cent * vec(_host(gv.v)), size(gh.v)))
+    #depth averaged velocities (cent of U/V onto H; no crop, matching the Kronecker map)
+    launch!(_avg_x!, gh.u, gu.u; ndrange = size(gh.u), sync = false)
+    launch!(_avg_y!, gh.v, gv.v; ndrange = size(gh.v))
 
     #bed velocities
     gh.ub .= gh.u ./ (1 .+ (gh.β .* gh.quad_f2))
@@ -288,16 +300,25 @@ end
 Evaluate rate of change of thickness using mass conservation.
 """
 function update_dhdt!(model::AbstractModel)
-    @unpack gh,gu,gv=model.fields
-    crop_u = Diagonal(_host(gu.crop.diag))
-    crop_v = Diagonal(_host(gv.crop.diag))
-    packed = gh.samp * (
-        vec(_host(gh.accumulation)) .- vec(_host(gh.basal_melt)) .- (
-            (gu.∂x * (crop_u * (vec(_host(gu.h)) .* vec(_host(gu.u))))) .+
-            (gv.∂y * (crop_v * (vec(_host(gv.h)) .* vec(_host(gv.v)))))
-        )
-    )
-    _copy_masked!(gh.dhdt, gh.mask, packed)
+    @unpack gh, gu, gv = model.fields
+    backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
+    u_crop = s.u_crop
+    v_crop = s.v_crop
+    dudx = s.dudx
+    dvdy = s.dvdy
+    extra = s.extra
+
+    @. u_crop = gu.h * gu.u
+    @. v_crop = gv.h * gv.v
+    launch!(_apply_mask!, u_crop, gu.mask; ndrange = size(u_crop), sync = false)
+    launch!(_apply_mask!, v_crop, gv.mask; ndrange = size(v_crop), sync = false)
+    KA.synchronize(backend)
+    launch!(_diff_x!, dudx, u_crop, s.dx_inv; ndrange = size(dudx), sync = false)
+    launch!(_diff_y!, dvdy, v_crop, s.dy_inv; ndrange = size(dvdy), sync = false)
+    KA.synchronize(backend)
+    @. extra = gh.accumulation - gh.basal_melt - dudx - dvdy
+    @. gh.dhdt = ifelse(gh.mask, extra, gh.dhdt)
     return model
 end
 
@@ -312,13 +333,22 @@ function update_model_wavelets!(model::AbstractModel)
 end
 
 function update_surface_velocities_on_uv_grid!(model)
-    @unpack gh,gu,gv = model.fields
-    #surface  velocities
-    crop_h = Diagonal(_host(gh.crop.diag))
-    crop_u = Diagonal(_host(gu.crop.diag))
-    crop_v = Diagonal(_host(gv.crop.diag))
-    copyto!(gu.us, reshape(crop_u * (gu.centᵀ * (crop_h * vec(_host(gh.us)))), size(gu.us)))
-    copyto!(gv.vs, reshape(crop_v * (gv.centᵀ * (crop_h * vec(_host(gh.vs)))), size(gv.vs)))
+    @unpack gh, gu, gv = model.fields
+    s = stencil_scratch!(model)
+    src_crop = s.β_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+
+    z = zero(eltype(tmpu))
+    copyto!(src_crop, gh.us)
+    launch!(_apply_mask!, src_crop, gh.mask; ndrange = size(src_crop))
+    launch!(_avg_xT!, tmpu, src_crop; ndrange = size(tmpu))
+    @. gu.us = ifelse(gu.mask, tmpu, z)
+
+    copyto!(src_crop, gh.vs)
+    launch!(_apply_mask!, src_crop, gh.mask; ndrange = size(src_crop))
+    launch!(_avg_yT!, tmpv, src_crop; ndrange = size(tmpv))
+    @. gv.vs = ifelse(gv.mask, tmpv, z)
     return model
 end
 
