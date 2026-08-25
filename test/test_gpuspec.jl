@@ -13,6 +13,7 @@ using KernelAbstractions: KernelAbstractions as KA
         @test all(iszero, z)
         @test architecture(arch) === arch
         @test architecture(BasicSpec()) isa CPU
+        @test assign_local_device!(CPU(), 0) === nothing
     end
 
     cuda_ext = Base.get_extension(WAVI, :WAVICUDAExt)

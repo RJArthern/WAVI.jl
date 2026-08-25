@@ -6,8 +6,11 @@ using Parameters
 
 using WAVI.Parameters
 
+using WAVI.Architectures: AbstractArchitecture, CPU, GPU
+
 import WAVI: AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance, AbstractFracture, AbstractSlidingLaw,
                    AbstractBasalHydrology, AbstractThermoDynamics, AbstractModel
+import WAVI.Architectures: architecture, child_architecture, assign_local_device!, on_architecture
 import WAVI.Deferred: Collector, register_item!, field_extractor
 import WAVI.Fields: GridField, InitialConditions
 import WAVI.Grids: Grid, reconstruct_on_grid, reconstruct_on_subdomain
@@ -112,9 +115,10 @@ Fields:
     pou_scratch: Cached PoU weights / host strip buffers (filled on first prolong)
     halo_scratch: Cached RAS host halo packs (filled on first halo_exchange!)
     core_inner: Cached core-only inner masks for the global residual
+    child_architecture: Where each rank's local arrays live (`CPU()` or `GPU()`)
     local_spec: Optional intraprocess ThreadedSpec for the rank-local solve (default=nothing to wavelet)
 """
-mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGrid} <: AbstractDecompSpec
+mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGrid, A <: AbstractArchitecture} <: AbstractDecompSpec
     # MPI Specification information
     px::N
     py::N
@@ -142,6 +146,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     pou_scratch::Union{Nothing, MPIPoUScratch{T}}
     halo_scratch::Union{Nothing, MPIHaloScratch{T}}
     core_inner::Union{Nothing, Tuple{Vector{Bool}, Vector{Bool}}}
+    child_architecture::A
     local_spec::Union{Nothing, ThreadedSpec}
 
     @doc """
@@ -154,6 +159,8 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     pou: Whether to use partition of unity for halo exchange (default=true)
     damping: Damping factor for halo exchange (default=0.0)
     local_spec: Optional ThreadedSpec for the intraprocess local solve (default=nothing)
+    child_architecture: `CPU()` (default) or `GPU()` after `using CUDA`. One GPU per rank.
+        Do not combine `GPU()` with `local_spec = ThreadedSpec(...)`.
     """ function MPISpec(
         px::Integer,
         py::Integer,
@@ -162,6 +169,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
         pou::Bool = true,
         damping::AbstractFloat = 0.0,
         niterations::Integer = 5,
+        child_architecture::AbstractArchitecture = CPU(),
         local_spec::Union{Nothing, ThreadedSpec} = nothing,
     ) where {G <: AbstractGrid}
         (px < 1 || py < 1 || halo < 0) &&
@@ -172,6 +180,13 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
         rank = MPI.Comm_rank(comm)
         size = MPI.Comm_size(comm)
         @debug "Creating dimensions of $(size) with ($(px), $(py))"
+
+        if child_architecture isa GPU && local_spec !== nothing
+            throw(ArgumentError(
+                "ThreadedSpec cannot be used as local_spec when child_architecture is a GPU. " *
+                "Use local_spec = nothing (the default) for GPU ranks.",
+            ))
+        end
 
         if size > 1 && halo == 0
             throw(ArgumentError(
@@ -221,7 +236,16 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             validate_dimension("ny", grid.ny, py, halo)
         end
 
-        return new{Int, Float64, MPI.Comm, G}(
+        if !(child_architecture isa CPU)
+            node_comm = MPI.Comm_split_type(comm, MPI.COMM_TYPE_SHARED, rank)
+            assign_local_device!(
+                child_architecture,
+                MPI.Comm_rank(node_comm),
+                MPI.Comm_size(node_comm),
+            )
+        end
+
+        return new{Int, Float64, MPI.Comm, G, typeof(child_architecture)}(
             px,
             py,
             halo,
@@ -243,10 +267,14 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             nothing,  # pou_scratch filled on first PoU prolong
             nothing,  # halo_scratch filled on first RAS exchange
             nothing,  # core_inner filled on first Schwarz residual
+            child_architecture,
             local_spec,
         )
     end
 end
+
+architecture(spec::MPISpec) = spec.child_architecture
+child_architecture(spec::MPISpec) = spec.child_architecture
 
 include("MPI/utils.jl")
 include("MPI/exchanges.jl")
@@ -271,7 +299,7 @@ function mpi_allocate_global_fields!(
     solver_params::SolverParams = SolverParams(),
 )
     spec.rank == 0 || return nothing
-    # Create global mpi_rank field (will be populated during collection)
+    # Host arrays only: collect/output stay on rank 0 CPU even when local fields are on a GPU.
     spec.global_fields = GridField(
         grid,
         bed_array;
@@ -402,6 +430,11 @@ function Model(grid::G,
     local_mpi_rank = fill(Float64(rank), nx_local, ny_local)
 
     fields = GridField(local_grid, bed_array; initial_conditions=local_initial_conditions, params=local_params, solver_params, mpi_rank=local_mpi_rank)
+    arch = architecture(spec)
+    if !(arch isa CPU)
+        # Rank-0 global_fields stay on the host for collect/output (see mpi_allocate_global_fields!).
+        fields = on_architecture(arch, fields)
+    end
     model = Model(local_grid, fields, local_params, solver_params, spec, local_shelf_melt_rate, local_surface_mass_balance, local_fracture, local_sliding_law, local_basal_hydrology, 
     local_thermo_dynamics, verbose)
 

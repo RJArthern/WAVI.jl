@@ -11,6 +11,7 @@ using KernelAbstractions: KernelAbstractions as KA
         @test child_architecture(arch) === arch
         @test device(arch) isa KA.CPU
         @test summary(arch) == "CPU"
+        assign_local_device!(arch, 0)
 
         x = rand(2, 3)
         @test on_architecture(arch, x) === x

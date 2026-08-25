@@ -77,6 +77,8 @@ using WAVI
         if model.spec.right > -1 && rh > 0
             @test all(h[(end - rh + 1):end, :] .== (model.spec.right + 1.0))
         end
+        @test architecture(model.spec) isa CPU
+        @test architecture(model) isa CPU
     end
 
     # Halo and PoU MPI buffers stay host `Vector`/`Matrix` (not CUDA-aware MPI).

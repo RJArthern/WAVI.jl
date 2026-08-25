@@ -8,7 +8,7 @@ using KernelAbstractions: KernelAbstractions as KA
 
 export AbstractArchitecture, CPU, GPU
 export device, synchronise, array_type, on_architecture, child_architecture, gpu_device
-export architecture, zeros_on
+export architecture, zeros_on, assign_local_device!
 
 """
     AbstractArchitecture
@@ -61,9 +61,10 @@ synchronise(arch::AbstractArchitecture) = KA.synchronize(device(arch))
 """
     child_architecture(arch)
 
-Architecture that owns local arrays. For `CPU` and `GPU` this is `arch` itself.
-Aim is for distributed specs to override this in the future (e.g. one GPU per
-MPI rank).
+Architecture that owns local arrays.
+
+For `CPU` and `GPU` this is `arch` itself. `MPISpec` returns its
+`child_architecture` field (CPU or one GPU per rank).
 """
 child_architecture(arch::AbstractArchitecture) = arch
 
@@ -76,9 +77,25 @@ Architecture that should own local arrays for `x`.
 
 Architectures return themselves. Specs without an architecture field
 (for example `BasicSpec`) return `CPU()`. `GPUSpec` returns its GPU.
+`MPISpec` returns `spec.child_architecture`.
 """
 architecture(arch::AbstractArchitecture) = arch
 architecture(_) = CPU()
+
+"""
+    assign_local_device!(arch, local_rank, node_size=1)
+
+Pin this process to a device for `arch`.
+
+`CPU` is a no-op. A vendor extension overrides this for GPU so each MPI rank
+on a node uses `local_rank` modulo the number of visible devices.
+`local_rank` is the rank in the node-local MPI communicator
+(`MPI.COMM_TYPE_SHARED`). `node_size` is that communicator's size. If it
+exceeds the number of visible GPUs, a warning is issued (ranks will share
+devices), unless `CUDA_VISIBLE_DEVICES` already isolates a single GPU
+per rank.
+"""
+assign_local_device!(::AbstractArchitecture, local_rank::Integer, node_size::Integer=1) = nothing
 
 on_architecture(::AbstractArchitecture, x::Number) = x
 on_architecture(::AbstractArchitecture, ::Nothing) = nothing

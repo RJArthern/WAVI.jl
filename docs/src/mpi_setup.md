@@ -147,7 +147,7 @@ Alternatively, you can use the bundled sweep script, which tests serial, threade
 ./run_mismip_plus.sh
 ```
 
-**Grid:** `MPISpec(px, py, halo, grid)` requires the global grid at construction time. The total process count must precisely match `px * py`. For more information, see [Model specifications](./model_specifications.md).
+**Grid:** `MPISpec(px, py, halo, grid)` requires the global grid at construction time. The total process count must precisely match `px * py`. For more information, see [Model specifications](./model_specifications.md). One GPU per rank: `MPISpec(..., child_architecture = GPU())` after `using CUDA`. See [GPU setup](./gpu_setup.md).
 
 **Logging:** WAVI uses `@info` and `@debug` for progress and residuals. You can enable debug logging across distributed processes by setting the environment variable `JULIA_DEBUG=WAVI`.
 

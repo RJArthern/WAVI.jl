@@ -82,7 +82,7 @@ export AbstractField, AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance
 using .Architectures
 export AbstractArchitecture, CPU, GPU
 export array_type, on_architecture, child_architecture, synchronise, gpu_device
-export architecture, zeros_on
+export architecture, zeros_on, assign_local_device!
 
 using .Deferred
 export Collector, clear!, collect!, register_field!

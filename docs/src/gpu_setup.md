@@ -112,7 +112,11 @@ update_state!(model)
 
 ## [5. HPC batch jobs](@id hpc-batch)
 
-Currently, only running on one GPU is supported while MPI + CUDA is planned. Pin the job to a GPU partition and start Julia as usual (no `mpiexec` for `GPUSpec`). The following is the set-up for a GPU node on BAS HPC.
+`GPUSpec` is one process on one GPU. Several GPUs on one node (or one GPU per node) use `MPISpec` with `child_architecture = GPU()`. Halo exchange and Partition of Unity strips copy through host MPI buffers (this should be optimised in the future, currently not using CUDA-aware MPI). CUDA.jl includes the Nvidia toolkit, so, do not run a `module load cuda` on a HPC.
+
+### One GPU (`GPUSpec`)
+
+Pin the job to a GPU partition and start Julia as usual (no `mpiexecjl`). The following is the set-up for a GPU node on BAS HPC.
 
 Example Slurm fragment (names of partitions and modules are site-specific):
 
@@ -130,6 +134,34 @@ In `driver.jl`, load CUDA before constructing the model, as in [Section 4](@ref 
 
 `GPUSpec` uses one GPU. If the job can see several devices (for example `--gres=gpu:2` or a whole node), set `CUDA_VISIBLE_DEVICES` to a single index. Do not override it on a `--gres=gpu:1` job: Slurm has already pointed the process at the allocated GPU.
 
+### Multiple GPUs (`MPISpec` + `GPU()`)
+
+This approach can be used where you want to:
+* Run on one system with multiple GPUs.
+* Run on multiple systems with one or more GPUs per system.
+
+For this, ask the scheduler for one GPU per MPI rank, and leave `CUDA_VISIBLE_DEVICES` unset. WAVI then gives each rank a GPU on that machine: the first rank on the node uses GPU 0, the second uses GPU 1, and so on. If you launch more ranks than GPUs, they share cards and WAVI prints a warning. That warning is not shown when Slurm has already given each rank its own GPU (for example `--gpus-per-task=1`).
+
+```bash
+#SBATCH --partition=gpu
+#SBATCH -N 1
+#SBATCH --nodelist=bsl-node-s22
+#SBATCH --ntasks=4
+#SBATCH --gres=gpu:4
+#SBATCH --time=00:30:00
+
+mpiexecjl -n 4 --project=. julia driver.jl
+```
+
+```julia
+using CUDA
+using WAVI
+spec = MPISpec(4, 1, 2, grid; child_architecture = GPU())
+model = Model(grid, bed, spec)
+```
+
+Do not combine `child_architecture = GPU()` with `local_spec = ThreadedSpec(...)`.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Resolution |
@@ -137,8 +169,9 @@ In `driver.jl`, load CUDA before constructing the model, as in [Section 4](@ref 
 | `GPUSpec()` throws “needs a GPU architecture” | CUDA not loaded, or no functional device. | `using CUDA` in this session; check `CUDA.functional()` and that you have a CUDA device. |
 | `CUDA.functional()` is `false` | Driver, module, or visible devices. | GPU node, site CUDA module, `CUDA_VISIBLE_DEVICES`. |
 | `GPU()` is a `MethodError` | CUDA extension did not load. | Add `CUDA` to *this* project; restart Julia; `using CUDA` then `using WAVI`. |
-| Fields are still `Array` after `Model(...)` | Spec is not `GPUSpec`. | Pass `GPUSpec()` as the third argument to `Model`. Default `Model(grid, bed)` is CPU `BasicSpec`. |
-| Job hangs or uses the wrong GPU on a multi-GPU node | Several devices visible. | Set `CUDA_VISIBLE_DEVICES` to one index only if the job can see more than one GPU. |
+| Fields are still `Array` after `Model(...)` | Spec is not `GPUSpec`, or `MPISpec` was built without `child_architecture = GPU()`. | Pass `GPUSpec()` as the third argument to `Model`, or `MPISpec(..., child_architecture = GPU())`. Default `Model(grid, bed)` is CPU `BasicSpec`. |
+| Job hangs or uses the wrong GPU on a multi-GPU node | Several devices visible to one `GPUSpec` process. | Set `CUDA_VISIBLE_DEVICES` to one index for `GPUSpec` only. For MPI+GPU, leave it unset so ranks pin by node-local rank. |
+| `ThreadedSpec` with `child_architecture = GPU()` | Invalid combination. | Use `local_spec = nothing` (the default) on GPU ranks. |
 
 ## References
 
