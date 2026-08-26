@@ -176,11 +176,7 @@ Update grounded area fraction on h-, u-, and v-grids for use in subgrid paramete
 """
 function update_grounded_fraction_on_huv_grids!(model::AbstractModel)
     @unpack gh,gu,gv = model.fields
-    # pos_fraction uses host boolean indexing; copyto! writes back to device arrays.
-    (gfh,gfu,gfv)=pos_fraction(_host(gh.haf);mask=_host(gh.mask))
-    copyto!(gh.grounded_fraction, gfh)
-    copyto!(gu.grounded_fraction, gfu)
-    copyto!(gv.grounded_fraction, gfv)
+    pos_fraction!(gh.grounded_fraction, gu.grounded_fraction, gv.grounded_fraction, gh.haf, gh.mask)
     return model
 end
 

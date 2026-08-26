@@ -8,7 +8,7 @@ using WAVI: AbstractModel
 using KernelAbstractions: KernelAbstractions as KA, @kernel, @index
 using WAVI.Stencils
 
-export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
+export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, pos_fraction!, mismip_plus_bed,
     get_glx, glen_b, fill_glen_b!, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!,
     icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
     stencil_scratch!, StencilScratch, apply_momentum_op!, copy_like, copy_onto!, zeros_like, _host
@@ -596,6 +596,164 @@ function get_prolong_fun(model::AbstractModel)
 end
 
 """
+    _quadrant_positive_area(z1, z2, z3)
+
+How much of one cell quarter sits above zero (0 to 1).
+`z1` is this cell; `z2` and `z3` are the two neighbours for this quarter.
+"""
+@inline function _quadrant_positive_area(z1::T, z2::T, z3::T) where {T}
+    if (z1 > 0) && (z2 > 0) && (z3 > 0)
+        return one(T)
+    end
+    if (z1 <= 0) && (z2 <= 0) && (z3 <= 0)
+        return zero(T)
+    end
+
+    # Pick the neighbour with the larger change so we do not divide by almost zero.
+    flip = abs(z3 - z1) < abs(z2 - z1)
+    den = flip ? (z2 - z1) : (z3 - z1)
+    a = -(flip ? (z3 - z1) : (z2 - z1)) / den
+    b = -T(2) * z1 / den
+    a1 = T(0.5) * (b * b) / a
+    a2 = T(0.5) * ((one(T) - b) * (one(T) - b)) / a
+    a3 = T(0.5) * a + b
+    test1 = Int(b > 0) + Int(b > 1)
+    test2 = Int((a + b) > 0) + Int((a + b) > 1)
+    ix = 1 + test1 + 3 * test2
+    area = if ix == 1
+        zero(T)
+    elseif ix == 2
+        -a1
+    elseif ix == 3
+        a2 - a1
+    elseif ix == 4
+        a1 + a3
+    elseif ix == 5
+        a3
+    elseif ix == 6
+        a2 + a3
+    elseif ix == 7
+        one(T) - a2 + a1
+    elseif ix == 8
+        one(T) - a2
+    else
+        one(T)
+    end
+    if b < 0
+        area = one(T) - area
+    end
+    if z1 < 0
+        area = one(T) - area
+    end
+    return area
+end
+
+@inline function _neighbour_z(z, mask, i, j, i_nb, j_nb)
+    @inbounds mask[i_nb, j_nb] ? z[i_nb, j_nb] : z[i, j]
+end
+
+"""
+    _quadrant_area(z, mask, i, j, m, n, quadrant)
+
+Above-zero area of one quarter of cell `(i, j)`.
+Quadrant 1 is east and north, 2 north and west, 3 west and south, 4 south and east.
+Invalid cells return 0. Invalid or off-grid neighbours reuse this cell's value.
+"""
+@inline function _quadrant_area(z, mask, i, j, m, n, quadrant)
+    @inbounds begin
+        mask[i, j] || return zero(eltype(z))
+        z1 = z[i, j]
+        if quadrant == 1
+            z2 = _neighbour_z(z, mask, i, j, min(i + 1, m), j)
+            z3 = _neighbour_z(z, mask, i, j, i, min(j + 1, n))
+        elseif quadrant == 2
+            z2 = _neighbour_z(z, mask, i, j, i, min(j + 1, n))
+            z3 = _neighbour_z(z, mask, i, j, max(i - 1, 1), j)
+        elseif quadrant == 3
+            z2 = _neighbour_z(z, mask, i, j, max(i - 1, 1), j)
+            z3 = _neighbour_z(z, mask, i, j, i, max(j - 1, 1))
+        else
+            z2 = _neighbour_z(z, mask, i, j, i, max(j - 1, 1))
+            z3 = _neighbour_z(z, mask, i, j, min(i + 1, m), j)
+        end
+        return _quadrant_positive_area(z1, z2, z3)
+    end
+end
+
+@inline function _cell_quadrants(z, mask, i, j, m, n)
+    return (
+        _quadrant_area(z, mask, i, j, m, n, 1),
+        _quadrant_area(z, mask, i, j, m, n, 2),
+        _quadrant_area(z, mask, i, j, m, n, 3),
+        _quadrant_area(z, mask, i, j, m, n, 4),
+    )
+end
+
+# This cell's four quarters, then u from the west neighbour and v from the south.
+@kernel function _pos_fraction_kernel!(area_h, area_u, area_v, z, mask)
+    i, j = @index(Global, NTuple)
+    m, n = size(z)
+    T = eltype(area_h)
+    quarter = T(0.25)
+    @inbounds begin
+        q1 = zero(T)
+        q2 = zero(T)
+        q3 = zero(T)
+        q4 = zero(T)
+        if (i <= m) && (j <= n)
+            q1, q2, q3, q4 = _cell_quadrants(z, mask, i, j, m, n)
+            area_h[i, j] = quarter * (q1 + q2 + q3 + q4)
+        end
+
+        if j <= n
+            acc = (i <= m) ? quarter * (q2 + q3) : zero(T)
+            if i > 1
+                w1, w2, w3, w4 = _cell_quadrants(z, mask, i - 1, j, m, n)
+                acc += quarter * (w1 + w4)
+            end
+            area_u[i, j] = acc
+        end
+
+        if i <= m
+            acc = (j <= n) ? quarter * (q3 + q4) : zero(T)
+            if j > 1
+                s1, s2, s3, s4 = _cell_quadrants(z, mask, i, j - 1, m, n)
+                acc += quarter * (s1 + s2)
+            end
+            area_v[i, j] = acc
+        end
+    end
+end
+
+function _pos_fraction_mask(z, mask)
+    size(mask) == size(z) || throw(DimensionMismatch(
+        "pos_fraction mask must have size $(size(z)), got $(size(mask))"
+    ))
+    host_mask = mask isa BitArray ? Array(mask) : mask
+    if typeof(host_mask) == typeof(similar(z, Bool))
+        return host_mask
+    end
+    msk = similar(z, Bool)
+    copyto!(msk, host_mask)
+    return msk
+end
+
+"""
+    pos_fraction!(area_h, area_u, area_v, z1, mask)
+
+In-place `pos_fraction`. Inputs must all be on the CPU, or all on the GPU.
+"""
+function pos_fraction!(area_h, area_u, area_v, z1, mask)
+    m, n = size(z1)
+    size(area_h) == (m, n) || throw(DimensionMismatch("area_h must be $((m, n))"))
+    size(area_u) == (m + 1, n) || throw(DimensionMismatch("area_u must be $((m + 1, n))"))
+    size(area_v) == (m, n + 1) || throw(DimensionMismatch("area_v must be $((m, n + 1))"))
+    msk = _pos_fraction_mask(z1, mask)
+    launch!(_pos_fraction_kernel!, area_h, area_u, area_v, z1, msk; ndrange = (m + 1, n + 1))
+    return area_h, area_u, area_v
+end
+
+"""
 pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
 
 Return fraction of each grid cell with function z1 above zero. Uses bilinear
@@ -608,147 +766,12 @@ Out:
    area_fraction_u: m+1 x n array showing area fraction of interpolated z1>0 on u-grid.
    area_fraction_v: m x n+1 array showing area fraction of interpolated z1>0 on v-grid.
 """
-function pos_fraction(z1::AbstractArray{T,2};mask=trues(size(z1))) where {T};
-
-    m,n=size(z1);
-
-    area_fraction=zeros(T,m,n);
-    area_fraction_u=zeros(T,m+1,n);
-    area_fraction_v=zeros(T,m,n+1);
-
-    for quadrant=1:4
-
-        area_fraction_quadrant=zeros(T,m,n);
-
-        #Define (x_i,y_i,z_i) triples i=1,2,3 for each point
-        #and its two nearest neighbours in each of two orthogonal directions.
-        #Distance unit is half a grid cell so each grid cell
-        #is made up of four unit-square quadrants.
-        #Quadrant 1: defined by neighbours in grid East & grid North direction
-        #In local coordinate system.
-        #(x_1,y_1,z_1)=(0,0,z_1);
-        #(x_2,y_2,z_2)=(2,0,z_2); Grid East
-        #(x_3,y_3,z_3)=(0,2,z_3); Grid North
-        #Triples for quadrants 2-4 are defined by neighbours in the other
-        #directions.
-        #Quadrant 2: Neighbours from grid North and grid West
-        #Quadrant 3: Neighbours from grid West and grid South
-        #Quadrant 4: Neighbours from grid South and grid East
-        #If there is no valid neighbour in any direction the central value is
-        #reused.
-        if quadrant == 1
-              z2=z1[[2:m;m],1:n];
-              z2[.!mask[[2:m;m],1:n]]=z1[.!mask[[2:m;m],1:n]];
-              z3=z1[1:m,[2:n;n]];
-              z3[.!mask[1:m,[2:n;n]]]=z1[.!mask[1:m,[2:n;n]]];
-        elseif quadrant == 2
-              z2=z1[1:m,[2:n;n]];
-              z2[.!mask[1:m,[2:n;n]]]=z1[.!mask[1:m,[2:n;n]]];
-              z3=z1[[1;1:(m-1)],1:n];
-              z3[.!mask[[1;1:(m-1)],1:n]]=z1[.!mask[[1;1:(m-1)],1:n]];
-        elseif quadrant == 3
-              z2=z1[[1;1:(m-1)],1:n];
-              z2[.!mask[[1;1:(m-1)],1:n]]=z1[.!mask[[1;1:(m-1)],1:n]];
-              z3=z1[1:m,[1;1:(n-1)]];
-              z3[.!mask[1:m,[1;1:(n-1)]]]=z1[.!mask[1:m,[1;1:(n-1)]]];
-        elseif quadrant == 4
-              z2=z1[1:m,[1;1:(n-1)]];
-              z2[.!mask[1:m,[1;1:(n-1)]]]=z1[.!mask[1:m,[1;1:(n-1)]]];
-              z3=z1[[2:m;m],1:n];
-              z3[.!mask[[2:m;m],1:n]]=z1[.!mask[[2:m;m],1:n]];
-        else
-                error("Quadrant not defined");
-        end
-
-
-        #Find triples where sign changes.
-        sc=findall(.!((sign.(z1) .== sign.(z2)) .& (sign.(z1) .== sign.(z3))));
-        nsc=length(sc);
-
-        #Initialise array.
-        areasc=zeros(T,nsc);
-
-        #Equation (y=ax+b) of zero contour for planar elements;
-        #Planar elements are defined by (x_i,y_i,z_i) triples i=1,2,3.
-        #N.B. distance unit for x and y is half a grid cell.
-        #Flip x and y if needed by exchanging z2 and z3, to avoid infinite a;
-        flip=(abs.(z3[sc] .- z1[sc]) .< abs.(z2[sc] .- z1[sc]));
-        a=zeros(T,nsc);
-        b=zeros(T,nsc);
-        a[.!flip].=-(z2[sc[.!flip]].-z1[sc[.!flip]])./(z3[sc[.!flip]].-z1[sc[.!flip]]);
-        b[.!flip].=-2*z1[sc[.!flip]]./(z3[sc[.!flip]].-z1[sc[.!flip]]);
-        a[flip].=-(z3[sc[flip]].-z1[sc[flip]])./(z2[sc[flip]].-z1[sc[flip]]);
-        b[flip].=-2*z1[sc[flip]]./(z2[sc[flip]].-z1[sc[flip]]);
-
-        #Areas of various useful triangles and trapezoids.
-        a1::Vector{T}=0.5*(b.^2)./a;
-        a2::Vector{T}=0.5*((1.0 .- b).^2)./a;
-        a3::Vector{T}=0.5*a.+b;
-
-        #Test which edges of unit square are intercepted by zero contour.
-        test1::Vector{Int64} = (b .> 0.0) .+ (b .> 1.0);
-        test2::Vector{Int64} = ((a+b) .> 0.0) .+ ((a+b) .> 1.0);
-
-        #There are nine possible combinations ix=1:9.
-        ix= 1 .+ test1 .+ 3*test2;
-
-        #Work out area fraction of unit square for each different combination.
-        areasc[ix.==1].= 0.0;
-        areasc[ix.==2].=-a1[ix.==2];
-        areasc[ix.==3].=a2[ix.==3].-a1[ix.==3];
-        areasc[ix.==4].=a1[ix.==4].+a3[ix.==4];
-        areasc[ix.==5].=a3[ix.==5];
-        areasc[ix.==6].=a2[ix.==6].+a3[ix.==6];
-        areasc[ix.==7].=1.0.-a2[ix.==7].+a1[ix.==7];
-        areasc[ix.==8].=1.0.-a2[ix.==8];
-        areasc[ix.==9].=1.0;
-
-        #Checks to see whether this is the area above zero or below zero.
-        areasc[b.<0.0].=1.0.-areasc[b.<0.0];
-        areasc[z1[sc].<0.0].=1.0.-areasc[z1[sc].<0.0];
-
-        #Compile areas for sign changes with trivial cases.
-        area_fraction_quadrant[sc].=areasc;
-        area_fraction_quadrant[(z1.>0.0) .& (z2.>0.0) .& (z3.>0.0)].=1.0;
-        area_fraction_quadrant[(z1.<=0.0) .& (z2.<=0.0) .& (z3.<=0.0)].=0.0;
-
-        #Don't use any quadrant from an invalid cell of the h-grid.
-        area_fraction_quadrant[.!mask].=0.0;
-
-        #Add areas for each quadrant together.
-        #N.B. distance unit for x and y is half a grid cell.
-        #Summing over quadrants gives the fraction of each grid cell above zero.
-        area_fraction.=area_fraction.+0.25*area_fraction_quadrant;
-
-        if quadrant == 1
-            area_fraction_u.=area_fraction_u.+0.25*[zeros(T,1,n);area_fraction_quadrant];
-        elseif quadrant == 2
-            area_fraction_u.=area_fraction_u.+0.25*[area_fraction_quadrant;zeros(T,1,n)];
-        elseif quadrant == 3
-            area_fraction_u.=area_fraction_u.+0.25*[area_fraction_quadrant;zeros(T,1,n)];
-        elseif quadrant == 4
-            area_fraction_u.=area_fraction_u.+0.25*[zeros(T,1,n);area_fraction_quadrant];
-        else
-            error("Quadrant not defined");
-        end
-
-
-        if quadrant == 1
-            area_fraction_v.=area_fraction_v.+0.25*[zeros(T,m,1) area_fraction_quadrant];
-        elseif quadrant == 2
-            area_fraction_v.=area_fraction_v.+0.25*[zeros(T,m,1) area_fraction_quadrant];
-        elseif quadrant == 3
-            area_fraction_v.=area_fraction_v.+0.25*[area_fraction_quadrant zeros(T,m,1)];
-        elseif quadrant == 4
-            area_fraction_v.=area_fraction_v.+0.25*[area_fraction_quadrant zeros(T,m,1)];
-        else
-            error("Quadrant not defined");
-        end
-
-    end
-
-    return area_fraction, area_fraction_u, area_fraction_v
-
+function pos_fraction(z1::AbstractArray{T,2}; mask=trues(size(z1))) where {T}
+    m, n = size(z1)
+    area_h = similar(z1)
+    area_u = similar(z1, T, m + 1, n)
+    area_v = similar(z1, T, m, n + 1)
+    return pos_fraction!(area_h, area_u, area_v, z1, mask)
 end
 
 
