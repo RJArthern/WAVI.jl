@@ -2,7 +2,7 @@ export update_state!, update_velocities_on_h_grid!, update_state_novelocity!
 
 using Parameters
 
-using WAVI: AbstractModel
+using WAVI: AbstractModel, AbstractThermoDynamics, AbstractFracture
 using WAVI.MeltRates
 using WAVI.SurfaceMassBalance
 using WAVI.Fracture
@@ -201,19 +201,39 @@ function update_thermodynamics_basal_melt!(model::AbstractModel)
     return model
 end
 
+glen_b_temperature_frozen(::AbstractThermoDynamics) = false
+glen_b_temperature_frozen(::NoThermoDynamics) = true
+
+glen_b_damage_frozen(::AbstractFracture) = false
+glen_b_damage_frozen(::ConstantDamage) = true
+
+glen_b_is_frozen(model::AbstractModel) =
+    glen_b_temperature_frozen(model.thermo_dynamics) &&
+    glen_b_damage_frozen(model.fracture)
+
+function glen_a_ref_for_fill(model::AbstractModel)
+    a_ref = model.params.glen_a_ref
+    KA.get_backend(a_ref) === KA.get_backend(model.fields.g3d.glen_b) && return a_ref
+    return stencil_scratch!(model).glen_a_ref
+end
+
 """
     update_glen_b!(model::AbstractModel)
 
 Update stiffness parameter B in Glen flow law.
+
+Skipped when temperature and damage are both held constant. Construction
+already filled `glen_b` from the initial fields.
 """
 function update_glen_b!(model::AbstractModel)
+    glen_b_is_frozen(model) && return model
     @unpack g3d = model.fields
     @unpack params = model
     fill_glen_b!(
         g3d.glen_b,
         g3d.θ,
         g3d.Φ,
-        params.glen_a_ref,
+        glen_a_ref_for_fill(model),
         params.glen_n,
         params.glen_a_activation_energy,
         params.glen_temperature_ref,

@@ -154,6 +154,7 @@ Base.@kwdef mutable struct StencilScratch{T <: Real}
     haar_u_tmp::AbstractArray{T, 2}
     haar_v::AbstractArray{T, 2}
     haar_v_tmp::AbstractArray{T, 2}
+    glen_a_ref::AbstractArray{T, 2}
 end
 
 """
@@ -285,6 +286,7 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
     haar_u_tmp = similar(gu.u)
     haar_v = similar(gv.v)
     haar_v_tmp = similar(gv.v)
+    glen_a_ref = copy_like(proto, model.params.glen_a_ref)
 
     return StencilScratch{T}(;
         gu_inner_indices,
@@ -350,6 +352,7 @@ function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
         haar_u_tmp,
         haar_v,
         haar_v_tmp,
+        glen_a_ref,
     )
 end
 
