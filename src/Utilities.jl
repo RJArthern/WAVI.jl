@@ -503,18 +503,21 @@ end
 
 Apply each Haar spacing as a 2D kernel (`ndrange = (nx, ny)`).
 Used on GPU so each pairing fills the device. CPU keeps `_haar_lift_axes_line!`.
+Queue every spacing, then synchronise once so the host does not wait per level.
 """
 function _haar_lift_axes_2d!(a, b, step_iter, mix)
     src, dst = a, b
     ndrange = size(a)
+    backend = KA.get_backend(a)
     for step in step_iter
-        launch!(_haar_lift_y!, dst, src, step, mix; ndrange = ndrange)
+        launch!(_haar_lift_y!, dst, src, step, mix; ndrange = ndrange, sync = false)
         src, dst = dst, src
     end
     for step in step_iter
-        launch!(_haar_lift_x!, dst, src, step, mix; ndrange = ndrange)
+        launch!(_haar_lift_x!, dst, src, step, mix; ndrange = ndrange, sync = false)
         src, dst = dst, src
     end
+    KA.synchronize(backend)
     return src
 end
 
