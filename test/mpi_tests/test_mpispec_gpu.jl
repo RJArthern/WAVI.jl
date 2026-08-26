@@ -99,12 +99,52 @@ end
     end
 
     u_core, v_core = WAVI.Specs.core_inner_masks(model)
-    @test u_core isa Vector{Bool}
-    @test v_core isa Vector{Bool}
-    @test length(u_core) == model.fields.gu.ni
-    @test length(v_core) == model.fields.gv.ni
+    @test u_core isa AbstractVector{Bool}
+    @test v_core isa AbstractVector{Bool}
+    @test !(u_core isa Vector{Bool})
+    @test !(v_core isa Vector{Bool})
+    gu, gv = model.fields.gu, model.fields.gv
+    @test length(u_core) == gu.ni
+    @test length(v_core) == gv.ni
 
-    # Hits the Schwarz residual check (host masks vs GPU packed residual).
+    # Non-zero packed vector: device reduce must match the host core-only formula.
+    n = gu.ni + gv.ni
+    packed = similar(gu.u, Float64, n)
+    copyto!(packed, Float64.(1:n))
+    u_range = 1:gu.ni
+    v_range = (gu.ni + 1):n
+    gpu_sq = WAVI.Specs.masked_sum_abs2(packed, u_range, u_core) +
+             WAVI.Specs.masked_sum_abs2(packed, v_range, v_core)
+    packed_h = Array(packed)
+    u_m, v_m = Array(u_core), Array(v_core)
+    host_sq = sum(abs2, packed_h[u_range][u_m]) + sum(abs2, packed_h[v_range][v_m])
+    @test host_sq > 0
+    @test gpu_sq ≈ host_sq rtol = 1e-8 atol = 1e-8
+
+    # Same ice as the CPU halo check; collect above overwrote GPU thickness.
+    copyto!(model.fields.gh.h, cpu_h)
+    WAVI.Processes.inner_update!(cpu_model)
+    WAVI.Processes.inner_update!(model)
+
+    function core_sq(m)
+        s = WAVI.Utilities.stencil_scratch!(m)
+        resid = s.picard_resid
+        rhs = WAVI.get_rhs(m)
+        WAVI.get_resid!(resid, WAVI.get_start_guess(m), WAVI.get_op(m), rhs)
+        uc, vc = WAVI.Specs.core_inner_masks(m)
+        ni, nv = m.fields.gu.ni, m.fields.gv.ni
+        rsq = WAVI.Specs.masked_sum_abs2(resid, 1:ni, uc) +
+              WAVI.Specs.masked_sum_abs2(resid, (ni + 1):(ni + nv), vc)
+        bsq = WAVI.Specs.masked_sum_abs2(rhs, 1:ni, uc) +
+              WAVI.Specs.masked_sum_abs2(rhs, (ni + 1):(ni + nv), vc)
+        return rsq, bsq
+    end
+    gpu_resid_sq, gpu_rhs_sq = core_sq(model)
+    cpu_resid_sq, cpu_rhs_sq = core_sq(cpu_model)
+    @test gpu_resid_sq ≈ cpu_resid_sq rtol = 1e-8 atol = 1e-8
+    @test gpu_rhs_sq ≈ cpu_rhs_sq rtol = 1e-8 atol = 1e-8
+
+    # Hits the Schwarz residual check (device reduce, Allreduce two scalars).
     update_velocities!(model)
     @test all(isfinite, Array(model.fields.gu.u))
     @test all(isfinite, Array(model.fields.gv.v))

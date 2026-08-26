@@ -118,7 +118,7 @@ Fields:
     field_collector: Field collector for the model
     pou_scratch: Cached PoU weights / host strip buffers (filled on first prolong)
     halo_scratch: Cached RAS host halo packs plus a device halo strip workspace (filled on first halo_exchange!)
-    core_inner: Cached core-only inner masks for the global residual
+    core_inner: Cached core-only inner masks for the global residual (host on CPU, device copy on GPU)
     child_architecture: Where each rank's local arrays live (`CPU()` or `GPU()`)
     local_spec: Optional intraprocess ThreadedSpec for the rank-local solve (default=nothing to wavelet)
 """
@@ -149,7 +149,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     niterations::N  # Number of Schwarz iterations per Picard iteration
     pou_scratch::Union{Nothing, MPIPoUScratch{T}}
     halo_scratch::Union{Nothing, MPIHaloScratch{T}}
-    core_inner::Union{Nothing, Tuple{Vector{Bool}, Vector{Bool}}}
+    core_inner::Union{Nothing, Tuple{AbstractVector{Bool}, AbstractVector{Bool}}}
     child_architecture::A
     local_spec::Union{Nothing, ThreadedSpec}
 
@@ -636,8 +636,31 @@ function core_inner_masks(model::Model{<:Any, <:Any, <:MPISpec})
     v_core_mask[(1+lh):(size(v_core_mask, 1)-rh), (1+th):(size(v_core_mask, 2)-bh)] .= true
     v_core_inner = Vector{Bool}(v_core_mask[mask_v])
 
-    model.spec.core_inner = (u_core_inner, v_core_inner)
+    proto = gu.u
+    if _is_host_array(proto)
+        model.spec.core_inner = (u_core_inner, v_core_inner)
+    else
+        u_dev = similar(proto, Bool, length(u_core_inner))
+        v_dev = similar(proto, Bool, length(v_core_inner))
+        copyto!(u_dev, u_core_inner)
+        copyto!(v_dev, v_core_inner)
+        model.spec.core_inner = (u_dev, v_dev)
+    end
     return model.spec.core_inner
+end
+
+"""
+    masked_sum_abs2(x, r, mask)
+
+Sum of squares of `x[r]` where `mask` is true. Host arrays use boolean views.
+Device arrays reduce on the same backend; only the scalar returns to the host.
+"""
+function masked_sum_abs2(x, r, mask)
+    if _is_host_array(x)
+        return sum(abs2, @view x[r][mask])
+    end
+    # Dense slice: a view of a device array can scalar-index under boolean mask.
+    return sum(abs2, x[r][mask])
 end
 
 """
@@ -704,17 +727,18 @@ function _schwarz_precondition!(model::Model{<:Any, <:Any, <:MPISpec})
 
         # Global Residual Check (core-only):
         # exclude overlap halos so each physical unknown is counted once globally.
-        # Packed vectors may be on GPU; masks and the reduction stay on the host.
+        # Packed residual may be on GPU. Core masks live on the same backend;
+        # only two scalars are Allreduced.
         @unpack gu, gv = model.fields
         u_core_inner, v_core_inner = core_inner_masks(model)
-        resid_h = _host(resid)
-        b_h = _host(b)
+        u_range = 1:gu.ni
+        v_range = (gu.ni + 1):(gu.ni + gv.ni)
 
         # Calculate squared norms locally on core unknowns only
-        local_resid_sq = sum(abs2, @view resid_h[1:gu.ni][u_core_inner]) +
-                         sum(abs2, @view resid_h[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
-        local_rhs_sq = sum(abs2, @view b_h[1:gu.ni][u_core_inner]) +
-                       sum(abs2, @view b_h[(gu.ni+1):(gu.ni+gv.ni)][v_core_inner])
+        local_resid_sq = masked_sum_abs2(resid, u_range, u_core_inner) +
+                         masked_sum_abs2(resid, v_range, v_core_inner)
+        local_rhs_sq = masked_sum_abs2(b, u_range, u_core_inner) +
+                       masked_sum_abs2(b, v_range, v_core_inner)
 
         # Sum squared norms across all ranks
         global_resid_sq = MPI.Allreduce(local_resid_sq, MPI.SUM, model.spec.comm)
