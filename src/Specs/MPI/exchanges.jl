@@ -170,10 +170,12 @@ function ensure_mpi_pou_scratch!(model::AbstractModel{<:Any, <:Any, <:MPISpec})
     T = eltype(gu.u)
 
     scratch = spec.pou_scratch
+    host_u = _is_host_array(gu.u)
     if scratch !== nothing &&
        size(scratch.ωu) == (mu, nu) &&
        size(scratch.ωv) == (mv, nv) &&
-       eltype(scratch.ωu) === T
+       eltype(scratch.ωu) === T &&
+       _is_host_array(scratch.ωu) === host_u
         return scratch
     end
 
@@ -187,8 +189,15 @@ function ensure_mpi_pou_scratch!(model::AbstractModel{<:Any, <:Any, <:MPISpec})
     o = 2 * halo
     ωu = partition_of_unity(mu, nu, leavei1, leaveim, leavej1, leavejn, o, o - 1)
     ωv = partition_of_unity(mv, nv, leavei1, leaveim, leavej1, leavejn, o - 1, o)
-    # Host `Matrix` on purpose; MPI strips are not CUDA-aware.
-    scratch = MPIPoUScratch(Matrix{T}(ωu), Matrix{T}(ωv))
+    if host_u
+        scratch = MPIPoUScratch(Matrix{T}(ωu), Matrix{T}(ωv))
+    else
+        ωu_dev = similar(gu.u, T, size(ωu)...)
+        ωv_dev = similar(gv.v, T, size(ωv)...)
+        copyto!(ωu_dev, ωu)
+        copyto!(ωv_dev, ωv)
+        scratch = MPIPoUScratch(ωu_dev, ωv_dev)
+    end
     spec.pou_scratch = scratch
     return scratch
 end
@@ -282,7 +291,7 @@ Get a reusable pack buffer of length `n` that lives on the same place as
 `field` (CPU or GPU). Allocates a new buffer only when the old one is missing,
 too short, or on the wrong place.
 """
-function ensure_dev_halo_strip!(scratch::MPIHaloScratch, field, n::Int)
+function ensure_dev_halo_strip!(scratch, field, n::Int)
     buf = scratch.dev_halo_strip
     if buf !== nothing &&
        buf isa AbstractVector &&
@@ -341,6 +350,40 @@ function unpack_halo_strip!(field, scratch, src, irange, jrange)
     copyto!(dev, 1, src_vec, 1, n)
     launch!(
         _unpack_halo_strip!,
+        field,
+        dev,
+        Int(first(irange)),
+        Int(first(jrange)),
+        Int(ni);
+        ndrange = n,
+    )
+    return nothing
+end
+
+"""
+    add_halo_strip!(field, scratch, src, irange, jrange)
+
+Add a flat CPU strip into one edge block of `field`.
+Host fields add in place. Device fields copy the strip onto the pack
+workspace and scatter-add with `_add_halo_strip!`.
+"""
+function add_halo_strip!(field, scratch, src, irange, jrange)
+    ni, nj = length(irange), length(jrange)
+    n = ni * nj
+    n == 0 && return nothing
+    if _is_host_array(field)
+        field[irange, jrange] .+= reshape(src, ni, nj)
+        return nothing
+    end
+    dev = ensure_dev_halo_strip!(scratch, field, n)
+    src_vec = src isa Vector && length(src) == n ? src : begin
+        tmp = Vector{eltype(src)}(undef, n)
+        copyto!(tmp, vec(src))
+        tmp
+    end
+    copyto!(dev, 1, src_vec, 1, n)
+    launch!(
+        _add_halo_strip!,
         field,
         dev,
         Int(first(irange)),
@@ -421,8 +464,9 @@ Communication happens in the X direction first, and the values received are imme
 added to the `field`. When the Y direction is then exchanged, it propagates
 any diagonal corner contributions without requiring an explicit corner message.
 
-Send/recv packs are reused via `scratch` (`MPIPoUScratch`). `field` is the host
-work array; device velocities are copied onto it before this call.
+Send/recv packs are reused via `scratch` (`MPIPoUScratch`). `field` is the
+weighted contrib on the same backend as the velocities. Overlap strips are
+packed for host MPI; this is not CUDA-aware MPI.
 """
 function mpi_pou_add_neighbour_strips!(
     field::AbstractMatrix{T},
@@ -451,29 +495,23 @@ function mpi_pou_add_neighbour_strips!(
         n_x = overlapi * ny
         recv_left_view = recv_right_view = nothing
         if left > -1
-            send_l = ensure_strip_buf!(scratch.send_l, n_x)
-            recv_l = ensure_strip_buf!(scratch.recv_l, n_x)
-            copyto!(send_l, 1, reshape(@view(field[1:overlapi, :]), n_x), 1, n_x)
-            send_view = @view send_l[1:n_x]
-            recv_left_view = @view recv_l[1:n_x]
+            send_view = pack_halo_strip!(scratch.send_l, field, 1:overlapi, 1:ny, scratch)
+            recv_left_view = recv_halo_strip!(scratch.recv_l, n_x)
             push!(requests_x, MPI.Isend(send_view, left, tag_base + 0, comm))
             push!(requests_x, MPI.Irecv!(recv_left_view, left, tag_base + 1, comm))
         end
         if right > -1
-            send_r = ensure_strip_buf!(scratch.send_r, n_x)
-            recv_r = ensure_strip_buf!(scratch.recv_r, n_x)
-            copyto!(send_r, 1, reshape(@view(field[(nx - overlapi + 1):nx, :]), n_x), 1, n_x)
-            send_view = @view send_r[1:n_x]
-            recv_right_view = @view recv_r[1:n_x]
+            send_view = pack_halo_strip!(scratch.send_r, field, (nx - overlapi + 1):nx, 1:ny, scratch)
+            recv_right_view = recv_halo_strip!(scratch.recv_r, n_x)
             push!(requests_x, MPI.Isend(send_view, right, tag_base + 1, comm))
             push!(requests_x, MPI.Irecv!(recv_right_view, right, tag_base + 0, comm))
         end
         MPI.Waitall(requests_x)
         if recv_left_view !== nothing
-            field[1:overlapi, :] .+= reshape(recv_left_view, overlapi, ny)
+            add_halo_strip!(field, scratch, recv_left_view, 1:overlapi, 1:ny)
         end
         if recv_right_view !== nothing
-            field[(nx - overlapi + 1):nx, :] .+= reshape(recv_right_view, overlapi, ny)
+            add_halo_strip!(field, scratch, recv_right_view, (nx - overlapi + 1):nx, 1:ny)
         end
     end
 
@@ -483,29 +521,23 @@ function mpi_pou_add_neighbour_strips!(
         n_y = nx * overlapj
         recv_top_view = recv_bottom_view = nothing
         if top > -1
-            send_t = ensure_strip_buf!(scratch.send_t, n_y)
-            recv_t = ensure_strip_buf!(scratch.recv_t, n_y)
-            copyto!(send_t, 1, reshape(@view(field[:, 1:overlapj]), n_y), 1, n_y)
-            send_view = @view send_t[1:n_y]
-            recv_top_view = @view recv_t[1:n_y]
+            send_view = pack_halo_strip!(scratch.send_t, field, 1:nx, 1:overlapj, scratch)
+            recv_top_view = recv_halo_strip!(scratch.recv_t, n_y)
             push!(requests_y, MPI.Isend(send_view, top, tag_base + 2, comm))
             push!(requests_y, MPI.Irecv!(recv_top_view, top, tag_base + 3, comm))
         end
         if bottom > -1
-            send_b = ensure_strip_buf!(scratch.send_b, n_y)
-            recv_b = ensure_strip_buf!(scratch.recv_b, n_y)
-            copyto!(send_b, 1, reshape(@view(field[:, (ny - overlapj + 1):ny]), n_y), 1, n_y)
-            send_view = @view send_b[1:n_y]
-            recv_bottom_view = @view recv_b[1:n_y]
+            send_view = pack_halo_strip!(scratch.send_b, field, 1:nx, (ny - overlapj + 1):ny, scratch)
+            recv_bottom_view = recv_halo_strip!(scratch.recv_b, n_y)
             push!(requests_y, MPI.Isend(send_view, bottom, tag_base + 3, comm))
             push!(requests_y, MPI.Irecv!(recv_bottom_view, bottom, tag_base + 2, comm))
         end
         MPI.Waitall(requests_y)
         if recv_top_view !== nothing
-            field[:, 1:overlapj] .+= reshape(recv_top_view, nx, overlapj)
+            add_halo_strip!(field, scratch, recv_top_view, 1:nx, 1:overlapj)
         end
         if recv_bottom_view !== nothing
-            field[:, (ny - overlapj + 1):ny] .+= reshape(recv_bottom_view, nx, overlapj)
+            add_halo_strip!(field, scratch, recv_bottom_view, 1:nx, (ny - overlapj + 1):ny)
         end
     end
 
@@ -535,18 +567,13 @@ function mpi_pou_weighted_prolong_velocities!(
     ωu, ωv = scratch.ωu, scratch.ωv
     contrib_u, contrib_v = scratch.work_u, scratch.work_v
 
-    # PoU work arrays stay on the host. Copy device velocities here, then MPI
-    # the host strips (see MPIPoUScratch).
-    u_h = _host(gu.u)
-    v_h = _host(gv.v)
-    # Combined local contribution (ThreadedSpec: damp*old*ω + (1-damp)*new*ω)
-    @. contrib_u = od * ωu * u_h
-    @. contrib_v = od * ωv * v_h
+    # Weighted contrib on the same backend as the velocities. MPI still uses
+    # host overlap strips (see MPIPoUScratch).
+    @. contrib_u = od * ωu * gu.u
+    @. contrib_v = od * ωv * gv.v
     if !iszero(d)
-        u0_h = _host(u0)
-        v0_h = _host(v0)
-        @. contrib_u += d * ωu * u0_h
-        @. contrib_v += d * ωv * v0_h
+        @. contrib_u += d * ωu * u0
+        @. contrib_v += d * ωv * v0
     end
 
     # Geometric patch overlap (h-overlap = 2*halo), plus one extra face on the

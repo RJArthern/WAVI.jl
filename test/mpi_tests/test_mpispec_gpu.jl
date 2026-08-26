@@ -144,6 +144,23 @@ end
     @test gpu_resid_sq ≈ cpu_resid_sq rtol = 1e-8 atol = 1e-8
     @test gpu_rhs_sq ≈ cpu_rhs_sq rtol = 1e-8 atol = 1e-8
 
+    fill!(model.fields.gu.u, 2.0)
+    fill!(model.fields.gv.v, 3.0)
+    fill!(cpu_model.fields.gu.u, 2.0)
+    fill!(cpu_model.fields.gv.v, 3.0)
+    WAVI.Specs.mpi_pou_weighted_prolong_velocities!(model, model.fields.gu.u, model.fields.gv.v)
+    WAVI.Specs.mpi_pou_weighted_prolong_velocities!(
+        cpu_model, cpu_model.fields.gu.u, cpu_model.fields.gv.v,
+    )
+    @test Array(model.fields.gu.u) ≈ cpu_model.fields.gu.u rtol = 1e-8 atol = 1e-8
+    @test Array(model.fields.gv.v) ≈ cpu_model.fields.gv.v rtol = 1e-8 atol = 1e-8
+    @test all(x -> abs(x - 2) < 1e-8, Array(model.fields.gu.u))
+    @test all(x -> abs(x - 3) < 1e-8, Array(model.fields.gv.v))
+    ps = model.spec.pou_scratch
+    @test !(ps.ωu isa Matrix)
+    @test ps.send_l isa Vector
+    @test ps.dev_halo_strip !== nothing
+
     # Hits the Schwarz residual check (device reduce, Allreduce two scalars).
     update_velocities!(model)
     @test all(isfinite, Array(model.fields.gu.u))

@@ -33,14 +33,15 @@ import WAVI.Time: Clock
 Reusable PoU weights, velocity workspaces, and strip packs for neighbour prolong.
 Allocated once per local velocity shape; reused across Schwarz iterations.
 
-Weights, work arrays, and send/recv strips are host `Array`s on purpose.
-Device fields are copied onto these buffers for MPI. This is not CUDA-aware MPI.
+Weights and work arrays follow the local velocity backend. Send/recv strips are
+host `Vector`s on purpose. Device contrib packs into `dev_halo_strip` then
+`copyto!` only that strip onto the host buffers for MPI. This is not CUDA-aware MPI.
 """
 mutable struct MPIPoUScratch{T <: AbstractFloat}
-    ωu::Matrix{T}
-    ωv::Matrix{T}
-    work_u::Matrix{T}
-    work_v::Matrix{T}
+    ωu::AbstractMatrix{T}
+    ωv::AbstractMatrix{T}
+    work_u::AbstractMatrix{T}
+    work_v::AbstractMatrix{T}
     send_l::Vector{T}
     recv_l::Vector{T}
     send_r::Vector{T}
@@ -49,14 +50,17 @@ mutable struct MPIPoUScratch{T <: AbstractFloat}
     recv_t::Vector{T}
     send_b::Vector{T}
     recv_b::Vector{T}
+    # GPU pack/unpack workspace for one PoU overlap edge (`nothing` until a GPU prolong).
+    dev_halo_strip::Any
 end
 
-function MPIPoUScratch(ωu::Matrix{T}, ωv::Matrix{T}) where {T <: AbstractFloat}
+function MPIPoUScratch(ωu::AbstractMatrix{T}, ωv::AbstractMatrix{T}) where {T <: AbstractFloat}
     empty = T[]
     return MPIPoUScratch{T}(
         ωu, ωv, similar(ωu), similar(ωv),
         copy(empty), copy(empty), copy(empty), copy(empty),
         copy(empty), copy(empty), copy(empty), copy(empty),
+        nothing,
     )
 end
 
@@ -116,7 +120,7 @@ Fields:
     damping: Damping factor for halo exchange (default=0.0)
     niterations: Number of Schwarz iterations per Picard iteration (default=5)
     field_collector: Field collector for the model
-    pou_scratch: Cached PoU weights / host strip buffers (filled on first prolong)
+    pou_scratch: Cached PoU weights (device copy on GPU ranks) and host MPI strip buffers (filled on first prolong)
     halo_scratch: Cached RAS host halo packs plus a device halo strip workspace (filled on first halo_exchange!)
     core_inner: Cached core-only inner masks for the global residual (host on CPU, device copy on GPU)
     child_architecture: Where each rank's local arrays live (`CPU()` or `GPU()`)

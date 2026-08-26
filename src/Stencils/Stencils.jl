@@ -26,6 +26,7 @@ export _diff_x!,
     _gather_mapped!,
     _pack_halo_strip!,
     _unpack_halo_strip!,
+    _add_halo_strip!,
     _gs_colour_update!,
     _haar_lift_x!,
     _haar_lift_y!,
@@ -439,6 +440,20 @@ The layout matches `_pack_halo_strip!`. Used after MPI receives a halo edge.
     i = t % ni
     j = t ÷ ni
     @inbounds field[i0 + i, j0 + j] = inp[k]
+end
+
+"""
+    _add_halo_strip!(field, inp, i0, j0, ni)
+
+Add a flat list `inp` into one rectangular edge of `field`.
+The layout matches `_pack_halo_strip!`. Used after MPI receives a PoU overlap strip.
+"""
+@kernel function _add_halo_strip!(field, inp, i0, j0, ni)
+    k = @index(Global, Linear)
+    t = k - 1
+    i = t % ni
+    j = t ÷ ni
+    @inbounds field[i0 + i, j0 + j] += inp[k]
 end
 
 """
