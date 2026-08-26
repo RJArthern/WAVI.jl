@@ -63,6 +63,31 @@ end
         @test all(h_host[(end - rh + 1):end, :] .== (model.spec.right + 1.0))
     end
 
+    cpu_spec = MPISpec(nprocs, 1, 2, grid; pou = true, niterations = 2)
+    cpu_model = Model(
+        grid = grid,
+        bed_elevation = -500.0 .* ones(grid.nx, grid.ny),
+        params = Params(accumulation_rate = 0.1),
+        solver_params = SolverParams(maxiter_picard = 1),
+        initial_conditions = InitialConditions(initial_thickness = 100.0 .* ones(grid.nx, grid.ny)),
+        spec = cpu_spec,
+    )
+    cpu_h = cpu_model.fields.gh.h
+    cpu_h .= -99.0
+    cpu_h[(1 + lh):(end - rh), (1 + th):(end - bh)] .= rank + 1.0
+    WAVI.Specs.halo_exchange!(cpu_model; fields = [:h])
+    @test h_host ≈ cpu_h rtol = 1e-8 atol = 1e-8
+
+    scratch = WAVI.Specs.ensure_mpi_halo_scratch!(model)
+    @test scratch.dev_halo_strip !== nothing
+    @test !(scratch.dev_halo_strip isa Array)
+    field = AT(reshape(collect(1.0:300.0), 20, 15))
+    buf = Float64[]
+    packed_x = WAVI.Specs.pack_halo_strip!(buf, field, 2:3, 1:15, scratch)
+    @test reshape(collect(packed_x), 2, 15) ≈ Array(field)[2:3, :]
+    packed_y = WAVI.Specs.pack_halo_strip!(buf, field, 1:20, 4:5, scratch)
+    @test reshape(collect(packed_y), 20, 2) ≈ Array(field)[:, 4:5]
+
     model.fields.gh.h .= -1.0
     model.fields.gh.h[(1 + lh):(end - rh), (1 + th):(end - bh)] .= rank + 10.0
     gathered = WAVI.Specs.collect_mpi_field!(model, [:global_fields, :gh, :h])

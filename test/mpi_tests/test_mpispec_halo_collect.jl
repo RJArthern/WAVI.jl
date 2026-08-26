@@ -91,6 +91,7 @@ using WAVI
         @test hs.recv_l isa Vector
         @test hs.l0_h isa Matrix
         @test hs.W_left isa Vector
+        @test hs.dev_halo_strip === nothing
 
         WAVI.Specs.mpi_velocity_pou_weights(model)
         ps = model.spec.pou_scratch

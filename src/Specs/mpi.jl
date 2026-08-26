@@ -22,7 +22,7 @@ import WAVI.Parameters: TimesteppingParams
 import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, inner_update!, inner_update_fields!,
                     precondition!, update_preconditioner!, update_rheological_operators!,
                     get_start_guess, get_op, get_rhs
-import WAVI.Utilities: stencil_scratch!, get_resid!, _host
+import WAVI.Utilities: stencil_scratch!, get_resid!, _host, _is_host_array
 import WAVI.Simulations: run_simulation!, timestep!, update_model_climate_forcing!
 import WAVI.Time: Clock
 
@@ -65,7 +65,8 @@ Reusable RAS halo packs, blend weights, and L0 snapshots.
 Allocated on first `halo_exchange!`; send/recv strips grow to the largest field.
 
 Packs, L0 snapshots, and blend weights are host `Array`s on purpose.
-Device fields are copied onto these buffers for MPI. This is not CUDA-aware MPI.
+Device fields pack into `dev_halo_strip` then `copyto!` the halo strip onto these host
+buffers for MPI. This is not CUDA-aware MPI.
 """
 mutable struct MPIHaloScratch{T <: AbstractFloat}
     send_l::Vector{T}
@@ -83,6 +84,8 @@ mutable struct MPIHaloScratch{T <: AbstractFloat}
     W_right::Vector{T}
     W_top::Matrix{T}
     W_bottom::Matrix{T}
+    # GPU pack/unpack workspace for one halo edge (`nothing` until a GPU field is exchanged).
+    dev_halo_strip::Any
 end
 
 function MPIHaloScratch(::Type{T}, halo::Integer, damping) where {T <: AbstractFloat}
@@ -93,6 +96,7 @@ function MPIHaloScratch(::Type{T}, halo::Integer, damping) where {T <: AbstractF
         copy(empty), copy(empty), copy(empty), copy(empty),
         zeros(T, 0, 0), zeros(T, 0, 0), zeros(T, 0, 0),
         fill(d, halo), fill(d, halo), fill(d, 1, halo), fill(d, 1, halo),
+        nothing,
     )
 end
 
@@ -113,7 +117,7 @@ Fields:
     niterations: Number of Schwarz iterations per Picard iteration (default=5)
     field_collector: Field collector for the model
     pou_scratch: Cached PoU weights / host strip buffers (filled on first prolong)
-    halo_scratch: Cached RAS host halo packs (filled on first halo_exchange!)
+    halo_scratch: Cached RAS host halo packs plus a device halo strip workspace (filled on first halo_exchange!)
     core_inner: Cached core-only inner masks for the global residual
     child_architecture: Where each rank's local arrays live (`CPU()` or `GPU()`)
     local_spec: Optional intraprocess ThreadedSpec for the rank-local solve (default=nothing to wavelet)

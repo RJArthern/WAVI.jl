@@ -27,5 +27,11 @@ end
         if !success(p)
             @error "MPI+GPU unit tests failed" cmd exitcode = p.exitcode
         end
+
+        p1, cmd1 = run_mpi_script("test_mpispec_gpu_one_rank.jl"; nprocs = 1)
+        @test success(p1)
+        if !success(p1)
+            @error "MPI+GPU one-rank tests failed" cmd = cmd1 exitcode = p1.exitcode
+        end
     end
 end

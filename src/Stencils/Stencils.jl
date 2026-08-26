@@ -24,6 +24,8 @@ export _diff_x!,
     _scatter!,
     _scatter_mapped!,
     _gather_mapped!,
+    _pack_halo_strip!,
+    _unpack_halo_strip!,
     _gs_colour_update!,
     _haar_lift_x!,
     _haar_lift_y!,
@@ -408,6 +410,35 @@ Equivalent to `out = samp * inp`.
             out_vec[k] = inp_2d[i, j]
         end
     end
+end
+
+"""
+    _pack_halo_strip!(out, field, i0, j0, ni)
+
+Copy one rectangular edge of `field` into a flat list `out`, starting at
+grid point `(i0, j0)` with `ni` rows. Values are stored column by column.
+Used so MPI can send a halo edge without copying the whole field.
+"""
+@kernel function _pack_halo_strip!(out, field, i0, j0, ni)
+    k = @index(Global, Linear)
+    t = k - 1
+    i = t % ni
+    j = t ÷ ni
+    @inbounds out[k] = field[i0 + i, j0 + j]
+end
+
+"""
+    _unpack_halo_strip!(field, inp, i0, j0, ni)
+
+Write a flat list `inp` back into one rectangular edge of `field`.
+The layout matches `_pack_halo_strip!`. Used after MPI receives a halo edge.
+"""
+@kernel function _unpack_halo_strip!(field, inp, i0, j0, ni)
+    k = @index(Global, Linear)
+    t = k - 1
+    i = t % ni
+    j = t ÷ ni
+    @inbounds field[i0 + i, j0 + j] = inp[k]
 end
 
 """

@@ -2,6 +2,7 @@ using Parameters
 using MPI
 
 using WAVI.Parameters
+using WAVI.Stencils
 
 import WAVI: AbstractField, AbstractGrid, AbstractMeltRate, AbstractModel
 import WAVI.Fields: GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, SigmaGrid
@@ -13,12 +14,6 @@ import WAVI.Wavelets: UWavelets, VWavelets
 
 # MPI send/recv, Gatherv, and scalar halo blends use host memory on purpose
 # (not CUDA-aware MPI). `_host(::Array)` is a no-copy so the CPU path is unchanged.
-# TODO: Will leave CUDA-aware MPI for future work.
-function _mpi_copy_back!(dest, host)
-    dest === host && return dest
-    copyto!(dest, host)
-    return dest
-end
 
 ##
 # Additional MPI functionality
@@ -218,37 +213,197 @@ function ensure_mpi_halo_scratch!(model::AbstractModel{<:Any, <:Any, <:MPISpec})
     return scratch
 end
 
+"""
+    copy_ras_l0!(scratch, field_data, local_field, fields)
+
+Save a CPU copy of the current local field before neighbour values are mixed in.
+Damping uses this saved copy so the update is a blend of old and new values,
+not a full overwrite. Returns the saved CPU matrix. CPU fields are already on
+the host, so that copy is free.
+"""
 function copy_ras_l0!(scratch::MPIHaloScratch{T}, field_data, local_field, fields) where {T}
+    nx, ny = size(local_field)
+    buf = ras_l0_workspace!(scratch, field_data, fields, nx, ny)
+    copyto!(buf, _host(local_field))
+    return buf
+end
+
+"""
+    ras_l0_workspace!(scratch, field_data, fields, nx, ny)
+
+Get a reusable CPU workspace for the thickness (`h`), `u`, or `v` field.
+The matrix is resized only when the local patch shape changes. Both the CPU
+and GPU halo paths use this workspace when mixing neighbour values.
+"""
+function ras_l0_workspace!(scratch::MPIHaloScratch{T}, field_data, fields, nx, ny) where {T}
     if field_data === fields.gh
-        scratch.l0_h = _copy_ras_l0_matrix!(scratch.l0_h, local_field)
+        scratch.l0_h = _ensure_matrix!(scratch.l0_h, nx, ny)
         return scratch.l0_h
     elseif field_data === fields.gu
-        scratch.l0_u = _copy_ras_l0_matrix!(scratch.l0_u, local_field)
+        scratch.l0_u = _ensure_matrix!(scratch.l0_u, nx, ny)
         return scratch.l0_u
     else
-        scratch.l0_v = _copy_ras_l0_matrix!(scratch.l0_v, local_field)
+        scratch.l0_v = _ensure_matrix!(scratch.l0_v, nx, ny)
         return scratch.l0_v
     end
 end
 
-function _copy_ras_l0_matrix!(buf::Matrix{T}, src) where {T}
-    src_h = _host(src)
-    if size(buf) != size(src_h)
-        buf = Matrix{T}(undef, size(src_h)...)
-    end
-    copyto!(buf, src_h)
-    return buf
+function _ensure_matrix!(buf::Matrix{T}, nx, ny) where {T}
+    size(buf) == (nx, ny) && return buf
+    return Matrix{T}(undef, nx, ny)
 end
 
-# `buf` is a host `Vector`. `field` must already be on the host (see `_host` in `halo_exchange!`).
-function pack_halo_strip!(buf::Vector{T}, field, irange, jrange) where {T}
+"""
+    pack_halo_strip!(buf, field, irange, jrange, scratch=nothing)
+
+Copy one edge strip of `field` into a flat CPU buffer ready for MPI.
+
+On the CPU this is a direct copy of that strip. On the GPU the strip is packed
+on the device first, then only that strip is copied to the CPU. Returns a view
+of the packed values in `buf`.
+"""
+function pack_halo_strip!(buf::Vector{T}, field, irange, jrange, scratch=nothing) where {T}
     ni, nj = length(irange), length(jrange)
     n = ni * nj
+    n == 0 && return view(buf, 1:0)
     ensure_strip_buf!(buf, n)
-    copyto!(reshape(view(buf, 1:n), ni, nj), @view field[irange, jrange])
+    if _is_host_array(field)
+        copyto!(reshape(view(buf, 1:n), ni, nj), @view field[irange, jrange])
+    else
+        pack_halo_strip_device!(buf, field, irange, jrange, scratch)
+    end
     return view(buf, 1:n)
 end
 
+"""
+    ensure_dev_halo_strip!(scratch, field, n)
+
+Get a reusable pack buffer of length `n` that lives on the same place as
+`field` (CPU or GPU). Allocates a new buffer only when the old one is missing,
+too short, or on the wrong place.
+"""
+function ensure_dev_halo_strip!(scratch::MPIHaloScratch, field, n::Int)
+    buf = scratch.dev_halo_strip
+    if buf !== nothing &&
+       buf isa AbstractVector &&
+       eltype(buf) === eltype(field) &&
+       length(buf) >= n &&
+       _is_host_array(buf) === _is_host_array(field)
+        return buf
+    end
+    scratch.dev_halo_strip = similar(field, n)
+    return scratch.dev_halo_strip
+end
+
+"""
+    pack_halo_strip_device!(buf, field, irange, jrange, scratch)
+
+Gather one edge strip from a GPU field into a flat CPU buffer.
+
+A small kernel packs the strip on the GPU, then the packed strip is copied to
+`buf`. The copy must use full arrays with start offsets; copying through a
+view can fail on CUDA.
+"""
+function pack_halo_strip_device!(buf::Vector, field, irange, jrange, scratch)
+    ni = length(irange)
+    n = ni * length(jrange)
+    dev = scratch === nothing ? similar(field, n) : ensure_dev_halo_strip!(scratch, field, n)
+    launch!(
+        _pack_halo_strip!,
+        dev,
+        field,
+        Int(first(irange)),
+        Int(first(jrange)),
+        Int(ni);
+        ndrange = n,
+    )
+    copyto!(buf, 1, dev, 1, n)
+    return nothing
+end
+
+"""
+    unpack_halo_strip!(field, scratch, src, irange, jrange)
+
+Write a flat CPU strip back into one edge block of a GPU field.
+If `src` is not already a packed vector of the right length, it is packed
+first, then copied to the GPU and scattered into `field`.
+"""
+function unpack_halo_strip!(field, scratch, src, irange, jrange)
+    ni, nj = length(irange), length(jrange)
+    n = ni * nj
+    n == 0 && return nothing
+    dev = ensure_dev_halo_strip!(scratch, field, n)
+    src_vec = src isa Vector && length(src) == n ? src : begin
+        tmp = Vector{eltype(src)}(undef, n)
+        copyto!(tmp, vec(src))
+        tmp
+    end
+    copyto!(dev, 1, src_vec, 1, n)
+    launch!(
+        _unpack_halo_strip!,
+        field,
+        dev,
+        Int(first(irange)),
+        Int(first(jrange)),
+        Int(ni);
+        ndrange = n,
+    )
+    return nothing
+end
+
+"""
+    unpack_halo_rings!(field, work, scratch, lh, rh, th, bh)
+
+Copy the left, right, top, and bottom halo edges from the CPU workspace
+`work` back onto the GPU field. Edges with zero width are skipped.
+"""
+function unpack_halo_rings!(field, work, scratch, lh, rh, th, bh)
+    nx, ny = size(work)
+    lh > 0 && unpack_halo_strip!(field, scratch, view(work, 1:lh, :), 1:lh, 1:ny)
+    rh > 0 && unpack_halo_strip!(field, scratch, view(work, (nx - rh + 1):nx, :), (nx - rh + 1):nx, 1:ny)
+    th > 0 && unpack_halo_strip!(field, scratch, view(work, :, 1:th), 1:nx, 1:th)
+    bh > 0 && unpack_halo_strip!(field, scratch, view(work, :, (ny - bh + 1):ny), 1:nx, (ny - bh + 1):ny)
+    return nothing
+end
+
+"""
+    copy_halo_rings_to_host!(work, field, scratch, lh, rh, th, bh)
+
+Copy the left, right, top, and bottom halo edges from the GPU field onto the
+CPU workspace `work`, so neighbour mixing can run on the CPU. Reuses the MPI
+send buffers; call this only after sends have finished.
+"""
+function copy_halo_rings_to_host!(work, field, scratch, lh, rh, th, bh)
+    nx, ny = size(work)
+    if lh > 0
+        n = lh * ny
+        pack_halo_strip!(scratch.send_l, field, 1:lh, 1:ny, scratch)
+        copyto!(view(work, 1:lh, :), reshape(view(scratch.send_l, 1:n), lh, ny))
+    end
+    if rh > 0
+        n = rh * ny
+        pack_halo_strip!(scratch.send_r, field, (nx - rh + 1):nx, 1:ny, scratch)
+        copyto!(view(work, (nx - rh + 1):nx, :), reshape(view(scratch.send_r, 1:n), rh, ny))
+    end
+    if th > 0
+        n = nx * th
+        pack_halo_strip!(scratch.send_t, field, 1:nx, 1:th, scratch)
+        copyto!(view(work, :, 1:th), reshape(view(scratch.send_t, 1:n), nx, th))
+    end
+    if bh > 0
+        n = nx * bh
+        pack_halo_strip!(scratch.send_b, field, 1:nx, (ny - bh + 1):ny, scratch)
+        copyto!(view(work, :, (ny - bh + 1):ny), reshape(view(scratch.send_b, 1:n), nx, bh))
+    end
+    return nothing
+end
+
+"""
+    recv_halo_strip!(buf, n)
+
+Make sure the CPU receive buffer is large enough for `n` values, and return a
+view of that length for MPI to write into.
+"""
 function recv_halo_strip!(buf::Vector{T}, n::Int) where {T}
     ensure_strip_buf!(buf, n)
     return view(buf, 1:n)
@@ -417,9 +572,9 @@ end
 
 Exchange halo strips with cardinal MPI neighbours, then blend into the local field.
 
-Pack, MPI, and blend run on host arrays. Device fields are copied onto the host
-for the exchange and copied back afterwards. This is not CUDA-aware MPI, just 
-running out of time to implement CUDA-aware MPI.
+Host fields pack from views. Device fields pack the strip on the array backend
+and `copyto!` only that strip through host MPI. This is not CUDA-aware MPI.
+One-rank models return before packing.
 """
 function halo_exchange!(model::AbstractModel{<:Any, <:Any, <:MPISpec}; fields=[:h, :u, :v])
     @unpack halo, rank = model.spec
@@ -470,9 +625,7 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
         length(size(local_field)) != 2 && continue
 
         field_nx, field_ny = size(local_field)
-        # Pack, MPI, and blend on the host. Copy back if `local_field` is a device array.
-        field_h = _host(local_field)
-        L0 = skip_l0 ? field_h : copy_ras_l0!(scratch, field_data, field_h, model.fields)
+        host_field = _is_host_array(local_field)
 
         # --- Phase 1: X-Direction Exchange (Left/Right) ---
         requests_x = MPI.RequestSet()
@@ -485,7 +638,7 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
         if left > -1
             ir = (lh + 1 + off_x):(lh + halo + off_x)
             n_x = halo * field_ny
-            send_left_flat = pack_halo_strip!(scratch.send_l, field_h, ir, axes(field_h, 2))
+            send_left_flat = pack_halo_strip!(scratch.send_l, local_field, ir, axes(local_field, 2), scratch)
             recv_left_flat = recv_halo_strip!(scratch.recv_l, n_x)
             push!(requests_x, MPI.Isend(send_left_flat, left, left_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_left_flat, left, right_send_tag, comm))
@@ -494,7 +647,7 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
         if right > -1
             ir = (field_nx - rh - halo + 1 - off_x):(field_nx - rh - off_x)
             n_x = halo * field_ny
-            send_right_flat = pack_halo_strip!(scratch.send_r, field_h, ir, axes(field_h, 2))
+            send_right_flat = pack_halo_strip!(scratch.send_r, local_field, ir, axes(local_field, 2), scratch)
             recv_right_flat = recv_halo_strip!(scratch.recv_r, n_x)
             push!(requests_x, MPI.Isend(send_right_flat, right, right_send_tag, comm))
             push!(requests_x, MPI.Irecv!(recv_right_flat, right, left_send_tag, comm))
@@ -512,7 +665,7 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
         if top > -1
             jr = (th + 1 + off_y):(th + halo + off_y)
             n_y = field_nx * halo
-            send_top_flat = pack_halo_strip!(scratch.send_t, field_h, axes(field_h, 1), jr)
+            send_top_flat = pack_halo_strip!(scratch.send_t, local_field, axes(local_field, 1), jr, scratch)
             recv_top_flat = recv_halo_strip!(scratch.recv_t, n_y)
             push!(requests_y, MPI.Isend(send_top_flat, top, top_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_top_flat, top, bottom_send_tag, comm))
@@ -521,7 +674,7 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
         if bottom > -1
             jr = (field_ny - bh - halo + 1 - off_y):(field_ny - bh - off_y)
             n_y = field_nx * halo
-            send_bottom_flat = pack_halo_strip!(scratch.send_b, field_h, axes(field_h, 1), jr)
+            send_bottom_flat = pack_halo_strip!(scratch.send_b, local_field, axes(local_field, 1), jr, scratch)
             recv_bottom_flat = recv_halo_strip!(scratch.recv_b, n_y)
             push!(requests_y, MPI.Isend(send_bottom_flat, bottom, bottom_send_tag, comm))
             push!(requests_y, MPI.Irecv!(recv_bottom_flat, bottom, top_send_tag, comm))
@@ -530,8 +683,16 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
 
         MPI.Waitall(requests_y)
 
+        if host_field
+            blend_field = local_field
+            L0 = skip_l0 ? local_field : copy_ras_l0!(scratch, field_data, local_field, model.fields)
+        else
+            blend_field = ras_l0_workspace!(scratch, field_data, model.fields, field_nx, field_ny)
+            copy_halo_rings_to_host!(blend_field, local_field, scratch, lh, rh, th, bh)
+            L0 = skip_l0 ? blend_field : copy(blend_field)
+        end
         apply_halo_exchange_blends!(
-            field_h,
+            blend_field,
             L0,
             recv_left,
             recv_right,
@@ -552,7 +713,9 @@ function _halo_exchange_neighbours!(model::AbstractModel{<:Any, <:Any, <:MPISpec
             top,
             bottom,
         )
-        _mpi_copy_back!(local_field, field_h)
+        if !host_field
+            unpack_halo_rings!(local_field, blend_field, scratch, lh, rh, th, bh)
+        end
     end
 end
 
