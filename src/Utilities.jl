@@ -540,6 +540,44 @@ function _haar_lift_axes_2d!(a, b, step_iter, mix)
 end
 
 """
+    _haar_rap_2d!(out_vec, a, b, packed, scatter_map, gather_map, step_iter, mix)
+
+GPU RAP: scatter `packed` into `a`, Haar y then x, gather into `out_vec`.
+CPU restrict/prolong keep separate scatter, line Haar, and gather.
+If a pairing axis is longer than a GPU workgroup, fall back to those
+three stages with 2D Haar.
+"""
+function _haar_rap_2d!(
+    out_vec,
+    a,
+    b,
+    packed,
+    scatter_map,
+    gather_map,
+    step_iter,
+    mix;
+    sync = true,
+)
+    nx, ny = size(a)
+    ndrange = (nx, ny)
+    if nx > 1024 || ny > 1024
+        launch!(_scatter_mapped!, a, packed, scatter_map; ndrange = ndrange)
+        r = _haar_lift_axes_2d!(a, b, step_iter, mix)
+        launch!(_gather_mapped!, out_vec, r, gather_map; ndrange = size(gather_map), sync = sync)
+        return
+    end
+    launch!(_haar_y_all_2d_scatter!, a, b, packed, scatter_map, step_iter, mix;
+            ndrange = (ny, nx), workgroupsize = (ny, 1), sync = false)
+    src, dst = a, b
+    if isodd(length(step_iter))
+        src, dst = dst, src
+    end
+    launch!(_haar_x_all_2d_gather!, src, dst, out_vec, gather_map, step_iter, mix;
+            ndrange = ndrange, workgroupsize = (nx, 1), sync = sync)
+    return
+end
+
+"""
     haar_idwtᵀ!(a, b, levels) -> result
 
 Apply the adjoint Haar transform.
@@ -561,6 +599,20 @@ function get_restrict_fun(model::AbstractModel)
         @assert length(vec) == (gu.ni + gv.ni)
         n_wu = wu.n[]
         n_wv = wv.n[]
+
+        if !(KA.get_backend(s.haar_u) isa KA.CPU)
+            _haar_rap_2d!(
+                view(restrictvec, 1:n_wu), s.haar_u, s.haar_u_tmp,
+                view(vec, 1:gu.ni), s.gu_inner_index_map, wu.index_map,
+                haar_steps(wu.levels), true; sync = false,
+            )
+            _haar_rap_2d!(
+                view(restrictvec, (n_wu + 1):(n_wu + n_wv)), s.haar_v, s.haar_v_tmp,
+                view(vec, (gu.ni + 1):(gu.ni + gv.ni)), s.gv_inner_index_map, wv.index_map,
+                haar_steps(wv.levels), true,
+            )
+            return restrictvec
+        end
 
         # spread_inner
         launch!(_scatter_mapped!, s.haar_u, view(vec, 1:gu.ni), s.gu_inner_index_map;
@@ -597,6 +649,20 @@ function get_prolong_fun(model::AbstractModel)
         n_wu = wu.n[]
         n_wv = wv.n[]
         @assert length(waveletvec) == (n_wu + n_wv)
+
+        if !(KA.get_backend(s.haar_u) isa KA.CPU)
+            _haar_rap_2d!(
+                view(prolongvec, 1:gu.ni), s.haar_u, s.haar_u_tmp,
+                view(waveletvec, 1:n_wu), wu.index_map, s.gu_inner_index_map,
+                reverse(haar_steps(wu.levels)), false; sync = false,
+            )
+            _haar_rap_2d!(
+                view(prolongvec, (gu.ni + 1):(gu.ni + gv.ni)), s.haar_v, s.haar_v_tmp,
+                view(waveletvec, (n_wu + 1):(n_wu + n_wv)), wv.index_map, s.gv_inner_index_map,
+                reverse(haar_steps(wv.levels)), false,
+            )
+            return prolongvec
+        end
 
         # spread
         launch!(_scatter_mapped!, s.haar_u, view(waveletvec, 1:n_wu), wu.index_map;

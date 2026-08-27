@@ -210,3 +210,23 @@ end
         end
     end
 end
+
+@testset "RAP Haar wrappers match scatter Haar gather" begin
+    for (nx, ny, levels) in ((8, 6, 2), (7, 5, 2))
+        X = reshape(collect(range(0.1; stop = 1.9, length = nx * ny)), nx, ny)
+        index_map = reshape(collect(1:(nx * ny)), nx, ny)
+        packed = vec(copy(X))
+        steps = WAVI.Utilities.haar_steps(levels)
+        for (mix, step_iter) in ((false, reverse(steps)), (true, steps))
+            a_ref, b_ref = copy(X), similar(X)
+            launch!(_scatter_mapped!, a_ref, packed, index_map; ndrange = size(X))
+            r = WAVI.Utilities._haar_lift_axes_2d!(a_ref, b_ref, step_iter, mix)
+            out_ref = zeros(nx * ny)
+            launch!(_gather_mapped!, out_ref, r, index_map; ndrange = size(X))
+            out_rap = zeros(nx * ny)
+            a_rap, b_rap = copy(X), similar(X)
+            WAVI.Utilities._haar_rap_2d!(out_rap, a_rap, b_rap, packed, index_map, index_map, step_iter, mix)
+            @test out_rap ≈ out_ref atol = 1e-12
+        end
+    end
+end

@@ -34,6 +34,8 @@ export _diff_x!,
     _haar_lift_y_all!,
     _haar_lift_x_all_2d!,
     _haar_lift_y_all_2d!,
+    _haar_y_all_2d_scatter!,
+    _haar_x_all_2d_gather!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
@@ -578,6 +580,57 @@ and workgroup `(ny, 1)` so the pairing axis is CUDA-x (same as Haar-x).
             _haar_write_y!(a, b, i, j, step, transpose)
         end
         @synchronize
+    end
+end
+
+"""
+    _haar_y_all_2d_scatter!(a, b, packed, scatter_map, steps, transpose)
+
+GPU RAP only. Scatter `packed` onto `a` using `scatter_map`, then the same
+y Haar as `_haar_lift_y_all_2d!`. Launch with `ndrange = (ny, nx)` and
+workgroup `(ny, 1)`.
+"""
+@kernel function _haar_y_all_2d_scatter!(a, b, packed, scatter_map, steps, transpose)
+    j, i = @index(Global, NTuple)
+    @inbounds begin
+        slot = scatter_map[i, j]
+        a[i, j] = slot == 0 ? zero(eltype(a)) : packed[slot]
+    end
+    @synchronize
+    for k in 1:length(steps)
+        step = steps[k]
+        if isodd(k)
+            _haar_write_y!(b, a, i, j, step, transpose)
+        else
+            _haar_write_y!(a, b, i, j, step, transpose)
+        end
+        @synchronize
+    end
+end
+
+"""
+    _haar_x_all_2d_gather!(a, b, packed, gather_map, steps, transpose)
+
+GPU RAP only. Same x Haar as `_haar_lift_x_all_2d!`, then gather into
+`packed` using `gather_map`. Launch with `ndrange = (nx, ny)` and
+workgroup `(nx, 1)`.
+"""
+@kernel function _haar_x_all_2d_gather!(a, b, packed, gather_map, steps, transpose)
+    i, j = @index(Global, NTuple)
+    for k in 1:length(steps)
+        step = steps[k]
+        if isodd(k)
+            _haar_write_x!(b, a, i, j, step, transpose)
+        else
+            _haar_write_x!(a, b, i, j, step, transpose)
+        end
+        @synchronize
+    end
+    @inbounds begin
+        slot = gather_map[i, j]
+        if slot != 0
+            packed[slot] = isodd(length(steps)) ? b[i, j] : a[i, j]
+        end
     end
 end
 
