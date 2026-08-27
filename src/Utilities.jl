@@ -501,23 +501,39 @@ end
 """
     _haar_lift_axes_2d!(a, b, step_iter, mix)
 
-Apply each Haar spacing as a 2D kernel (`ndrange = (nx, ny)`).
-Used on GPU so each pairing fills the device. CPU keeps `_haar_lift_axes_line!`.
-Queue every spacing, then synchronise once so the host does not wait per level.
+Apply Haar along y, then along x, with one 2D kernel per axis
+(`ndrange = (nx, ny)`). Each kernel loops every spacing and synchronises
+the workgroup between them. Used on GPU. CPU keeps `_haar_lift_axes_line!`.
+If a pairing axis is longer than a GPU workgroup, fall back to one launch
+per spacing.
 """
 function _haar_lift_axes_2d!(a, b, step_iter, mix)
     src, dst = a, b
-    ndrange = size(a)
-    backend = KA.get_backend(a)
-    for step in step_iter
-        launch!(_haar_lift_y!, dst, src, step, mix; ndrange = ndrange, sync = false)
+    nx, ny = size(a)
+    ndrange = (nx, ny)
+    if nx > 1024 || ny > 1024
+        backend = KA.get_backend(a)
+        for step in step_iter
+            launch!(_haar_lift_y!, dst, src, step, mix; ndrange = ndrange, sync = false)
+            src, dst = dst, src
+        end
+        for step in step_iter
+            launch!(_haar_lift_x!, dst, src, step, mix; ndrange = ndrange, sync = false)
+            src, dst = dst, src
+        end
+        KA.synchronize(backend)
+        return src
+    end
+    launch!(_haar_lift_y_all_2d!, src, dst, step_iter, mix;
+            ndrange = ndrange, workgroupsize = (1, ny), sync = false)
+    if isodd(length(step_iter))
         src, dst = dst, src
     end
-    for step in step_iter
-        launch!(_haar_lift_x!, dst, src, step, mix; ndrange = ndrange, sync = false)
+    launch!(_haar_lift_x_all_2d!, src, dst, step_iter, mix;
+            ndrange = ndrange, workgroupsize = (nx, 1))
+    if isodd(length(step_iter))
         src, dst = dst, src
     end
-    KA.synchronize(backend)
     return src
 end
 

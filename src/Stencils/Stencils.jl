@@ -32,6 +32,8 @@ export _diff_x!,
     _haar_lift_y!,
     _haar_lift_x_all!,
     _haar_lift_y_all!,
+    _haar_lift_x_all_2d!,
+    _haar_lift_y_all_2d!,
     _op_h_stresses!,
     _op_force_u!,
     _op_force_v!,
@@ -40,7 +42,7 @@ export _diff_x!,
     launch!
 
 using KernelAbstractions: KernelAbstractions as KA
-using KernelAbstractions: @kernel, @index
+using KernelAbstractions: @kernel, @index, @synchronize
 
 """
     launch!(kernel!, args...; ndrange, sync = true, workgroupsize = nothing)
@@ -479,19 +481,11 @@ end
 @inline _haar_odd_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (odd + even)
 @inline _haar_even_slot(odd, even, ::Val{:forward}) = oftype(odd, 0.5) * (even - odd)
 
-"""
-    _haar_lift_x!(out, inp, step, transpose)
-
-One Haar pairing along x at spacing `step` (2, 4, 8, ...), one grid point
-per work item. Same even/odd split as `_haar_lift_x_line!`.
-`ndrange` is `(nx, ny)`. Used on device; CPU keeps the fused line kernels.
-"""
-@kernel function _haar_lift_x!(out, inp, step, transpose)
-    i, j = @index(Global, NTuple)
+@inline function _haar_write_x!(out, inp, i, j, step, transpose)
+    n = size(inp, 1)
+    half = div(step, 2)
+    rem = (i - 1) % step
     @inbounds begin
-        n = size(inp, 1)
-        half = div(step, 2)
-        rem = (i - 1) % step
         if rem == 0 && i + half <= n
             odd = inp[i, j]
             even = inp[i + half, j]
@@ -506,17 +500,11 @@ per work item. Same even/odd split as `_haar_lift_x_line!`.
     end
 end
 
-"""
-    _haar_lift_y!(out, inp, step, transpose)
-
-Same as `_haar_lift_x!`, but along y.
-"""
-@kernel function _haar_lift_y!(out, inp, step, transpose)
-    i, j = @index(Global, NTuple)
+@inline function _haar_write_y!(out, inp, i, j, step, transpose)
+    n = size(inp, 2)
+    half = div(step, 2)
+    rem = (j - 1) % step
     @inbounds begin
-        n = size(inp, 2)
-        half = div(step, 2)
-        rem = (j - 1) % step
         if rem == 0 && j + half <= n
             odd = inp[i, j]
             even = inp[i, j + half]
@@ -528,6 +516,67 @@ Same as `_haar_lift_x!`, but along y.
         else
             out[i, j] = inp[i, j]
         end
+    end
+end
+
+"""
+    _haar_lift_x!(out, inp, step, transpose)
+
+One Haar pairing along x at spacing `step` (2, 4, 8, ...), one grid point
+per work item. Same even/odd split as `_haar_lift_x_line!`.
+`ndrange` is `(nx, ny)`. Used on device; CPU keeps the fused line kernels.
+"""
+@kernel function _haar_lift_x!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    _haar_write_x!(out, inp, i, j, step, transpose)
+end
+
+"""
+    _haar_lift_y!(out, inp, step, transpose)
+
+Same as `_haar_lift_x!`, but along y.
+"""
+@kernel function _haar_lift_y!(out, inp, step, transpose)
+    i, j = @index(Global, NTuple)
+    _haar_write_y!(out, inp, i, j, step, transpose)
+end
+
+"""
+    _haar_lift_x_all_2d!(a, b, steps, transpose)
+
+Apply every Haar spacing along x in one 2D kernel (`ndrange = (nx, ny)`).
+One work item per grid point. The workgroup is one column so `@synchronize`
+is valid between spacings. Result is in `a` if `steps` has even length,
+otherwise in `b`.
+"""
+@kernel function _haar_lift_x_all_2d!(a, b, steps, transpose)
+    i, j = @index(Global, NTuple)
+    for k in 1:length(steps)
+        step = steps[k]
+        if isodd(k)
+            _haar_write_x!(b, a, i, j, step, transpose)
+        else
+            _haar_write_x!(a, b, i, j, step, transpose)
+        end
+        @synchronize
+    end
+end
+
+"""
+    _haar_lift_y_all_2d!(a, b, steps, transpose)
+
+Same as `_haar_lift_x_all_2d!`, but along y. The workgroup is one row.
+"""
+@kernel function _haar_lift_y_all_2d!(a, b, steps, transpose)
+    i, j = @index(Global, NTuple)
+    for k in 1:length(steps)
+        step = steps[k]
+        if isodd(k)
+            _haar_write_y!(b, a, i, j, step, transpose)
+        else
+            _haar_write_y!(a, b, i, j, step, transpose)
+        end
+        @synchronize
     end
 end
 
