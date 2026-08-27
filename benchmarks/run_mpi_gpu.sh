@@ -29,7 +29,7 @@
 
 set -e
 
-TAG_PREFIX=${1:-"ka.jl_haar_fuse_v5"}
+TAG_PREFIX=${1:-"ka.jl_haar_y_layout_v6"}
 DRIVER=${2:-"ismip7_16km_synthetic"}
 NODE_TAG=$(hostname -s | sed 's/^bsl-node-//')
 MPIEXEC=mpiexecjl

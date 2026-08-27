@@ -565,10 +565,11 @@ end
 """
     _haar_lift_y_all_2d!(a, b, steps, transpose)
 
-Same as `_haar_lift_x_all_2d!`, but along y. The workgroup is one row.
+Same as `_haar_lift_x_all_2d!`, but along y. Launch with `ndrange = (ny, nx)`
+and workgroup `(ny, 1)` so the pairing axis is CUDA-x (same as Haar-x).
 """
 @kernel function _haar_lift_y_all_2d!(a, b, steps, transpose)
-    i, j = @index(Global, NTuple)
+    j, i = @index(Global, NTuple)
     for k in 1:length(steps)
         step = steps[k]
         if isodd(k)

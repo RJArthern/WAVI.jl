@@ -501,9 +501,11 @@ end
 """
     _haar_lift_axes_2d!(a, b, step_iter, mix)
 
-Apply Haar along y, then along x, with one 2D kernel per axis
-(`ndrange = (nx, ny)`). Each kernel loops every spacing and synchronises
-the workgroup between them. Used on GPU. CPU keeps `_haar_lift_axes_line!`.
+Apply Haar along y, then along x, with one 2D kernel per axis.
+Haar-x uses `ndrange = (nx, ny)` and workgroup `(nx, 1)`. Haar-y uses
+`ndrange = (ny, nx)` and workgroup `(ny, 1)` so the pairing axis is CUDA-x.
+Each kernel loops every spacing and synchronises the workgroup between them.
+Used on GPU. CPU keeps `_haar_lift_axes_line!`.
 If a pairing axis is longer than a GPU workgroup, fall back to one launch
 per spacing.
 """
@@ -525,7 +527,7 @@ function _haar_lift_axes_2d!(a, b, step_iter, mix)
         return src
     end
     launch!(_haar_lift_y_all_2d!, src, dst, step_iter, mix;
-            ndrange = ndrange, workgroupsize = (1, ny), sync = false)
+            ndrange = (ny, nx), workgroupsize = (ny, 1), sync = false)
     if isodd(length(step_iter))
         src, dst = dst, src
     end
