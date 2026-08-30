@@ -1,6 +1,6 @@
 export SchoofSlidingLaw
 
-struct SchoofSlidingLaw{T <: Real, C <: Union{T,Array{T,2}}, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct SchoofSlidingLaw{T <: Real, C <: Union{T,AbstractArray{T,2}}, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     coulomb_coefficient :: C
     drag_coefficient :: W
     weertman_m :: T
@@ -59,4 +59,13 @@ function reconstruct_on_subdomain(sliding_law::SchoofSlidingLaw, grid::Grid, sub
           spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
           sliding_law.reg_speed)
+end
+
+function on_architecture(arch::AbstractArchitecture, sliding_law::SchoofSlidingLaw)
+    return SchoofSlidingLaw(
+        on_architecture(arch, sliding_law.coulomb_coefficient),
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+    )
 end

@@ -443,6 +443,8 @@ function Model(grid::G,
         # Rank-0 global_fields stay on the host for collect/output (see mpi_allocate_global_fields!).
         fields = on_architecture(arch, fields)
         local_surface_mass_balance = on_architecture(arch, local_surface_mass_balance)
+        local_fracture = on_architecture(arch, local_fracture)
+        local_sliding_law = on_architecture(arch, local_sliding_law)
     end
     model = Model(local_grid, fields, local_params, solver_params, spec, local_shelf_melt_rate, local_surface_mass_balance, local_fracture, local_sliding_law, local_basal_hydrology, 
     local_thermo_dynamics, verbose)

@@ -1,6 +1,6 @@
 export WeertmanSlidingLaw
 
-struct WeertmanSlidingLaw{T <: Real, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct WeertmanSlidingLaw{T <: Real, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     drag_coefficient :: W
     weertman_m :: T
     reg_speed :: T
@@ -69,4 +69,17 @@ function reconstruct_on_subdomain(sliding_law::WeertmanSlidingLaw, grid::Grid, s
           spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
           sliding_law.reg_speed)
+end
+
+"""
+    on_architecture(arch, sliding_law::WeertmanSlidingLaw)
+
+Copy the drag coefficient onto `arch` when it is a dense array.
+"""
+function on_architecture(arch::AbstractArchitecture, sliding_law::WeertmanSlidingLaw)
+    return WeertmanSlidingLaw(
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+    )
 end

@@ -1,6 +1,6 @@
 export CoulombSlidingLaw
 
-struct CoulombSlidingLaw{T <: Real, C <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct CoulombSlidingLaw{T <: Real, C <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     coulomb_coefficient :: C
     reg_speed :: T
 end
@@ -47,4 +47,11 @@ function reconstruct_on_subdomain(sliding_law::CoulombSlidingLaw, grid::Grid, su
     return CoulombSlidingLaw(
           spatial_on_subdomain(sliding_law.coulomb_coefficient, grid, subdomain),
           sliding_law.reg_speed)
+end
+
+function on_architecture(arch::AbstractArchitecture, sliding_law::CoulombSlidingLaw)
+    return CoulombSlidingLaw(
+        on_architecture(arch, sliding_law.coulomb_coefficient),
+        sliding_law.reg_speed,
+    )
 end

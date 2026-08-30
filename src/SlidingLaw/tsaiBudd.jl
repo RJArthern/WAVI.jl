@@ -1,6 +1,6 @@
 export TsaiBuddSlidingLaw
 
-struct TsaiBuddSlidingLaw{T <: Real, C <: Union{T,Array{T,2}}, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct TsaiBuddSlidingLaw{T <: Real, C <: Union{T,AbstractArray{T,2}}, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     coulomb_coefficient :: C
     drag_coefficient :: W
     weertman_m :: T
@@ -66,4 +66,14 @@ function reconstruct_on_subdomain(sliding_law::TsaiBuddSlidingLaw, grid::Grid, s
           sliding_law.weertman_m,
           sliding_law.reg_speed,
           sliding_law.budd_q)
+end
+
+function on_architecture(arch::AbstractArchitecture, sliding_law::TsaiBuddSlidingLaw)
+    return TsaiBuddSlidingLaw(
+        on_architecture(arch, sliding_law.coulomb_coefficient),
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+        sliding_law.budd_q,
+    )
 end

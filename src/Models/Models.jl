@@ -128,6 +128,8 @@ function Model(grid::G,
     if !(arch isa CPU)
         fields = on_architecture(arch, fields)
         surface_mass_balance = on_architecture(arch, surface_mass_balance)
+        fracture = on_architecture(arch, fracture)
+        sliding_law = on_architecture(arch, sliding_law)
     end
 
     model = Model(
@@ -155,8 +157,8 @@ architecture(model::AbstractModel) = architecture(model.spec)
 """
     restore_pickup_architecture!(model)
 
-Put dense fields and surface-mass-balance arrays on the spec's architecture
-and drop stencil scratch.
+Put dense fields, climate, fracture, and sliding-law arrays on the spec's
+architecture and drop stencil scratch.
 
 Call this after loading a checkpoint, before the next velocity solve.
 JLD2 may restore mixed host and device arrays, or a host scratch buffer,
@@ -170,8 +172,12 @@ function restore_pickup_architecture!(model::AbstractModel)
     arch isa CPU && return model
     fields = on_architecture(arch, model.fields)
     smb = on_architecture(arch, model.surface_mass_balance)
+    fracture = on_architecture(arch, model.fracture)
+    sliding_law = on_architecture(arch, model.sliding_law)
     model = @set model.fields = fields
-    return @set model.surface_mass_balance = smb
+    model = @set model.surface_mass_balance = smb
+    model = @set model.fracture = fracture
+    return @set model.sliding_law = sliding_law
 end
 
 # This is to enable use of Setfield, which derives a parameter setup from the fields of an existing structure via JuliaObjects

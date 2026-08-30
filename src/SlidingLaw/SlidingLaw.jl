@@ -11,7 +11,11 @@ using WAVI: AbstractSlidingLaw, AbstractModel
 using WAVI.Grids
 using WAVI.Time
 using WAVI.Utilities: copy_onto!
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
 
+# Default: scalar-only sliding laws need no dense-array move.
+on_architecture(::AbstractArchitecture, sliding_law::AbstractSlidingLaw) = sliding_law
 
 #add each of the individual sliding laws
 include("./WeertmanSlidingLaw.jl")

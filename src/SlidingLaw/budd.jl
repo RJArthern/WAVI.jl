@@ -1,6 +1,6 @@
 export BuddSlidingLaw
 
-struct BuddSlidingLaw{T <: Real, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct BuddSlidingLaw{T <: Real, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     drag_coefficient :: W
     weertman_m :: T
     reg_speed :: T
@@ -58,4 +58,13 @@ function reconstruct_on_subdomain(sliding_law::BuddSlidingLaw, grid::Grid, subdo
           sliding_law.weertman_m,
           sliding_law.reg_speed,
           sliding_law.budd_q)
+end
+
+function on_architecture(arch::AbstractArchitecture, sliding_law::BuddSlidingLaw)
+    return BuddSlidingLaw(
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+        sliding_law.budd_q,
+    )
 end

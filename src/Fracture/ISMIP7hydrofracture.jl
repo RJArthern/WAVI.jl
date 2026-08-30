@@ -2,9 +2,12 @@ export ISMIP7Hydrofracture
 
 using WAVI: AbstractClimateForcing
 using WAVI.ClimateForcing
+using WAVI.Utilities: copy_onto!
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
 using NCDatasets
 
-struct ISMIP7Hydrofracture{P <: String, V<:String, T <: Real, CM <: Union{Array{T,2}, Nothing}} <: AbstractFracture
+struct ISMIP7Hydrofracture{P <: String, V<:String, T <: Real, CM <: Union{AbstractArray{T,2}, Nothing}} <: AbstractFracture
       hydrofracture_prefix::P
       hydrofracture_varname::V
       damage_value :: T
@@ -96,9 +99,29 @@ function update_climate_forcing!(fracture::ISMIP7Hydrofracture, grid::Grid, cloc
       throw(ArgumentError("ISMIP7 hydrofracture mask has not been allocated; reconstruct on the grid first"))
   end
   is, js = forcing_index_ranges(x_indices, y_indices, ice_shelf_collapse_mask)
-  ice_shelf_collapse_mask .= ice_shelf_collapse_mask_ncfile[hydrofracture_varname][is, js, 1]
+  # NetCDF mask is typically Int8; destination is Float64 (host or device).
+  mask_host = Float64.(ice_shelf_collapse_mask_ncfile[hydrofracture_varname][is, js, 1])
+  copy_onto!(ice_shelf_collapse_mask, mask_host)
 
   return nothing
+end
+
+"""
+    on_architecture(arch, fracture::ISMIP7Hydrofracture)
+
+Copy the collapse mask onto `arch` so it can broadcast with model fields.
+"""
+function on_architecture(arch::AbstractArchitecture, fracture::ISMIP7Hydrofracture)
+    return ISMIP7Hydrofracture(
+        fracture.hydrofracture_prefix,
+        fracture.hydrofracture_varname,
+        fracture.damage_value,
+        fracture.partially_floating_cells,
+        on_architecture(arch, fracture.ice_shelf_collapse_mask),
+        fracture.path_to_forcing,
+        fracture.x_indices,
+        fracture.y_indices,
+    )
 end
 
 function update_damage!(fracture::ISMIP7Hydrofracture,model::AbstractModel{T,N};kwargs...) where {T,N}
