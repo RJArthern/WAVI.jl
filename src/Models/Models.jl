@@ -127,6 +127,7 @@ function Model(grid::G,
     arch = architecture(spec)
     if !(arch isa CPU)
         fields = on_architecture(arch, fields)
+        surface_mass_balance = on_architecture(arch, surface_mass_balance)
     end
 
     model = Model(
@@ -154,7 +155,8 @@ architecture(model::AbstractModel) = architecture(model.spec)
 """
     restore_pickup_architecture!(model)
 
-Put dense fields on the spec's architecture and drop stencil scratch.
+Put dense fields and surface-mass-balance arrays on the spec's architecture
+and drop stencil scratch.
 
 Call this after loading a checkpoint, before the next velocity solve.
 JLD2 may restore mixed host and device arrays, or a host scratch buffer,
@@ -167,7 +169,9 @@ function restore_pickup_architecture!(model::AbstractModel)
     arch = architecture(model)
     arch isa CPU && return model
     fields = on_architecture(arch, model.fields)
-    return @set model.fields = fields
+    smb = on_architecture(arch, model.surface_mass_balance)
+    model = @set model.fields = fields
+    return @set model.surface_mass_balance = smb
 end
 
 # This is to enable use of Setfield, which derives a parameter setup from the fields of an existing structure via JuliaObjects

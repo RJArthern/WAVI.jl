@@ -110,9 +110,14 @@ function update_shelf_melt_rate!(ISMIP7_melt_rate::ISMIP7MeltRate, fields, grid,
 
     @unpack b, shelf_basal_melt, grounded_fraction, h = fields.gh 
     @unpack K, shelf_slope, ρ_ocean, ρ_ice, c_ocean, L_ice, β_s, g, f, S_loc, T_loc, Tf_loc, z_forcing, melt_partial_cell, x_indices, y_indices = ISMIP7_melt_rate
-    
+
+    # Ocean lookup uses host 3D arrays and scalar indexing; compute on host then copy back.
+    b_h = _host(b)
+    h_h = _host(h)
+    gf_h = _host(grounded_fraction)
+
     #compute the ice draft
-    zb = b .* (grounded_fraction .== 1) + - ρ_ice / ρ_ocean .* h .* (grounded_fraction .< 1)
+    zb = b_h .* (gf_h .== 1) + - ρ_ice / ρ_ocean .* h_h .* (gf_h .< 1)
 
     # Local draft indices into (possibly global) ocean fields
     nx, ny = size(zb)
@@ -135,13 +140,15 @@ function update_shelf_melt_rate!(ISMIP7_melt_rate::ISMIP7MeltRate, fields, grid,
 
     #set the shelf melt rate
     secs_per_year = 365.25*24*60^2
+    melt_h = similar(b_h)
     if melt_partial_cell
-        shelf_basal_melt[:] .= K * secs_per_year * shelf_slope * ρ_ocean / ρ_ice * (c_ocean/L_ice)^2 * β_s * 0.5 * g /abs(f) * S_local_shelf[:] .* abs.(Tf_local_shelf[:]) .* Tf_local_shelf[:] .*  (1 .- grounded_fraction[:])
+        melt_h[:] .= K * secs_per_year * shelf_slope * ρ_ocean / ρ_ice * (c_ocean/L_ice)^2 * β_s * 0.5 * g /abs(f) * S_local_shelf[:] .* abs.(Tf_local_shelf[:]) .* Tf_local_shelf[:] .*  (1 .- gf_h[:])
 
     elseif ~(melt_partial_cell)
-        shelf_basal_melt[grounded_fraction .== 0] .= K * secs_per_year * shelf_slope * ρ_ocean / ρ_ice * (c_ocean/L_ice)^2 * β_s * 0.5 * g /abs(f) * S_local_shelf[grounded_fraction .== 0] .* abs.(Tf_local_shelf[grounded_fraction .== 0]) .* Tf_local_shelf[grounded_fraction .== 0]
-        shelf_basal_melt[.~(grounded_fraction .== 0)] .= 0
+        melt_h .= 0
+        melt_h[gf_h .== 0] .= K * secs_per_year * shelf_slope * ρ_ocean / ρ_ice * (c_ocean/L_ice)^2 * β_s * 0.5 * g /abs(f) * S_local_shelf[gf_h .== 0] .* abs.(Tf_local_shelf[gf_h .== 0]) .* Tf_local_shelf[gf_h .== 0]
     end
+    copy_onto!(shelf_basal_melt, melt_h)
 
 
     return nothing

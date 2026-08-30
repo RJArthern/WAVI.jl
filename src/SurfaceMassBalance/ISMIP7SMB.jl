@@ -7,10 +7,10 @@ using NCDatasets
 struct ISMIP7SMB{T <: Real,
                 P <: String,
                 V <: String,
-                RE <: Union{Array{T,2}, Nothing}, 
-                VSG <: Union{Array{T,2}, Nothing},
-                SA <: Union{Array{T,2}, Nothing},
-                RS <: Union{Array{T,2}, Nothing}} <: AbstractSurfaceMassBalance
+                RE <: Union{AbstractArray{T,2}, Nothing},
+                VSG <: Union{AbstractArray{T,2}, Nothing},
+                SA <: Union{AbstractArray{T,2}, Nothing},
+                RS <: Union{AbstractArray{T,2}, Nothing}} <: AbstractSurfaceMassBalance
     smb_anomaly_prefix::P
     vertical_smb_gradient_prefix::P
     smb_anomaly_varname::V 
@@ -192,22 +192,39 @@ function reconstruct_on_subdomain(smb::ISMIP7SMB,grid::Grid,subdomain::NTuple{4,
                     ys)
 end
 
+"""
+    on_architecture(arch, smb::ISMIP7SMB)
+
+Copy dense SMB fields onto `arch` so they can broadcast with model fields.
+"""
+function on_architecture(arch::AbstractArchitecture, smb::ISMIP7SMB)
+    return ISMIP7SMB(
+        smb.smb_anomaly_prefix,
+        smb.vertical_smb_gradient_prefix,
+        smb.smb_anomaly_varname,
+        smb.vertical_smb_gradient_varname,
+        on_architecture(arch, smb.reference_elevation),
+        on_architecture(arch, smb.vertical_smb_gradient),
+        on_architecture(arch, smb.smb_anomaly),
+        on_architecture(arch, smb.reference_smb),
+        smb.path_to_forcing,
+        smb.x_indices,
+        smb.y_indices,
+    )
+end
+
 function update_accumulation_rate!(surface_mass_balance::ISMIP7SMB, model::AbstractModel, clock::Clock)
     @unpack reference_smb, smb_anomaly, vertical_smb_gradient, reference_elevation = surface_mass_balance
-    @unpack accumulation,s = model.fields.gh
-    
-    change_in_elevation = s - reference_elevation
+    @unpack accumulation, s = model.fields.gh
 
     #check the files are the right size
     (size(smb_anomaly) == (model.grid.nx, model.grid.ny)) || throw(DimensionMismatch("Size of read in smb anomaly is not compatible with grid size"))
     (size(vertical_smb_gradient) == (model.grid.nx, model.grid.ny)) || throw(DimensionMismatch("Size of read in vertical smb gradient is not compatible with grid size"))
 
-
-    #set the updated smb 
-    accumulation .=  reference_smb .+ smb_anomaly .+ vertical_smb_gradient .* change_in_elevation
-    return nothing 
-
-
+    # Dense SMB arrays must share the architecture of `s` / `accumulation`.
+    change_in_elevation = s .- reference_elevation
+    accumulation .= reference_smb .+ smb_anomaly .+ vertical_smb_gradient .* change_in_elevation
+    return nothing
 end
 
 
@@ -237,9 +254,16 @@ function update_climate_forcing!(surface_mass_balance::ISMIP7SMB, grid::Grid, cl
     @info "read in vertical smb gradient forcing file: $vertical_smb_gradient_anomaly_filename"
 
     is, js = forcing_index_ranges(x_indices, y_indices, smb_anomaly)
-    smb_anomaly .= replace(replace(smb_anomaly_ncfile[smb_anomaly_varname][is, js, 1], missing => NaN), NaN => 0.0) #read in the anomaly and set any NaN to zero
-    vertical_smb_gradient .= replace(replace(vertical_smb_gradient_anomaly_ncfile[vertical_smb_gradient_varname][is, js, 1], missing => NaN), NaN => 0.0) #read in the SMB gradient and set NaNs to zero
-    
+    # NetCDF reads are host arrays; copy_onto! handles host or device destinations.
+    copy_onto!(
+        smb_anomaly,
+        replace(replace(smb_anomaly_ncfile[smb_anomaly_varname][is, js, 1], missing => NaN), NaN => 0.0),
+    )
+    copy_onto!(
+        vertical_smb_gradient,
+        replace(replace(vertical_smb_gradient_anomaly_ncfile[vertical_smb_gradient_varname][is, js, 1], missing => NaN), NaN => 0.0),
+    )
+
     return nothing
 
 end

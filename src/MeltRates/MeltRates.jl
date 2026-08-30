@@ -11,6 +11,7 @@ using WAVI: AbstractMeltRate
 using WAVI.Time
 using WAVI.Grids
 using WAVI.ClimateForcing
+using WAVI.Utilities: _host, copy_onto!
 
 #add each of the individual melt rate models
 #include("./analytic_melt_rate_model.jl")
