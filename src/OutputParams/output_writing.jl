@@ -13,6 +13,11 @@ function write_output(simulation)
     if ~haskey(output_dict, :t); output_dict["t"] = round(clock.time, digits = 3); end
     if ~haskey(output_dict, :x); output_dict["x"] = model.grid.xxh; end
     if ~haskey(output_dict, :y); output_dict["y"] = model.grid.yyh; end
+    # Add u and v grid coordinates for multi-grid NetCDF support
+    if ~haskey(output_dict, :xu); output_dict["xu"] = model.grid.xxu; end
+    if ~haskey(output_dict, :yu); output_dict["yu"] = model.grid.yyu; end
+    if ~haskey(output_dict, :xv); output_dict["xv"] = model.grid.xxv; end
+    if ~haskey(output_dict, :yv); output_dict["yv"] = model.grid.yyv; end
 
     fname = string(output_params.output_path, output_params.prefix , lpad(simulation.clock.n_iter, 10,"0"));
     if output_params.output_format == "jld2"

@@ -49,6 +49,7 @@ test_basic_outputting = true
 test_zipping_output   = true
 test_output_after_restart = true
 test_output_errors = true
+test_multigrid_output = true
 ##########################################################
 
 
@@ -310,6 +311,196 @@ test_output_errors = true
                 foreach(rm, filter(endswith(".jld2"), readdir()))
                 foreach(rm, filter(endswith(".bin"), readdir()))
             end
+        end
+    end
+
+    if test_multigrid_output
+        @testset "Multi-grid NetCDF output" begin
+            @info "Testing multi-grid NetCDF output..."
+            
+            folder = "outputs/"
+            isdir(folder) && rm(folder, force = true, recursive = true)
+            mkdir(folder)
+            
+            # Create a grid and model to get multi-grid variables
+            grid = Grid()
+            bed = WAVI.mismip_plus_bed
+            solver_params = SolverParams(maxiter_picard = 1)
+            model = Model(grid = grid, bed_elevation = bed, solver_params = solver_params)
+            
+            # Create multi-grid variables with different dimensions
+            nx, ny = grid.nx, grid.ny
+            mg_outputs = (
+                h = model.fields.gh.h,                    # h-grid (80×10)
+                b = model.fields.gh.b,                    # h-grid (80×10)
+                u = model.fields.gh.u,                    # h-grid in this case (80×10)
+                v = model.fields.gh.v,                    # h-grid in this case (80×10)
+                u_vel = model.fields.gu.u,                # u-grid (81×10) - u-velocity on u-grid
+                v_vel = model.fields.gv.v                 # v-grid (80×11) - v-velocity on v-grid
+            )
+            
+            # Run simulation with multi-grid outputs
+            timestepping_params = TimesteppingParams(dt = 0.5, end_time = 2.0)
+            output_params = OutputParams(
+                outputs = mg_outputs,
+                output_freq = 0.5,
+                output_format = "jld2",
+                output_path = folder,
+                zip_format = "nc",
+                prefix = "multigrid_test",
+                output_start = true
+            )
+            
+            simulation = Simulation(
+                model = model,
+                timestepping_params = timestepping_params,
+                output_params = output_params
+            )
+            
+            run_simulation!(simulation)
+            
+            # Test the resulting NetCDF file
+            nc_file = joinpath(folder, "multigrid_test.nc")
+            @test isfile(nc_file)
+            
+            NCDataset(nc_file, "r") do ds
+                # Test coordinate systems for each grid
+                @test haskey(ds, "x")     # h-grid coordinates
+                @test haskey(ds, "y")
+                @test haskey(ds, "x_u")   # u-grid coordinates
+                @test haskey(ds, "y_u")
+                @test haskey(ds, "x_v")   # v-grid coordinates
+                @test haskey(ds, "y_v")
+                
+                # Test coordinate dimensions (default 80×10 grid)
+                @test length(ds["x"]) == 80      # nx
+                @test length(ds["y"]) == 10      # ny
+                @test length(ds["x_u"]) == 81    # nx+1
+                @test length(ds["y_u"]) == 10    # ny
+                @test length(ds["x_v"]) == 80    # nx
+                @test length(ds["y_v"]) == 11    # ny+1
+                
+                # Test variable dimensions match expected grids
+                # h-grid variables (80 × 10)
+                @test size(ds["h"]) == (80, 10, 5)  # nx × ny × time
+                @test size(ds["b"]) == (80, 10, 5)
+                @test size(ds["u"]) == (80, 10, 5)  # model u,v are on h-grid
+                @test size(ds["v"]) == (80, 10, 5)
+                
+                # u-grid variables (81 × 10)
+                @test size(ds["u_vel"]) == (81, 10, 5)  # (nx+1) × ny × time
+                
+                # v-grid variables (80 × 11)
+                @test size(ds["v_vel"]) == (80, 11, 5)  # nx × (ny+1) × time
+                
+                # Test time coordinate
+                @test ds["TIME"][:] ≈ [0.0, 0.5, 1.0, 1.5, 2.0]
+            end
+            
+            # Clean up
+            rm(folder, force = true, recursive = true)
+        end
+        
+        @testset "Grid detection and error handling" begin
+            @info "Testing grid detection and error handling..."
+            
+            folder = "outputs/"
+            isdir(folder) && rm(folder, force = true, recursive = true)
+            mkdir(folder)
+            
+            # Create a standard model
+            grid = Grid()
+            bed = WAVI.mismip_plus_bed
+            solver_params = SolverParams(maxiter_picard = 1)
+            model = Model(grid = grid, bed_elevation = bed, solver_params = solver_params)
+            
+            # Create outputs with one invalid dimension variable
+            invalid_outputs = (
+                h = model.fields.gh.h,      # Valid h-grid (80×10)
+                invalid = zeros(12, 9)       # Invalid dimensions
+            )
+            
+            timestepping_params = TimesteppingParams(dt = 1.0, end_time = 1.0)
+            output_params = OutputParams(
+                outputs = invalid_outputs,
+                output_freq = 1.0,
+                output_format = "jld2",
+                output_path = folder,
+                zip_format = "nc",
+                prefix = "error_test"
+            )
+            
+            simulation = Simulation(
+                model = model,
+                timestepping_params = timestepping_params,
+                output_params = output_params
+            )
+            
+            # This should warn about invalid grid dimensions but still complete
+            @test_logs (:warn, r"found an output variable.*with spatial dimensions.*that do not match any known grid type") run_simulation!(simulation)
+            
+            # Verify that the NetCDF file was created but only contains valid variables
+            nc_file = joinpath(folder, "error_test.nc")
+            @test isfile(nc_file)
+            
+            NCDataset(nc_file, "r") do ds
+                # Should contain the valid h variable
+                @test haskey(ds, "h")
+                # Should NOT contain the invalid variable
+                @test !haskey(ds, "invalid")
+            end
+            
+            # Clean up
+            rm(folder, force = true, recursive = true)
+        end
+        
+        @testset "Backward compatibility" begin
+            @info "Testing backward compatibility with existing h-grid only outputs..."
+            
+            folder = "outputs/"
+            isdir(folder) && rm(folder, force = true, recursive = true)
+            mkdir(folder)
+            
+            # Test using the standard output_test function with only h-grid variables
+            sim = output_test(
+                dt = 1.0,
+                end_time = 2.0,
+                output_freq = 1.0,
+                output_format = "jld2",
+                output_path = folder,
+                zip_format = "nc",
+                prefix = "compat_test",
+                output_start = true
+            )
+            
+            # Test the NetCDF file maintains backward compatibility
+            nc_file = joinpath(folder, "compat_test.nc")
+            @test isfile(nc_file)
+            
+            NCDataset(nc_file, "r") do ds
+                # Should still have traditional x, y coordinates
+                @test haskey(ds, "x")
+                @test haskey(ds, "y")
+                
+                # Should NOT have u/v grid coordinates when only h-grid used
+                @test !haskey(ds, "x_u")
+                @test !haskey(ds, "y_u")
+                @test !haskey(ds, "x_v")
+                @test !haskey(ds, "y_v")
+                
+                # Variables should be on h-grid dimensions (default 80×10)
+                @test size(ds["h"]) == (80, 10, 3)  # nx × ny × time (0, 1, 2)
+                @test size(ds["b"]) == (80, 10, 3)
+                @test size(ds["u"]) == (80, 10, 3)  # model u,v are on h-grid
+                @test size(ds["v"]) == (80, 10, 3)
+                
+                # Coordinate dimensions  
+                @test length(ds["x"]) == 80
+                @test length(ds["y"]) == 10
+            end
+            
+            # Clean up
+            rm(folder, force = true, recursive = true)
         end
     end
 
