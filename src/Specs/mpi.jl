@@ -6,19 +6,22 @@ using Parameters
 
 using WAVI.Parameters
 
-import WAVI: AbstractField, AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance, AbstractFracture, AbstractSlidingLaw, 
+import WAVI: AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance, AbstractFracture, AbstractSlidingLaw,
                    AbstractBasalHydrology, AbstractThermoDynamics, AbstractModel
 import WAVI.Deferred: Collector, register_item!, field_extractor
-import WAVI.Fields: GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, SigmaGrid
-import WAVI.Grids: Grid
+import WAVI.Fields: GridField, InitialConditions
+import WAVI.Grids: Grid, reconstruct_on_grid, reconstruct_on_subdomain
 import WAVI.MeltRates: UniformMeltRate
-import WAVI.Models: BasicSpec, Model, get_bed_elevation
-import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!, checkpoint_path
+import WAVI.Models: Model, get_bed_elevation
+import WAVI.Outputs: write_outputs, zip_output, OutputParams, checkpoint_filename, load_checkpoint, write_checkpoint!,
+                    checkpoint_path, with_cleared_stencil_scratch, is_output_step
 import WAVI.Parameters: TimesteppingParams
-import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, update_velocities_on_h_grid!, inner_update!, precondition!, update_preconditioner!, update_rheological_operators!
+import WAVI.Processes: update_state!, update_model_velocities!, update_velocities!, inner_update!, inner_update_fields!,
+                    precondition!, update_preconditioner!, update_rheological_operators!,
+                    get_start_guess, get_op, get_rhs
+import WAVI.Utilities: stencil_scratch!, get_resid!
 import WAVI.Simulations: run_simulation!, timestep!, update_model_climate_forcing!
 import WAVI.Time: Clock
-import WAVI.Wavelets: UWavelets, VWavelets
 
 # FIXME: important to realise that this specification has become a complex structure to house many things that should be baked into the model structurally
 #  not least the global grid and fields 
@@ -52,6 +55,39 @@ function MPIPoUScratch(ωu::Matrix{T}, ωv::Matrix{T}) where {T <: AbstractFloat
 end
 
 """
+Reusable RAS halo packs, blend weights, and L0 snapshots.
+Allocated on first `halo_exchange!`; send/recv strips grow to the largest field.
+"""
+mutable struct MPIHaloScratch{T <: AbstractFloat}
+    send_l::Vector{T}
+    recv_l::Vector{T}
+    send_r::Vector{T}
+    recv_r::Vector{T}
+    send_t::Vector{T}
+    recv_t::Vector{T}
+    send_b::Vector{T}
+    recv_b::Vector{T}
+    l0_h::Matrix{T}
+    l0_u::Matrix{T}
+    l0_v::Matrix{T}
+    W_left::Vector{T}
+    W_right::Vector{T}
+    W_top::Matrix{T}
+    W_bottom::Matrix{T}
+end
+
+function MPIHaloScratch(::Type{T}, halo::Integer, damping) where {T <: AbstractFloat}
+    empty = T[]
+    d = T(damping)
+    return MPIHaloScratch{T}(
+        copy(empty), copy(empty), copy(empty), copy(empty),
+        copy(empty), copy(empty), copy(empty), copy(empty),
+        zeros(T, 0, 0), zeros(T, 0, 0), zeros(T, 0, 0),
+        fill(d, halo), fill(d, halo), fill(d, 1, halo), fill(d, 1, halo),
+    )
+end
+
+"""
 Struct to represent the MPI parallel specification of a model.
 
 Fields:
@@ -59,8 +95,8 @@ Fields:
     halo: Number of halo cells on each side of the subgrid
     rank: MPI rank of the current process
     comm: MPI communicator for the current process
-    coords: Cartesian coordinates of the current process
-    top, right, bottom, left: Neighbouring processes in the x and y directions
+    coords: Cartesian coordinates of the current process as (x, y)
+    top, right, bottom, left: Neighbouring processes in the x and y directions; MPI_PROC_NULL if none
     global_size: Total number of processes
     global_comm: MPI communicator for the global grid
     global_grid: Global grid to be used for the model
@@ -68,6 +104,8 @@ Fields:
     niterations: Number of Schwarz iterations per Picard iteration (default=5)
     field_collector: Field collector for the model
     pou_scratch: Cached PoU weights / strip buffers (filled on first prolong)
+    halo_scratch: Cached RAS halo packs (filled on first halo_exchange!)
+    core_inner: Cached core-only inner masks for the global residual
     local_spec: Optional intraprocess ThreadedSpec for the rank-local solve (default=nothing to wavelet)
 """
 mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGrid} <: AbstractDecompSpec
@@ -85,17 +123,19 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
 
     rank::N
     comm::M
-    coords::Array{N, 1}
+    coords::NTuple{2,N}
 
-    # Neighbourhood information
-    top::Union{N, Nothing}
-    right::Union{N, Nothing}
-    bottom::Union{N, Nothing}
-    left::Union{N, Nothing}
+    # Neighbourhood information (MPI_PROC_NULL if no neighbour)
+    top::N
+    right::N
+    bottom::N
+    left::N
     pou::Bool
     damping::T
     niterations::N  # Number of Schwarz iterations per Picard iteration
-    pou_scratch::Union{Nothing, MPIPoUScratch}
+    pou_scratch::Union{Nothing, MPIPoUScratch{T}}
+    halo_scratch::Union{Nothing, MPIHaloScratch{T}}
+    core_inner::Union{Nothing, Tuple{Vector{Bool}, Vector{Bool}}}
     local_spec::Union{Nothing, ThreadedSpec}
 
     @doc """
@@ -108,9 +148,17 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
     pou: Whether to use partition of unity for halo exchange (default=true)
     damping: Damping factor for halo exchange (default=0.0)
     local_spec: Optional ThreadedSpec for the intraprocess local solve (default=nothing)
-    """
-    function MPISpec(px::Integer, py::Integer, halo::Integer, grid::AbstractGrid; pou::Bool=true, damping::AbstractFloat=0.0, niterations::Integer=5, local_spec::Union{Nothing,ThreadedSpec}=nothing)
-        (px < 1 || py < 1 || halo < 0) && 
+    """ function MPISpec(
+        px::Integer,
+        py::Integer,
+        halo::Integer,
+        grid::G;
+        pou::Bool = true,
+        damping::AbstractFloat = 0.0,
+        niterations::Integer = 5,
+        local_spec::Union{Nothing, ThreadedSpec} = nothing,
+    ) where {G <: AbstractGrid}
+        (px < 1 || py < 1 || halo < 0) &&
             throw(ArgumentError("Invalid parameters specified for MPISpec"))
 
         MPI.Initialized() || MPI.Init()
@@ -144,7 +192,7 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
         bottom = MPI.Cart_shift(cart_comm, 1, 1)[2]
         left = MPI.Cart_shift(cart_comm, 0, -1)[2]
 
-        @info "[$(rank+1)/$(size)] Neighbours $(top),$(right),$(bottom),$(left)"
+        @debug "[$(rank+1)/$(size)] Neighbours $(top),$(right),$(bottom),$(left)"
 
         # Check if the process grid is valid
         if px * py != size
@@ -167,9 +215,9 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             validate_dimension("ny", grid.ny, py, halo)
         end
 
-        return new{Int, Float64, MPI.Comm, AbstractGrid}(
-            px, 
-            py, 
+        return new{Int, Float64, MPI.Comm, G}(
+            px,
+            py,
             halo,
             size,
             comm,
@@ -178,14 +226,19 @@ mutable struct MPISpec{N <: Integer, T <: Number, M <: MPI.Comm, G <: AbstractGr
             Collector(),
             rank,
             cart_comm,
-            [x_coord, y_coord],
-            top, right, bottom, left,
+            (Int(x_coord), Int(y_coord)),
+            Int(top),
+            Int(right),
+            Int(bottom),
+            Int(left),
             pou,
             damping,
             niterations,
             nothing,  # pou_scratch filled on first PoU prolong
+            nothing,  # halo_scratch filled on first RAS exchange
+            nothing,  # core_inner filled on first Schwarz residual
             local_spec,
-            )
+        )
     end
 end
 
@@ -193,6 +246,62 @@ include("MPI/utils.jl")
 include("MPI/exchanges.jl")
 include("MPI/outputs.jl")
 include("MPI/mpi_checkpoints.jl")
+
+"""
+    mpi_allocate_global_fields!(spec, grid, bed_array; kwargs...)
+
+Create the full-domain arrays that rank 0 uses when writing output.
+
+Only rank 0 stores `spec.global_fields`. Other ranks leave it as `nothing` and send
+their patch when fields are gathered. These arrays are only for output, they are not
+used for the velocity solve or other physics.
+"""
+function mpi_allocate_global_fields!(
+    spec::MPISpec,
+    grid::AbstractGrid,
+    bed_array;
+    initial_conditions::InitialConditions = InitialConditions(),
+    params::Params = Params(),
+    solver_params::SolverParams = SolverParams(),
+)
+    spec.rank == 0 || return nothing
+    # Create global mpi_rank field (will be populated during collection)
+    spec.global_fields = GridField(
+        grid,
+        bed_array;
+        initial_conditions,
+        params,
+        solver_params,
+        mpi_rank = zeros(Float64, grid.nx, grid.ny),
+        assembly_buffer = true,
+    )
+    return spec.global_fields
+end
+
+"""
+    mpi_restore_global_fields!(spec, saved_global_fields, model)
+
+Put rank 0's output arrays back after loading a checkpoint.
+
+Loading a checkpoint builds a new `MPISpec`, so those arrays would otherwise be
+missing. Rank 0 reuses the saved arrays when they are in the file, or allocates
+empty ones. Other ranks do nothing.
+"""
+function mpi_restore_global_fields!(spec::MPISpec, saved_global_fields, model)
+    spec.rank == 0 || return nothing
+    if saved_global_fields isa GridField
+        spec.global_fields = saved_global_fields
+        return spec.global_fields
+    end
+    grid = spec.global_grid
+    return mpi_allocate_global_fields!(
+        spec,
+        grid,
+        zeros(grid.nx, grid.ny);
+        params = model.params,
+        solver_params = model.solver_params,
+    )
+end
 
 function Model(grid::G,
                bed_elevation::Union{Integer, Function, AbstractArray},
@@ -215,50 +324,21 @@ function Model(grid::G,
                                                         BH<:AbstractBasalHydrology,
                                                         TD<:AbstractThermoDynamics}
 
-    @unpack coords, global_size, rank = spec
-    @info "[$(rank+1)/$(global_size)] - $(coords) - creating Grid and Model for MPI rank $(rank)"
+    @unpack coords, global_size, rank, comm = spec
 
     # Recalculate grid dimensions and mask parameters, creating a new local Grid
     th, rh, bh, lh = get_halos(spec)
-    @info "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - $(th), $(rh), $(bh), $(lh)"
     nx_local, ny_local = get_size(spec)
     x_start, x_end, y_start, y_end = get_bounds(spec)
-    
     x0_local = grid.x0 + (x_start-1) * grid.dx
     y0_local = grid.y0 + (y_start-1) * grid.dy
-    
-    @info "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - grid $(nx_local)x$(ny_local)"
-    @info "[$(rank+1)/$(global_size)] - X [$(x_start):$(x_end)] - Y [$(y_start):$(y_end)] - Centroid $(x0_local),$(y0_local) "
+    @info "[$(rank+1)/$(global_size)] proc $(coords[1]),$(coords[2]) grid $(nx_local)x$(ny_local) X[$(x_start):$(x_end)] Y[$(y_start):$(y_end)]"
+    @debug "[$(rank+1)/$(global_size)] - $(coords) - creating Grid and Model for MPI rank $(rank)"
+    @debug "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - $(th), $(rh), $(bh), $(lh)"
+    @debug "[$(rank+1)/$(global_size)] - proc $(coords[1]),$(coords[2]) - grid $(nx_local)x$(ny_local)"
+    @debug "[$(rank+1)/$(global_size)] - X [$(x_start):$(x_end)] - Y [$(y_start):$(y_end)] - Centroid $(x0_local),$(y0_local) "
 
-    u_grid_size, v_grid_size = (grid.nx+1, grid.ny), (grid.nx, grid.ny+1)
-    
-    #expand scalar paramaters onto grid
-    params = reconstruct_on_grid(params,grid)
-
-    #Replace all NaN entries with defaults from params on correct grid              
-    initial_conditions = reconstruct_on_grid(initial_conditions, params, grid)
-
-    #expand spatial parameters onto grid
-    shelf_melt_rate = reconstruct_on_grid(shelf_melt_rate,grid)
-    surface_mass_balance = reconstruct_on_grid(surface_mass_balance,grid)
-    fracture = reconstruct_on_grid(fracture,grid)
-    sliding_law = reconstruct_on_grid(sliding_law,grid)
-    basal_hydrology = reconstruct_on_grid(basal_hydrology,grid)
-    thermo_dynamics = reconstruct_on_grid(thermo_dynamics,grid)
-
-    #trim initial conditions to local domain
-    local_initial_conditions = reconstruct_on_subdomain(initial_conditions, grid, (x_start, x_end, y_start, y_end))
-
-    # dt cannot be copied via the external constructor so we create the structure directly
-    local_params = reconstruct_on_subdomain(params,grid,(x_start, x_end, y_start, y_end))
-
-    local_shelf_melt_rate = reconstruct_on_subdomain(shelf_melt_rate,grid,(x_start, x_end, y_start, y_end))
-    local_surface_mass_balance = reconstruct_on_subdomain(surface_mass_balance,grid,(x_start, x_end, y_start, y_end))
-    local_fracture = reconstruct_on_subdomain(fracture,grid,(x_start, x_end, y_start, y_end))
-    local_sliding_law = reconstruct_on_subdomain(sliding_law,grid,(x_start, x_end, y_start, y_end))
-    local_basal_hydrology = reconstruct_on_subdomain(basal_hydrology,grid,(x_start, x_end, y_start, y_end))
-    local_thermo_dynamics = reconstruct_on_subdomain(thermo_dynamics,grid,(x_start, x_end, y_start, y_end))
-
+    bounds = (x_start, x_end, y_start, y_end)
     
     u_isfixed = grid.u_isfixed[x_start:x_end+1, y_start:y_end]
     v_isfixed = grid.v_isfixed[x_start:x_end, y_start:y_end+1]
@@ -291,6 +371,21 @@ function Model(grid::G,
         σ = grid.σ,
         basin_ID = grid.basin_ID[x_start:x_end, y_start:y_end])
 
+    # Slice global arrays first, then expand remaining scalars onto the local grid.
+    #expand scalar paramaters onto grid
+    # dt cannot be copied via the external constructor so we create the structure directly
+    local_params = reconstruct_on_grid(reconstruct_on_subdomain(params, grid, bounds), local_grid)
+    #Replace all NaN entries with defaults from params on correct grid
+    #trim initial conditions to local domain
+    local_initial_conditions = reconstruct_on_grid(reconstruct_on_subdomain(initial_conditions, grid, bounds), local_params, local_grid)
+    #expand spatial parameters onto grid
+    local_shelf_melt_rate = reconstruct_on_grid(reconstruct_on_subdomain(shelf_melt_rate, grid, bounds), local_grid)
+    local_surface_mass_balance = reconstruct_on_grid(reconstruct_on_subdomain(surface_mass_balance, grid, bounds), local_grid)
+    local_fracture = reconstruct_on_grid(reconstruct_on_subdomain(fracture, grid, bounds), local_grid)
+    local_sliding_law = reconstruct_on_grid(reconstruct_on_subdomain(sliding_law, grid, bounds), local_grid)
+    local_basal_hydrology = reconstruct_on_grid(reconstruct_on_subdomain(basal_hydrology, grid, bounds), local_grid)
+    local_thermo_dynamics = reconstruct_on_grid(reconstruct_on_subdomain(thermo_dynamics, grid, bounds), local_grid)
+
     if typeof(bed_elevation) <: AbstractArray
         bed_array = bed_elevation[x_start:x_end, y_start:y_end]
     else
@@ -304,14 +399,18 @@ function Model(grid::G,
     model = Model(local_grid, fields, local_params, solver_params, spec, local_shelf_melt_rate, local_surface_mass_balance, local_fracture, local_sliding_law, local_basal_hydrology, 
     local_thermo_dynamics, verbose)
 
-    global_bed = typeof(bed_elevation) <: AbstractArray ? bed_elevation : get_bed_elevation(bed_elevation, grid)
-    # Create global mpi_rank field (will be populated during collection)
-    global_mpi_rank = zeros(Float64, grid.nx, grid.ny)
-
+    # Assembly buffers stay on rank 0 only. Other ranks send patches during collect.
     # Global assembly buffers for gather/Bcast only: sized arrays, no IC/operator cost.
     # (Physics lives on each rank's local GridField; bed is retained for static outputs.)
-    model.spec.global_fields = GridField(grid, global_bed; initial_conditions, params, solver_params, mpi_rank=global_mpi_rank, assembly_buffer=true)
+    if rank == 0
+        global_bed = typeof(bed_elevation) <: AbstractArray ? bed_elevation : get_bed_elevation(bed_elevation, grid)
+        mpi_allocate_global_fields!(spec, grid, global_bed; initial_conditions, params, solver_params)
+    end
 
+    MPI.Barrier(comm)
+    if rank == 0
+        @info "MPI: local models ready on $(global_size) ranks"
+    end
     return model
 end
 
@@ -390,19 +489,24 @@ function timestep!(model::AbstractModel{T,N,S},
     end
     update_clock!(clock, timestepping_params)
 
-    # Collect AFTER thickness update to match BasicSpec output timing
-    collect!(model.spec.field_collector, model)
+    # Collect AFTER thickness update to match BasicSpec output timing.
+    # Gather registered global fields only when write_output will actually write.
+    if is_output_step(output_params, clock)
+        collect!(model.spec.field_collector, model)
+    end
     write_outputs(model, timestepping_params, output_params, clock)
-    clear!(model.spec.field_collector)
+    if is_output_step(output_params, clock)
+        clear!(model.spec.field_collector)
+    end
 end
 
 function run_simulation!(model::AbstractModel{T,N,S}, 
                          timestepping_params::TimesteppingParams, 
                          output_params::OutputParams,
                          clock::Clock) where {T,N,S<:MPISpec}
-    for field in values(output_params.outputs.items)    
+    for field in values(output_params.outputs.items)
         if model.spec.rank == 0
-            @info "Registering $(field.path) from outputs"
+            @debug "Registering $(field.path) from outputs"
         end
         if field.path[1] == :global_fields
             register_mpi_field!(model.spec.field_collector, field.path)
@@ -411,11 +515,18 @@ function run_simulation!(model::AbstractModel{T,N,S},
 
     # TODO: we potentially register other fields here too, but currently concentrating on outputs (update_thickness might want to exploit this mechanism)
 
+    rank = model.spec.rank
+    if rank == 0
+        @info "MPI: exchanging initial halos"
+    end
     mpi_sync_halos_initial!(model)
 
     for i = (clock.n_iter+1):timestepping_params.n_iter_total
-        if model.spec.rank == 0
+        if rank == 0
             @info "Running iteration $(clock.n_iter)/$(timestepping_params.n_iter_total)"
+            if clock.n_iter == 0
+                @info "MPI: first velocity solve compiles kernels and may take a while"
+            end
         end
         timestep!(model, timestepping_params, output_params, clock)
     end
@@ -425,12 +536,7 @@ end
 
 function register_mpi_field!(collector::Collector, path::Vector{Symbol})
     accessor = function(model)
-        collect_mpi_field!(model, path)
-        result = model.spec
-        for field in path
-            result = getproperty(result, field)
-        end
-        return result
+        return collect_mpi_field!(model, path)
     end
     extractor = field_extractor(join(string.(path), "."), accessor, path)
     register_item!(collector, extractor)
@@ -443,36 +549,38 @@ Overload for the inner update of the velocity solve.
 We need to sync halos before performing the update so that the viscosity and other
 calculations have correct boundary information from neighbouring procs.
 
-Note: `update_rheological_operators!` is called a second time here (after the halo sync)
-because the base `inner_update!` builds the operators before we have correct cross-rank
-rheology values (β, βeff, ηav). The second call rebuilds them with consistent halo data.
+Note: `update_rheological_operators!` is called after the halo sync because the field
+update runs before we have correct cross-rank rheology values (β, βeff, ηav). The
+operators must be built from that halo data.
 """
 function inner_update!(model::Model{<:Any, <:Any, <:MPISpec})
     # RAS ghost sync for velocities; AS-PoU keeps overlap values from the last prolongation.
     if !model.spec.pou
         halo_exchange!(model; fields=[:u, :v])
     end
-    # Call the standard inner update function for the velocity solve
-    invoke(inner_update!, Tuple{AbstractModel}, model)
-    # Sync rheology fields used near rank interfaces, then rebuild operators with correct halo data.
+    inner_update_fields!(model)
     halo_exchange!(model; fields=[:β, :βeff, :ηav])
     update_rheological_operators!(model)
     return model
 end
 
 function core_inner_masks(model::Model{<:Any, <:Any, <:MPISpec})
+    cached = model.spec.core_inner
+    cached !== nothing && return cached
+
     @unpack gu, gv = model.fields
     th, rh, bh, lh = get_halos(model.spec)
 
     u_core_mask = falses(size(gu.mask_inner))
     u_core_mask[(1+lh):(size(u_core_mask, 1)-rh), (1+th):(size(u_core_mask, 2)-bh)] .= true
-    u_core_inner = u_core_mask[gu.mask_inner]
+    u_core_inner = Vector{Bool}(u_core_mask[gu.mask_inner])
 
     v_core_mask = falses(size(gv.mask_inner))
     v_core_mask[(1+lh):(size(v_core_mask, 1)-rh), (1+th):(size(v_core_mask, 2)-bh)] .= true
-    v_core_inner = v_core_mask[gv.mask_inner]
+    v_core_inner = Vector{Bool}(v_core_mask[gv.mask_inner])
 
-    return u_core_inner, v_core_inner
+    model.spec.core_inner = (u_core_inner, v_core_inner)
+    return model.spec.core_inner
 end
 
 """
@@ -493,11 +601,16 @@ Solves the linear system using an iterative overlapping Schwarz method across th
     *   Solver exits early if the global relative residual meets the Picard tolerance.
 """
 function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
-    @unpack niterations, pou = model.spec
+    @unpack niterations, pou, global_size = model.spec
     @unpack solver_params = model
+
+    if global_size == 1
+        return local_precondition!(model)
+    end
 
     converged = false
     global_rel_resid = Inf
+    s = stencil_scratch!(model)
 
     for iteration = 1:niterations
         if (iteration > 1) && (model.spec.rank == 0)
@@ -528,7 +641,8 @@ function precondition!(model::Model{<:Any, <:Any, <:MPISpec})
         x = get_start_guess(model)
         op = get_op(model)
         b = get_rhs(model)
-        resid = get_resid(x, op, b)
+        resid = s.picard_resid
+        get_resid!(resid, x, op, b)
 
         # Global Residual Check (core-only):
         # exclude overlap halos so each physical unknown is counted once globally.

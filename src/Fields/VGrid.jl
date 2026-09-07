@@ -18,7 +18,6 @@ struct VGrid{T <: Real, N <: Int}
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
                   ∂yᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                  dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
                     s :: Array{T,2}                            # Ice surface elevation
                     h :: Array{T,2}                            # Ice thickness
     grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
@@ -98,7 +97,7 @@ function VGrid(;
         spread = spzeros(Float64, nxv * nyv, 0)
         spread_inner = spzeros(Float64, nxv * nyv, 0)
         kron = _storage_only_kron()
-        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = dωt = kron
+        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = kron
         dnegβeff = Ref(Diagonal(Float64[]))
     else
         #construct operators
@@ -115,17 +114,11 @@ function VGrid(;
         ∂xᵀ = sparse(χ(nyv-2)') ⊗ sparse(∂1d(nxv-1,dx)')
         ∂y = ∂1d(nyv-1,dy) ⊗ spI(nxv)
         ∂yᵀ = sparse(∂1d(nyv-1,dy)') ⊗ sparse(spI(nxv)')
-        dωt = wavelet_matrix(nyv,levels,"forward" ) ⊗ wavelet_matrix(nxv,levels,"forward")
         dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
 
         #size assertions
         @assert n == count(mask)
         @assert ni == count(mask_inner)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxv*nyv))[mask[:]],ones(n),n,nxv*nyv)
-        @assert samp_inner == sparse(1:ni,(1:(nxv*nyv))[mask_inner[:]],ones(ni),ni,nxv*nyv)
-        @assert spread == sparse(samp')
-        @assert spread_inner == sparse(samp_inner')
     end
 
     @assert size(s)==(nxv,nyv)
@@ -155,7 +148,6 @@ function VGrid(;
                 ∂y,
                 ∂yᵀ,
                 levels,
-                dωt,
                 s,
                 h,
                 grounded_fraction,

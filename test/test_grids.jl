@@ -72,4 +72,23 @@ using Test, WAVI
         @test_throws ArgumentError Grid(nσ = -5)
 
     end
+
+    @testset "spatial_on_subdomain" begin
+        grid = Grid(nx = 8, ny = 6)
+        bounds = (2, 5, 3, 6)
+        @test WAVI.Grids.spatial_on_subdomain(0.3, grid, bounds) == 0.3
+        @test WAVI.Grids.spatial_on_subdomain(nothing, grid, bounds) === nothing
+        f = (x, y) -> x + y
+        @test WAVI.Grids.spatial_on_subdomain(f, grid, bounds) === f
+        a = reshape(collect(1.0:48.0), 8, 6)
+        sliced = WAVI.Grids.spatial_on_subdomain(a, grid, bounds)
+        @test sliced == a[2:5, 3:6]
+        sliced[1, 1] = -1.0
+        @test a[2, 3] != -1.0
+        a3 = reshape(collect(1.0:96.0), 8, 6, 2)
+        sliced3 = WAVI.Grids.spatial_on_subdomain(a3, grid, bounds)
+        @test sliced3 == a3[2:5, 3:6, :]
+        sliced3[1, 1, 1] = -1.0
+        @test a3[2, 3, 1] != -1.0
+    end
 end

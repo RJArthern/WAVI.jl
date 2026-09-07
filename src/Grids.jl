@@ -1,7 +1,14 @@
 module Grids
 
 import Base: show, size
-export Grid, reconstruct_on_grid, reconstruct_on_subdomain
+export Grid,
+    reconstruct_on_grid,
+    reconstruct_on_subdomain,
+    spatial_on_subdomain,
+    field_on_grid,
+    subdomain_index_ranges,
+    grid_index_ranges,
+    forcing_index_ranges
 
 using WAVI: AbstractGrid
 
@@ -269,6 +276,94 @@ function reconstruct_on_grid(s, params, grid::Grid)
     return s
 end
 
+
+"""
+    spatial_on_subdomain(a, grid, subdomain)
+
+Copy the rectangle of `a` that belongs to one piece of `grid`.
+
+`subdomain` is `(x_start, x_end, y_start, y_end)`, the index box of one MPI rank or
+Schwarz tile. Numbers, functions, and `nothing` are left unchanged. A 2D or 3D array
+that matches the ice grid in x and y is copied on that box (3D keeps every vertical
+level). Other sizes are left unchanged, so a small placeholder array is not sliced.
+"""
+function spatial_on_subdomain(a, grid::Grid, subdomain::NTuple{4,<:Integer})
+    (isnothing(a) || a isa Number || a isa Function) && return a
+    x_start, x_end, y_start, y_end = subdomain
+    if ndims(a) == 2 && size(a) == (grid.nx, grid.ny)
+        return copy(a[x_start:x_end, y_start:y_end])
+    elseif ndims(a) == 3 && size(a, 1) == grid.nx && size(a, 2) == grid.ny
+        return copy(a[x_start:x_end, y_start:y_end, axes(a, 3)])
+    else
+        return a
+    end
+end
+
+"""
+    field_on_grid(a, grid; name=nothing)
+
+Turn a number into an array of that value on every cell of `grid`. Leave a matching
+2D array as it is.
+
+If you pass `name` and the array is the wrong size, throw `DimensionMismatch` with
+that name in the message. Without `name`, a wrong-sized array is left unchanged.
+"""
+function field_on_grid(a, grid::Grid; name::Union{Nothing,AbstractString} = nothing)
+    if a isa Number
+        return a .* ones(grid.nx, grid.ny)
+    elseif name === nothing || (ndims(a) == 2 && size(a) == (grid.nx, grid.ny))
+        return a
+    else
+        throw(DimensionMismatch("$name does not match grid size $(grid.nx) x $(grid.ny)"))
+    end
+end
+
+"""
+    subdomain_index_ranges(x_indices, y_indices, grid, subdomain)
+
+Cut the file-lookup lists down to one MPI rank or Schwarz tile of `grid`.
+
+`x_indices` and `y_indices` say, for each local cell, which column to read from a
+global file. If they are `nothing`, start from `1:nx` and `1:ny`. If they already
+exist, they are cut to `subdomain` rather than started again from 1.
+"""
+function subdomain_index_ranges(x_indices, y_indices, grid::Grid, subdomain::NTuple{4,<:Integer})
+    x_start, x_end, y_start, y_end = subdomain
+    parent_x = isnothing(x_indices) ? (1:grid.nx) : x_indices
+    parent_y = isnothing(y_indices) ? (1:grid.ny) : y_indices
+    return parent_x[x_start:x_end], parent_y[y_start:y_end]
+end
+
+"""
+    grid_index_ranges(x_indices, y_indices, grid)
+
+File-lookup lists to use on `grid` (an MPI/Schwarz tile, or the full domain).
+
+Keep lists if they already exist (this object is already a tile). Otherwise use
+`1:nx` and `1:ny`, so local index 1 is file index 1 (the full-domain case).
+"""
+function grid_index_ranges(x_indices, y_indices, grid::Grid)
+    xs = isnothing(x_indices) ? (1:grid.nx) : x_indices
+    ys = isnothing(y_indices) ? (1:grid.ny) : y_indices
+    return xs, ys
+end
+
+"""
+    forcing_index_ranges(x_indices, y_indices, dest)
+
+Which columns of a forcing file to read into local array `dest` (MPI tile or full domain).
+
+Use the lookup lists if they exist. If they are `nothing`, read a `dest`-sized block
+starting at 1. The list lengths must match `dest` in x and y.
+"""
+function forcing_index_ranges(x_indices, y_indices, dest)
+    is = isnothing(x_indices) ? (1:size(dest, 1)) : x_indices
+    js = isnothing(y_indices) ? (1:size(dest, 2)) : y_indices
+    (length(is) == size(dest, 1) && length(js) == size(dest, 2)) || throw(DimensionMismatch(
+        "x/y index ranges ($(length(is)),$(length(js))) do not match field size $(size(dest)[1:2])"
+    ))
+    return is, js
+end
 
 """
     reconstruct_on_subdomain(s, grid::Grid, subdomain::NTuple{4,<: Integer})

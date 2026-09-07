@@ -1,15 +1,17 @@
 module Utilities
 
-using InplaceOps
 using LinearAlgebra
 using Parameters
+using SparseArrays
 
 using WAVI: AbstractModel
-using WAVI.KroneckerProducts
+using KernelAbstractions: KernelAbstractions as KA, @kernel, @index
+using WAVI.Stencils
 
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
-    get_glx, glen_b, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!, 
-    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ
+    get_glx, glen_b, fill_glen_b!, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!,
+    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ,
+    stencil_scratch!, StencilScratch, apply_momentum_op!
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -17,241 +19,502 @@ spI(n) = spdiagm(n,n, 0 => ones(n))
 c(n) = spdiagm(n,n+1,0 => ones(n), 1 => ones(n))/2
 χ(n) = spdiagm(n,n+2, 1 => ones(n))
 
+"""
+    fill_index_map!(idx, mask) -> n
+
+Build a 2D lookup from a true/false mask of the same size.
+True cells are numbered 1, 2, 3, ... down each column, then left to right
+(the position in the short packed vector). False cells get `0`.
+Returns how many cells were true.
+"""
+function fill_index_map!(idx::AbstractMatrix{<:Integer}, mask::AbstractMatrix{Bool})
+    k = 0
+    @inbounds for j in axes(mask, 2), i in axes(mask, 1)
+        if mask[i, j]
+            k += 1
+            idx[i, j] = k
+        else
+            idx[i, j] = 0
+        end
+    end
+    return k
+end
+
+"""
+    inner_index_map(mask_inner) -> Matrix{Int}
+
+The velocity solver stores one value per inner point rather than per grid
+point. Inner points are ice that is free to move, so not ocean and not a
+fixed boundary; `mask_inner` is true there.
+
+This returns a 2D array of the same size as the grid. Where the point is
+inner, `idx[i, j]` is its position `k` in the solver vector, and the
+velocity is `u[k]`. Where it is not, `idx[i, j]` is `0`.
+
+The list `inner_indices` runs the other way: `inner_indices[k]` is the 2D
+location of the k-th inner point. Both number cells down each column, then
+left to right, matching `findall(vec(mask_inner))`.
+"""
+function inner_index_map(mask_inner::AbstractMatrix{Bool})
+    idx = zeros(Int, size(mask_inner))
+    fill_index_map!(idx, mask_inner)
+    return idx
+end
+
+
+"""
+Coarse-grid work vectors for the wavelet multigrid cycle.
+Resized when the number of kept wavelet coefficients changes.
+"""
+Base.@kwdef struct MultigridScratch{T <: Real}
+    n_wu::Int
+    n_wv::Int
+    b_coarse::Vector{T}
+    correction_coarse::Vector{T}
+end
+
+"""
+Workspace for the momentum operator, Picard stencils, Haar RAP, and Gauss-Seidel.
+
+Allocated once per `GridField` and reused. Colour lists are filled on first
+preconditioner call. `op_coarse_tmp1` and `op_coarse_tmp2` are the RAP
+coarse-operator work vectors. Coarse correction vectors sit in `mg_ops` and
+are resized when the number of kept wavelets changes.
+"""
+Base.@kwdef mutable struct StencilScratch{T <: Real}
+    gu_inner_indices::Vector{Int}
+    gv_inner_indices::Vector{Int}
+    surf_crop::Array{T, 2}
+    ones_crop::Array{T, 2}
+    tmpu::Array{T, 2}
+    tmpv::Array{T, 2}
+    tmpui::Vector{T}
+    tmpvi::Vector{T}
+    u_crop::Array{T, 2}
+    v_crop::Array{T, 2}
+    u_h::Array{T, 2}
+    v_h::Array{T, 2}
+    dudx::Array{T, 2}
+    dvdy::Array{T, 2}
+    dudy_c::Array{T, 2}
+    dvdx_c::Array{T, 2}
+    shear_c::Array{T, 2}
+    shear_h::Array{T, 2}
+    β_crop::Array{T, 2}
+    gf_crop::Array{T, 2}
+    denu::Array{T, 2}
+    denv::Array{T, 2}
+    ipolgfu::Array{T, 2}
+    ipolgfv::Array{T, 2}
+    hη::Array{T, 2}
+    hη_c::Array{T, 2}
+    rhs::Vector{T}
+    f1::Vector{T}
+    f2::Vector{T}
+    f3::Vector{T}
+    sui::Vector{T}
+    hui::Vector{T}
+    dui::Vector{T}
+    svi::Vector{T}
+    hvi::Vector{T}
+    dvi::Vector{T}
+    uvfixed::Vector{T}
+    start_guess::Vector{T}
+    picard_resid::Vector{T}
+    picard_correction::Vector{T}
+    gs_resid::Vector{T}
+    prolonged::Vector{T}
+    op_coarse_tmp1::Vector{T}
+    op_coarse_tmp2::Vector{T}
+    op_diag::Vector{T}
+    r_xx::Array{T, 2}
+    r_yy::Array{T, 2}
+    r_xy::Array{T, 2}
+    extra::Array{T, 2}
+    dx_inv::T
+    dy_inv::T
+    gs_colour_indices::Vector{Vector{Int}} = [Int[], Int[], Int[], Int[]]
+    gs_colours_filled::Bool = false
+    mg_ops::MultigridScratch{T}
+    gu_inner_index_map::Array{Int, 2}
+    gv_inner_index_map::Array{Int, 2}
+    haar_u::Array{T, 2}
+    haar_u_tmp::Array{T, 2}
+    haar_v::Array{T, 2}
+    haar_v_tmp::Array{T, 2}
+end
+
+"""
+    stencil_scratch!(model)
+
+Return persistent scratch for the momentum operator and Picard stencil applies.
+Allocated on first use and kept for the life of the model's `GridField`.
+"""
+function stencil_scratch!(model::AbstractModel{T, N}) where {T, N}
+    ref = model.fields.stencil_scratch
+    s = ref[]
+    if s !== nothing
+        return s::StencilScratch{T}
+    end
+    allocated = allocate_stencil_scratch(model)
+    ref[] = allocated
+    return allocated
+end
+
+function allocate_stencil_scratch(model::AbstractModel{T,N}) where {T,N}
+    @unpack gh,gu,gv,gc=model.fields
+    grid = model.grid
+
+    # Inner unknowns: 1D list for gather/scatter, 2D map for op_fun! kernels.
+    gu_inner_indices = findall(vec(gu.mask_inner))
+    gv_inner_indices = findall(vec(gv.mask_inner))
+    gu_inner_index_map = inner_index_map(gu.mask_inner)
+    gv_inner_index_map = inner_index_map(gv.mask_inner)
+
+    # Preallocate intermediate variables used by op_fun and Picard applies
+    dudx = similar(gh.h)
+    dvdy = similar(gh.h)
+    r_xx = similar(gh.h)
+    r_yy = similar(gh.h)
+
+    dudy_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    dvdx_c = similar(dudy_c)
+    r_xy = similar(dudy_c)
+
+    extra = similar(gh.h)
+
+    surf_crop = similar(gh.h)
+    ones_crop = similar(gh.h)
+    tmpu = similar(gu.u)
+    tmpv = similar(gv.v)
+    tmpui = similar(gu.u, gu.ni)
+    tmpvi = similar(gv.v, gv.ni)
+    u_crop = similar(gu.u)
+    v_crop = similar(gv.v)
+    u_h = similar(gh.h)
+    v_h = similar(gh.h)
+    shear_c = similar(dudy_c)
+    shear_h = similar(gh.h)
+    β_crop = similar(gh.h)
+    gf_crop = similar(gh.h)
+    denu = similar(gu.u)
+    denv = similar(gv.v)
+    ipolgfu = zeros(T, gu.nxu, gu.nyu)
+    ipolgfv = zeros(T, gv.nxv, gv.nyv)
+    hη = similar(gh.h)
+    hη_c = similar(gh.h, T, gc.nxc, gc.nyc)
+    rhs = zeros(T, gu.ni + gv.ni)
+    f1 = zeros(T, gu.ni + gv.ni)
+    f2 = zeros(T, gu.ni + gv.ni)
+    f3 = zeros(T, gu.ni + gv.ni)
+    sui = zeros(T, gu.ni)
+    hui = zeros(T, gu.ni)
+    dui = zeros(T, gu.ni)
+    svi = zeros(T, gv.ni)
+    hvi = zeros(T, gv.ni)
+    dvi = zeros(T, gv.ni)
+    uvfixed = zeros(T, gu.nxu * gu.nyu + gv.nxv * gv.nyv)
+
+    # Inner velocity length (free u-points, then free v-points).
+    ni = gu.ni + gv.ni
+
+    # Picard / smoother vectors. Reused every iterate instead of similar/zero.
+    start_guess = zeros(T, ni)
+    picard_resid = zeros(T, ni)
+    picard_correction = zeros(T, ni)
+    gs_resid = zeros(T, ni)
+    prolonged = zeros(T, ni)
+    op_coarse_tmp1 = zeros(T, ni)
+    op_coarse_tmp2 = zeros(T, ni)
+
+    # Jacobi diagonal (filled each get_op_diag from the fused stencil).
+    op_diag = zeros(T, ni)
+
+    dx_inv = one(T) / grid.dx
+    dy_inv = one(T) / grid.dy
+
+    # Two work arrays per grid: each Haar step reads one and writes the other.
+    haar_u = similar(gu.u)
+    haar_u_tmp = similar(gu.u)
+    haar_v = similar(gv.v)
+    haar_v_tmp = similar(gv.v)
+
+    return StencilScratch{T}(;
+        gu_inner_indices,
+        gv_inner_indices,
+        surf_crop,
+        ones_crop,
+        tmpu,
+        tmpv,
+        tmpui,
+        tmpvi,
+        u_crop,
+        v_crop,
+        u_h,
+        v_h,
+        dudx,
+        dvdy,
+        dudy_c,
+        dvdx_c,
+        shear_c,
+        shear_h,
+        β_crop,
+        gf_crop,
+        denu,
+        denv,
+        ipolgfu,
+        ipolgfv,
+        hη,
+        hη_c,
+        rhs,
+        f1,
+        f2,
+        f3,
+        sui,
+        hui,
+        dui,
+        svi,
+        hvi,
+        dvi,
+        uvfixed,
+        start_guess,
+        picard_resid,
+        picard_correction,
+        gs_resid,
+        prolonged,
+        op_coarse_tmp1,
+        op_coarse_tmp2,
+        op_diag,
+        r_xx,
+        r_yy,
+        r_xy,
+        extra,
+        dx_inv,
+        dy_inv,
+        mg_ops = MultigridScratch{T}(;
+            n_wu = 0,
+            n_wv = 0,
+            b_coarse = T[],
+            correction_coarse = T[],
+        ),
+        gu_inner_index_map,
+        gv_inner_index_map,
+        haar_u,
+        haar_u_tmp,
+        haar_v,
+        haar_v_tmp,
+    )
+end
+
+"""
+    apply_momentum_op!(out, in, s, gh, gu, gv, gc; vecSampled=true)
+
+Multiply the stacked inner (or full-grid) velocity vector by the momentum operator.
+Work arrays live on `s`. Rheology diagonals are read from the grids so Picard
+updates are seen without rebuilding scratch.
+"""
+function apply_momentum_op!(
+    opvecprod::AbstractVector,
+    inputVector::AbstractVector,
+    s::StencilScratch{T},
+    gh, gu, gv, gc;
+    vecSampled::Bool = true,
+) where {T}
+    if vecSampled
+        @assert length(inputVector) == (gu.ni + gv.ni)
+        u_in = view(inputVector, 1:gu.ni)
+        v_in = view(inputVector, (gu.ni + 1):(gu.ni + gv.ni))
+    else
+        nu = gu.nxu * gu.nyu
+        nv = gv.nxv * gv.nyv
+        @assert length(inputVector) == (nu + nv)
+        u_in = view(inputVector, 1:nu)
+        v_in = view(inputVector, (nu + 1):(nu + nv))
+    end
+    out_u = view(opvecprod, 1:gu.ni)
+    out_v = view(opvecprod, (gu.ni + 1):(gu.ni + gv.ni))
+
+    D_h = reshape(gh.dneghηav[].diag, gh.nxh, gh.nyh)
+    D_c = reshape(gc.dneghηav[].diag, gc.nxc, gc.nyc)
+    D_u = reshape(gu.dnegβeff[].diag, gu.nxu, gu.nyu)
+    D_v = reshape(gv.dnegβeff[].diag, gv.nxv, gv.nyv)
+    D_imp = reshape(gh.dimplicit[].diag, gh.nxh, gh.nyh)
+
+    launch!(
+        _op_h_stresses!, s.r_xx, s.r_yy, s.extra, s.r_xy, u_in, v_in,
+        s.gu_inner_index_map, s.gv_inner_index_map,
+        gu.h, gv.h, gu.mask, gv.mask, gc.mask, D_h, D_imp, D_c, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.r_xx),
+    )
+    launch!(
+        _op_force_u!, out_u, s.r_xx, s.r_xy, s.extra, u_in, s.gu_inner_index_map, gu.h,
+        D_u, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.gu_inner_index_map), sync = false,
+    )
+    launch!(
+        _op_force_v!, out_v, s.r_yy, s.r_xy, s.extra, v_in, s.gv_inner_index_map, gv.h,
+        D_v, s.dx_inv, s.dy_inv, vecSampled;
+        ndrange = size(s.gv_inner_index_map), sync = false,
+    )
+    KA.synchronize(KA.get_backend(s.r_xx))
+    return opvecprod
+end
 
 """
     get_op_fun(model::AbstractModel)
 
 Returns a function that multiplies a vector by the momentum operator.
 """
-function get_op_fun(model::AbstractModel{T,N}) where {T,N}
-    @unpack gh,gu,gv,gc=model.fields
-    
-    #Preallocate intermediate variables used by op_fun
-    nxnyh :: N = gh.nxh*gh.nyh
-    nxnyu :: N = gu.nxu*gu.nyu
-    nxnyv :: N = gv.nxv*gv.nyv
-    nxnyc :: N = gc.nxc*gc.nyc
-    usampi :: Vector{T} = zeros(gu.ni);                             @assert length(usampi) == gu.ni
-    vsampi :: Vector{T} = zeros(gv.ni);                             @assert length(vsampi) == gv.ni
-    uspread :: Vector{T} = zeros(nxnyu);                            @assert length(uspread) == nxnyu
-    vspread :: Vector{T} = zeros(nxnyv);                            @assert length(vspread) == nxnyv
-    dudx :: Vector{T} = zeros(nxnyh);                               @assert length(dudx) == nxnyh
-    dvdy :: Vector{T} = zeros(nxnyh);                               @assert length(dvdy) == nxnyh
-    r_xx_strain_rate_sum :: Vector{T} = zeros(nxnyh);               @assert length(r_xx_strain_rate_sum) == nxnyh
-    r_yy_strain_rate_sum :: Vector{T} = zeros(nxnyh);               @assert length(r_yy_strain_rate_sum) == nxnyh
-    r_xx :: Vector{T} = zeros(nxnyh);                               @assert length(r_xx) == nxnyh
-    r_yy :: Vector{T} = zeros(nxnyh);                               @assert length(r_yy) == nxnyh
-    dudy_c :: Vector{T} = zeros(nxnyc);                             @assert length(dudy_c) == nxnyc
-    dvdx_c :: Vector{T} = zeros(nxnyc);                             @assert length(dvdx_c) == nxnyc
-    r_xy_strain_rate_sum_c :: Vector{T} = zeros(nxnyc);             @assert length(r_xy_strain_rate_sum_c) == nxnyc
-    r_xy_strain_rate_sum_crop_c :: Vector{T} = zeros(nxnyc);        @assert length(r_xy_strain_rate_sum_crop_c) == nxnyc
-    r_xy_c :: Vector{T} = zeros(nxnyc);                             @assert length(r_xy_c) == nxnyc
-    r_xy_crop_c :: Vector{T} = zeros(nxnyc);                        @assert length(r_xy_crop_c) == nxnyc
-    d_rxx_dx :: Vector{T} = zeros(nxnyu);                           @assert length(d_rxx_dx) == nxnyu
-    d_rxy_dy :: Vector{T} = zeros(nxnyu);                           @assert length(d_rxy_dy) == nxnyu
-    d_ryy_dy :: Vector{T} = zeros(nxnyv);                           @assert length(d_ryy_dy) == nxnyv
-    d_rxy_dx :: Vector{T} = zeros(nxnyv);                           @assert length(d_rxy_dx) == nxnyv
-    taubx :: Vector{T} = zeros(nxnyu);                              @assert length(taubx) == nxnyu
-    tauby :: Vector{T} = zeros(nxnyv);                              @assert length(tauby) == nxnyv
-    qx :: Vector{T} = zeros(nxnyu);                                 @assert length(qx) == nxnyu
-    qx_crop :: Vector{T} = zeros(nxnyu);                            @assert length(qx_crop) == nxnyu
-    dqxdx :: Vector{T} = zeros(nxnyh);                              @assert length(dqxdx) == nxnyh
-    qy :: Vector{T} = zeros(nxnyv);                                 @assert length(qy) == nxnyv
-    qy_crop :: Vector{T} = zeros(nxnyv);                            @assert length(qy_crop) == nxnyv
-    dqydy :: Vector{T} = zeros(nxnyh);                              @assert length(dqydy) == nxnyh
-    divq :: Vector{T} = zeros(nxnyh);                               @assert length(divq) == nxnyh
-    extra :: Vector{T} = zeros(nxnyh);                              @assert length(extra) == nxnyh
-    d_extra_dx :: Vector{T} = zeros(nxnyu);                         @assert length(d_extra_dx) == nxnyu
-    d_extra_dy :: Vector{T} = zeros(nxnyv);                         @assert length(d_extra_dy) == nxnyv
-    h_d_extra_dx :: Vector{T} = zeros(nxnyu);                       @assert length(h_d_extra_dx) == nxnyu
-    h_d_extra_dy :: Vector{T} = zeros(nxnyv);                       @assert length(h_d_extra_dy) == nxnyv
-    fx :: Vector{T} = zeros(nxnyu);                                 @assert length(fx) == nxnyu
-    fy :: Vector{T} = zeros(nxnyv);                                 @assert length(fy) == nxnyv
-    fx_sampi :: Vector{T} = zeros(gu.ni);                           @assert length(fx_sampi) == gu.ni
-    fy_sampi :: Vector{T} = zeros(gv.ni);                           @assert length(fy_sampi) == gv.ni
-    opvecprod :: Vector{T} = zeros(gu.ni+gv.ni);                    @assert length(opvecprod) == gu.ni + gv.ni
-
-    function op_fun!(opvecprod::AbstractVector,inputVector::AbstractVector;vecSampled::Bool=true)
-        if vecSampled
-            @assert length(inputVector)==(gu.ni+gv.ni)
-
-            #Split vector into u- and v- components
-            usampi .= @view inputVector[1:gu.ni]
-            vsampi .= @view inputVector[(gu.ni+1):(gu.ni+gv.ni)]
-
-            #Spread to vectors that include all grid points within rectangular domain.
-            @!  uspread = gu.spread_inner*usampi
-            @!  vspread = gv.spread_inner*vsampi
-
-        else
-            #Vector already includes all grid points within rectangular domain.
-            @assert length(inputVector)==(gu.nxu*gu.nyu+gv.nxv*gv.nyv)
-            
-            uspread .= @view inputVector[1:gu.nxu*gu.nyu]
-            vspread .= @view inputVector[(gu.nxu*gu.nyu+1):(gu.nxu*gu.nyu+gv.nxv*gv.nyv)]
-
-        end
-        
-            #Extensional resistive stresses
-        @!  dudx = gu.∂x*uspread
-        @!  dvdy = gv.∂y*vspread
-        @.  r_xx_strain_rate_sum = 2dudx + dvdy
-        @.  r_yy_strain_rate_sum = 2dvdy + dudx
-        @!  r_xx = gh.dneghηav[]*r_xx_strain_rate_sum
-        @.  r_xx = -2r_xx
-        @!  r_yy = gh.dneghηav[]*r_yy_strain_rate_sum
-        @.  r_yy = -2r_yy
-
-            #Shearing resistive stresses
-        @!  dudy_c = gu.∂y*uspread
-        @!  dvdx_c = gv.∂x*vspread
-        @.  r_xy_strain_rate_sum_c = dudy_c + dvdx_c
-        @!  r_xy_strain_rate_sum_crop_c = gc.crop*r_xy_strain_rate_sum_c
-        @!  r_xy_c = gc.dneghηav[]*r_xy_strain_rate_sum_crop_c
-        @.  r_xy_c = -r_xy_c
-        @!  r_xy_crop_c = gc.crop*r_xy_c
-
-            #Gradients of resisitve stresses
-        @!  d_rxx_dx = gu.∂xᵀ*r_xx
-        @.  d_rxx_dx = - d_rxx_dx 
-        @!  d_rxy_dy = gu.∂yᵀ*r_xy_crop_c
-        @.  d_rxy_dy = - d_rxy_dy 
-        @!  d_ryy_dy = gv.∂yᵀ*r_yy
-        @.  d_ryy_dy = -d_ryy_dy
-        @!  d_rxy_dx = gv.∂xᵀ*r_xy_crop_c
-        @.  d_rxy_dx = -d_rxy_dx
-
-            #Basal drag
-        @!  taubx = gu.dnegβeff[]*uspread
-        @.  taubx = -taubx
-        @!  tauby = gv.dnegβeff[]*vspread
-        @.  tauby = -tauby
-            
-            #Extra terms arising from Schur complement of semi implicit system (Arthern et al. 2015).
-            qx .= vec(gu.h).*uspread
-        @!  qx_crop = gu.crop*qx
-        @!  dqxdx = gu.∂x*qx_crop
-            qy .=  vec(gv.h).* vspread
-        @!  qy_crop = gv.crop*qy
-        @!  dqydy = gv.∂y*qy_crop
-            divq .= dqxdx .+ dqydy
-        @!  extra = gh.dimplicit[]*divq
-        @!  d_extra_dx = gu.∂xᵀ*extra
-        @.  d_extra_dx = -d_extra_dx
-        @!  d_extra_dy = gv.∂yᵀ*extra
-        @.  d_extra_dy = -d_extra_dy
-            h_d_extra_dx .= vec(gu.h).*d_extra_dx
-            h_d_extra_dy .= vec(gv.h).*d_extra_dy
-
-            #Resistive forces resolved in x anf y directions
-            fx .= d_rxx_dx .+ d_rxy_dy .- taubx .- h_d_extra_dx
-            fy .= d_ryy_dy .+ d_rxy_dx .- tauby .- h_d_extra_dy
-
-            #Resistive forces sampled at valid grid points
-        @!  fx_sampi = gu.samp_inner*fx
-        @!  fy_sampi = gv.samp_inner*fy
-
-            opvecprod[1:gu.ni] .= fx_sampi
-            opvecprod[(gu.ni+1):(gu.ni+gv.ni)] .= fy_sampi
-
-            return opvecprod
-    end
-
-    #Return op_fun as a closure
-    return op_fun!
+function get_op_fun(model::AbstractModel)
+    s = stencil_scratch!(model)
+    gh, gu, gv, gc = model.fields.gh, model.fields.gu, model.fields.gv, model.fields.gc
+    return (out, in; vecSampled = true) -> apply_momentum_op!(out, in, s, gh, gu, gv, gc; vecSampled)
 end
+
+"""
+    haar_steps(levels)
+
+Return the pairing gaps for a Haar transform with the given number of levels.
+The first gap is 2 cells, then 4, then 8, doubling until `levels + 1` gaps
+have been listed.
+"""
+haar_steps(levels::Integer) = ntuple(i -> 2^i, levels + 1)
+
+# KernelAbstractions schedules CPU threads one workgroup at a time. A
+# default workgroup that covers the whole ndrange runs on one thread.
+# On the main thread, when Julia has extra threads, use one item
+# per workgroup so the groups can map onto those threads. Serial, MPI,
+# and nested ThreadedSpec workers keep a single workgroup.
+function _haar_workgroup()
+    (Threads.nthreads() > 1 && Threads.threadid() == 1) ? 1 : nothing
+end
+
+"""
+    haar_idwt!(a, b, levels, transpose=false) -> result
+
+Apply the Haar inverse transform to the grid `a` by pairing neighbours at
+spacings 2, 4, 8, ... instead of a matrix product.
+`b` is a workspace of the same size. Each axis reads one array and writes the
+other. Pairings run along y first, then along x. The array that contains the
+result is returned. If `transpose` is true, this is the adjoint used by
+restrict (see `haar_idwtᵀ!`).
+"""
+function haar_idwt!(a, b, levels, transpose=false)
+    steps = haar_steps(levels)
+    step_iter = transpose ? steps : reverse(steps)
+    return _haar_lift_axes!(a, b, step_iter, transpose)
+end
+
+"""
+    haar_dwt!(a, b, levels) -> result
+
+Apply the forward Haar transform to the grid `a`.
+`update_wavelets!` uses this to form wavelet coefficients from velocity.
+`b` is a workspace of the same size. Matches `wavelet_matrix(..., "forward")`.
+This is not the reverse Haar used by prolong (`haar_idwt!`).
+"""
+function haar_dwt!(a, b, levels)
+    return _haar_lift_axes!(a, b, haar_steps(levels), Val{:forward}())
+end
+
+function _haar_lift_axes!(a, b, step_iter, mix)
+    src, dst = a, b
+    nx = size(a, 1)
+    wg = _haar_workgroup()
+    nwork = wg === 1 ? min(nx, Threads.nthreads()) : 1
+    launch!(_haar_lift_y_all!, src, dst, step_iter, mix, nwork;
+            ndrange = nwork, workgroupsize = wg)
+    if isodd(length(step_iter))
+        src, dst = dst, src
+    end
+    launch!(_haar_lift_x_all!, src, dst, step_iter, mix;
+            ndrange = size(a, 2), workgroupsize = wg)
+    if isodd(length(step_iter))
+        src, dst = dst, src
+    end
+    return src
+end
+
+"""
+    haar_idwtᵀ!(a, b, levels) -> result
+
+Apply the adjoint Haar transform.
+Restrict uses this to form wavelet coefficients.
+"""
+haar_idwtᵀ!(a, b, levels) = haar_idwt!(a, b, levels, true)
 
 """
     get_restrict_fun(model::AbstractModel)
 
-Returns a function that restricts a vector from the fine grid to the coarse grid, 
-used in multigrid preconditioner.
+Map a residual on free ice points onto the coarse wavelet coefficients
+kept above the threshold. Matches the old sparse `samp * idwtᵀ * spread_inner`.
 """
-function get_restrict_fun(model::AbstractModel{T,N}) where {T,N}
-    @unpack wu,wv,gu,gv=model.fields
+function get_restrict_fun(model::AbstractModel)
+    s = stencil_scratch!(model)
+    @unpack wu, wv, gu, gv = model.fields
 
-    #Preallocate intermediate variables used by restrict_fun
-    nxnyu = gu.nxu*gu.nyu
-    nxnyv = gv.nxv*gv.nyv
-    nxnywu = wu.nxuw*wu.nyuw
-    nxnywv = wv.nxvw*wv.nyvw
-    vecx :: Vector{T} = zeros(gu.ni)
-    vecy :: Vector{T} = zeros(gv.ni)
-    spreadvecx :: Vector{T} = zeros(nxnyu)
-    spreadvecy :: Vector{T} = zeros(nxnyv)
-    bigoutx :: Vector{T} = zeros(nxnywu)
-    bigouty :: Vector{T} = zeros(nxnywv)
-    outx :: Vector{T} = zeros(wu.n[])
-    outy :: Vector{T} = zeros(wv.n[])
-    restrictvec :: Vector{T} = zeros(wu.n[]+wv.n[])
+    function restrict_fun!(restrictvec::AbstractVector, vec::AbstractVector)
+        @assert length(vec) == (gu.ni + gv.ni)
+        n_wu = wu.n[]
+        n_wv = wv.n[]
 
-    function restrict_fun!(restrictvec::AbstractVector,vec::AbstractVector)
-        @assert length(vec)==(gu.ni+gv.ni)
-        vecx .= @view vec[1:gu.ni]
-        vecy .= @view vec[(gu.ni+1):(gu.ni+gv.ni)]
-@!      spreadvecx = gu.spread_inner*vecx
-@!      spreadvecy = gv.spread_inner*vecy
-@!      bigoutx = wu.idwtᵀ*spreadvecx
-@!      bigouty = wv.idwtᵀ*spreadvecy
-@!      outx = wu.samp[]*bigoutx
-@!      outy = wv.samp[]*bigouty
+        # spread_inner
+        launch!(_scatter_mapped!, s.haar_u, view(vec, 1:gu.ni), s.gu_inner_index_map;
+                ndrange = size(s.haar_u), sync = false)
+        launch!(_scatter_mapped!, s.haar_v, view(vec, (gu.ni + 1):(gu.ni + gv.ni)), s.gv_inner_index_map;
+                ndrange = size(s.haar_v))
 
-        restrictvec[1:wu.n[]] .=  outx
-        restrictvec[(wu.n[]+1):(wu.n[]+wv.n[])] .= outy
+        # idwtᵀ
+        ru = haar_idwtᵀ!(s.haar_u, s.haar_u_tmp, wu.levels)
+        rv = haar_idwtᵀ!(s.haar_v, s.haar_v_tmp, wv.levels)
 
+        # samp
+        launch!(_gather_mapped!, view(restrictvec, 1:n_wu), ru, wu.index_map;
+                ndrange = size(wu.index_map), sync = false)
+        launch!(_gather_mapped!, view(restrictvec, (n_wu + 1):(n_wu + n_wv)), rv, wv.index_map;
+                ndrange = size(wv.index_map))
         return restrictvec
     end
 
-    # Return restrict_fun as a closure
     return restrict_fun!
 end
 
 """
     get_prolong_fun(model::AbstractModel)
 
-Returns a function that prolongs a vector from the coarse grid to the fine grid, 
-used in multigrid preconditioner.
+Map kept coarse wavelet coefficients back to a velocity increment on free
+ice points. Matches the old sparse `samp_inner * idwt * spread`.
 """
-function get_prolong_fun(model::AbstractModel{T,N}) where {T,N}
-    @unpack wu,wv,gu,gv=model.fields
+function get_prolong_fun(model::AbstractModel)
+    s = stencil_scratch!(model)
+    @unpack wu, wv, gu, gv = model.fields
 
-    #Preallocate intermediate variables used by prolong_fun
-    nxnyu = gu.nxu*gu.nyu
-    nxnyv = gv.nxv*gv.nyv
-    nxnywu = wu.nxuw*wu.nyuw
-    nxnywv = wv.nxvw*wv.nyvw
-    waveletvecx :: Vector{T} = zeros(wu.n[])
-    waveletvecy :: Vector{T} = zeros(wv.n[])
-    spreadwaveletvecx :: Vector{T} = zeros(nxnywu)
-    spreadwaveletvecy :: Vector{T} = zeros(nxnywv)
-    bigoutx :: Vector{T} = zeros(nxnyu)
-    bigouty :: Vector{T} = zeros(nxnyv)
-    outx :: Vector{T} = zeros(gu.ni)
-    outy :: Vector{T} = zeros(gv.ni)
-    prolongvec :: Vector{T} = zeros(gu.ni+gv.ni)
+    function prolong_fun!(prolongvec::AbstractVector, waveletvec::AbstractVector)
+        n_wu = wu.n[]
+        n_wv = wv.n[]
+        @assert length(waveletvec) == (n_wu + n_wv)
 
-    function prolong_fun!(prolongvec::AbstractVector,waveletvec::AbstractVector)
+        # spread
+        launch!(_scatter_mapped!, s.haar_u, view(waveletvec, 1:n_wu), wu.index_map;
+                ndrange = size(wu.index_map), sync = false)
+        launch!(_scatter_mapped!, s.haar_v, view(waveletvec, (n_wu + 1):(n_wu + n_wv)), wv.index_map;
+                ndrange = size(wv.index_map))
 
-        @assert length(waveletvec)==(wu.n[]+wv.n[])
+        # idwt
+        ru = haar_idwt!(s.haar_u, s.haar_u_tmp, wu.levels)
+        rv = haar_idwt!(s.haar_v, s.haar_v_tmp, wv.levels)
 
-        waveletvecx .= @view waveletvec[1:wu.n[]]
-        waveletvecy .= @view waveletvec[(wu.n[]+1):(wu.n[]+wv.n[])]
-@!      spreadwaveletvecx = wu.spread[]*waveletvecx
-@!      spreadwaveletvecy = wv.spread[]*waveletvecy
-@!      bigoutx = wu.idwt*spreadwaveletvecx
-@!      bigouty = wv.idwt*spreadwaveletvecy
-@!      outx = gu.samp_inner*bigoutx
-@!      outy = gv.samp_inner*bigouty
-
-        prolongvec[1:gu.ni] .= outx
-        prolongvec[(gu.ni+1):(gu.ni+gv.ni)] .= outy
-        
+        # samp_inner
+        launch!(_gather_mapped!, view(prolongvec, 1:gu.ni), ru, s.gu_inner_index_map;
+                ndrange = size(s.gu_inner_index_map), sync = false)
+        launch!(_gather_mapped!, view(prolongvec, (gu.ni + 1):(gu.ni + gv.ni)), rv, s.gv_inner_index_map;
+                ndrange = size(s.gv_inner_index_map))
         return prolongvec
     end
-    
-    # Return prolong_fun as a closure
+
     return prolong_fun!
 end
+
 """
 pos_fraction(z1;mask=mask) -> area_fraction, area_fraction_u, area_fraction_v
 
@@ -476,6 +739,61 @@ function glen_b(temperature,damage,glen_a_ref, glen_n, glen_a_activation_energy,
     glen_a0 = glen_a_ref*exp(+glen_a_activation_energy/(glen_temperature_ref*gas_const) )
     glen_b = (1-damage)*( glen_a0*exp(-glen_a_activation_energy/(temperature*gas_const)) )^(-1.0/glen_n)
     return glen_b
+end
+
+@kernel function _update_glen_b_kernel!(
+    glen_b_arr,
+    θ,
+    Φ,
+    glen_a_ref,
+    glen_n,
+    glen_a_activation_energy,
+    glen_temperature_ref,
+    gas_const,
+)
+    i, j, k = @index(Global, NTuple)
+    @inbounds glen_b_arr[i, j, k] = glen_b(
+        θ[i, j, k],
+        Φ[i, j, k],
+        glen_a_ref[i, j],
+        glen_n,
+        glen_a_activation_energy,
+        glen_temperature_ref,
+        gas_const,
+    )
+end
+
+"""
+    fill_glen_b!(glen_b_arr, θ, Φ, glen_a_ref, glen_n, glen_a_activation_energy, glen_temperature_ref, gas_const)
+
+Fill `glen_b_arr` from temperature and damage using Glen's flow-law formula.
+
+This is the same calculation as `update_glen_b!`. Model construction calls it so the
+starting Glen B field matches what later timesteps compute.
+"""
+function fill_glen_b!(
+    glen_b_arr,
+    θ,
+    Φ,
+    glen_a_ref,
+    glen_n,
+    glen_a_activation_energy,
+    glen_temperature_ref,
+    gas_const,
+)
+    launch!(
+        _update_glen_b_kernel!,
+        glen_b_arr,
+        θ,
+        Φ,
+        glen_a_ref,
+        glen_n,
+        glen_a_activation_energy,
+        glen_temperature_ref,
+        gas_const;
+        ndrange = size(glen_b_arr),
+    )
+    return glen_b_arr
 end
 
 

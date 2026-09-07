@@ -177,15 +177,18 @@ end
 Update stiffness parameter B in Glen flow law.
 """
 function update_glen_b!(model::AbstractModel)
-    @unpack g3d=model.fields
-    @unpack params=model
-    for k=1:g3d.nσs
-        for j=1:g3d.nys
-            for i=1:g3d.nxs
-                g3d.glen_b[i,j,k] = glen_b.(g3d.θ[i,j,k],g3d.Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
-            end
-        end
-    end
+    @unpack g3d = model.fields
+    @unpack params = model
+    fill_glen_b!(
+        g3d.glen_b,
+        g3d.θ,
+        g3d.Φ,
+        params.glen_a_ref,
+        params.glen_n,
+        params.glen_a_activation_energy,
+        params.glen_temperature_ref,
+        params.gas_const,
+    )
     return model
 end
 

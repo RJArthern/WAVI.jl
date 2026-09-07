@@ -210,9 +210,6 @@ function HGrid(;
     @assert size(hyd_potential_isfixed)==(nxh,nyh);
     if !storage_only
         @assert n == count(mask)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
-        @assert spread == sparse(samp')
         @assert size(cent_xy) == ((nxh-1)*(nyh-1),nxh*nyh)
     end
     @assert size(b)==(nxh,nyh)

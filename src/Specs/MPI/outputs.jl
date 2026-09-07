@@ -8,17 +8,20 @@ import WAVI: AbstractModel
 import WAVI.Grids: Grid
 import WAVI.MeltRates: UniformMeltRate
 import WAVI.Models: BasicSpec, Model, get_bed_elevation
-import WAVI.Outputs: write_outputs, zip_output, OutputParams, should_write_checkpoint, write_checkpoint!
+import WAVI.Outputs: write_outputs, zip_output, OutputParams, should_write_checkpoint, write_checkpoint!, is_output_step
 import WAVI.Parameters: TimesteppingParams
 import WAVI.Time: Clock
 
 
 # TODO: these redefinitions are loathsome, but can't get a clearer way of limiting output via a simple method declaration with @root
 function write_output(model::M, output_params::OutputParams, clock::Clock) where {M<:AbstractModel{<:Any, <:Any, <:MPISpec}}
-    output_dict = collect!(output_params, model)
     name = lpad(clock.n_iter, 10,"0")
 
+    # Only rank 0 writes the file. Every rank already joined in the gather during
+    # the timestep, so the full-domain fields are ready to read. Do not gather
+    # again in this block: other ranks never enter it, and the run would hang.
     @root begin
+        output_dict = collect!(output_params, model)
         if isnothing(output_dict)
             @warn "No outputs processed for $(name)"
         end
@@ -55,7 +58,7 @@ function write_outputs(model::M,
     end
 
     #check if we have hit an output timestep
-    if mod(clock.n_iter, output_params.n_iter_out) == 0
+    if is_output_step(output_params, clock)
         write_output(model, output_params, clock)
     end
 

@@ -54,6 +54,7 @@ include("Grids.jl")
 include("Parameters.jl")
 include("ClimateForcing/ClimateForcing.jl")
 include("KroneckerProducts.jl")
+include("Stencils/Stencils.jl")
 include("Utilities.jl")
 include("Wavelets/Wavelets.jl")
 include("Fields/Fields.jl")
@@ -148,6 +149,9 @@ export Inversion, InversionParams, JKVsteppingParams, DataFields,
 
 using .ClimateForcing 
 export ISMIP7_ANOMALY,ISMIP7_CONTROL,ISMIP7_OCX
+
+using .Stencils
+export launch!
 
 end
 

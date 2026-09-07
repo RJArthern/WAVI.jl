@@ -86,6 +86,11 @@ function Model(grid::G,
                         BH<:AbstractBasalHydrology,
                         TD<:AbstractThermoDynamics}
 
+    spec_label = hasproperty(spec, :ngridsx) ?
+        "$(nameof(typeof(spec))) $(spec.ngridsx)x$(spec.ngridsy)" :
+        string(nameof(typeof(spec)))
+    @debug "$(spec_label) grid $(grid.nx)x$(grid.ny)"
+
     # FIXME: this all smells, hacking for threading
     bed_array = typeof(bed_elevation) <: AbstractArray ? bed_elevation : get_bed_elevation(bed_elevation, grid)
     
@@ -123,6 +128,7 @@ function Model(grid::G,
                basal_hydrology,
                thermo_dynamics,
                verbose)
+    @debug "$(nameof(typeof(spec))): model ready"
     return model
 end
 

@@ -22,7 +22,7 @@ function write_outputs(model::M,
     end
 
     #check if we have hit an output timestep
-    if mod(clock.n_iter, output_params.n_iter_out) == 0
+    if is_output_step(output_params, clock)
         write_output(model, output_params, clock)
     end
 

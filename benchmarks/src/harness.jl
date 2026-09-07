@@ -35,6 +35,8 @@ Base.@kwdef struct BenchmarkOptions
     sample_interval::Float64 = 0.25
     no_plots::Bool = false
     warmup::Bool = false
+    tag::String = ""
+    output_group::String = ""
 end
 
 # Convenience constructor accepting a string mode (from the Comonicon CLI),
@@ -75,6 +77,13 @@ Extract benchmark details (mode, driver, julia threads, and BLAS threads)
 into a dict for serialisation with final benchmark JSON results output.
 """
 function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
+    commit_hash = ""
+    try
+        commit_hash = strip(read(`git rev-parse HEAD`, String))
+    catch
+        commit_hash = "unknown"
+    end
+
     return merge!(Dict{String, Any}(
         "mode" => string(opts.mode),
         "driver" => opts.driver,
@@ -83,6 +92,9 @@ function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothin
         "sample_interval_s" => opts.sample_interval,
         "reference_cores" => reference_cores(opts; mpi_world_size = mpi_world_size),
         "command" => BENCHMARK_COMMAND[],
+        "tag" => opts.tag,
+        "output_group" => opts.output_group,
+        "git_commit" => commit_hash,
     ), slurm_metadata())
 end
 
@@ -92,7 +104,7 @@ end
 How many cores this benchmark is meant to use, for normalising CPU samples
 (`cpu_fraction = cpu_cores_used / reference_cores`).
 
-- `:basic`: `1`
+- `:basic`: `Threads.nthreads()`
 - `:threaded`: `ngridsx * ngridsy`
 - `:mpi`: `mpi_world_size` if given, else `SLURM_NTASKS`, else `1`
 """
@@ -100,9 +112,9 @@ function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, 
     if opts.mode == :threaded
         return opts.ngridsx * opts.ngridsy
     elseif opts.mode == :mpi
-        return something(mpi_world_size, tryparse(Int, get(ENV, "SLURM_NTASKS", "")), 1)
+        return something(mpi_world_size, 1)
     else
-        return 1
+        return Threads.nthreads()
     end
 end
 
@@ -135,8 +147,8 @@ function run_benchmark(opts::BenchmarkOptions)
         spec_kwargs = Dict{Symbol, Any}()
 
         if opts.mode == :basic
-            # Serial: BasicSpec setup
-            run_id = "basic"
+            # Serial / Multi-threaded: BasicSpec setup
+            run_id = "basic" * (Threads.nthreads() > 1 ? "_t$(Threads.nthreads())" : "")
 
         elseif opts.mode == :threaded
             # Shared memory: ThreadedSpec setup
@@ -153,10 +165,6 @@ function run_benchmark(opts::BenchmarkOptions)
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             # Narrow domains (e.g. MISMIP+ ny=10) need enough core cells after halo.
@@ -186,6 +194,34 @@ function run_benchmark(opts::BenchmarkOptions)
         opts.mode == :mpi && MPI.Initialized() && MPI.Finalize()
     end
 
+    return nothing
+end
+
+"""
+    log_wavelet_sizes(result)
+
+Print coarse wavelet DOFs (`wu.n + wv.n`) against fine inner DOFs (`gu.ni + gv.ni`).
+Used after a profile warm-up to decide whether assembling a coarse operator is cheap.
+If `io` is given, the same line is written there as well.
+"""
+function log_wavelet_sizes(result; io::Union{IO, Nothing} = nothing)
+    sim = if result isa NamedTuple && haskey(result, :simulation)
+        result.simulation
+    elseif hasproperty(result, :model)
+        result
+    else
+        nothing
+    end
+    sim === nothing && return
+    hasproperty(sim, :model) || return
+    fields = sim.model.fields
+    n_fine = fields.gu.ni + fields.gv.ni
+    n_coarse = fields.wu.n[] + fields.wv.n[]
+    msg = "Wavelet sizes: n_coarse=$(n_coarse) (wu.n=$(fields.wu.n[]), wv.n=$(fields.wv.n[])); " *
+          "n_fine=$(n_fine) (gu.ni=$(fields.gu.ni), gv.ni=$(fields.gv.ni)); " *
+          "ratio=$(round(n_coarse / max(n_fine, 1); digits = 4))"
+    @info msg
+    io !== nothing && println(io, msg)
     return nothing
 end
 
@@ -224,10 +260,6 @@ function run_profile(opts::BenchmarkOptions)
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             halo = 2
@@ -252,7 +284,15 @@ function run_profile(opts::BenchmarkOptions)
         spec_kwargs[:folder] = output_dir
 
         rank == 0 && @info "Profiling $(opts.driver) ($(opts.mode)): warm-up then @profile..."
-        Base.invokelatest(driver.run; spec_kwargs...)
+        warmup_result = Base.invokelatest(driver.run; spec_kwargs...)
+        if rank == 0
+            open(joinpath(output_dir, "wavelet_sizes.txt"), "w") do io
+                log_wavelet_sizes(warmup_result; io = io)
+            end
+        end
+        # Default n=10^7 fills on the 381x381 ISMIP7 driver; 10^8 is about 800 MB and
+        # covers a full 5-step run at -t 1 and a moderately threaded -t 16 run.
+        Profile.init(n = 10^8, delay = 0.001)
         Profile.clear()
         @profile Base.invokelatest(driver.run; spec_kwargs...)
 
