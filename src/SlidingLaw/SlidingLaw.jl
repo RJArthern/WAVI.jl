@@ -10,7 +10,12 @@ using Parameters
 using WAVI: AbstractSlidingLaw, AbstractModel
 using WAVI.Grids
 using WAVI.Time
+using WAVI.Utilities: copy_onto!
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
 
+# Default: scalar-only sliding laws need no dense-array move.
+on_architecture(::AbstractArchitecture, sliding_law::AbstractSlidingLaw) = sliding_law
 
 #add each of the individual sliding laws
 include("./WeertmanSlidingLaw.jl")
@@ -33,7 +38,8 @@ acounts for migration of grounding line.
 function update_drag_coefficient!(model::AbstractModel)
     @unpack gh=model.fields
     @unpack sliding_law=model
-    gh.drag_coefficient .= sliding_law.drag_coefficient .* gh.grounded_fraction
+    copy_onto!(gh.drag_coefficient, sliding_law.drag_coefficient)
+    gh.drag_coefficient .*= gh.grounded_fraction
     return model
 end
 

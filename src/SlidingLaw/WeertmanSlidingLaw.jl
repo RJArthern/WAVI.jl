@@ -1,6 +1,6 @@
 export WeertmanSlidingLaw
 
-struct WeertmanSlidingLaw{T <: Real, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct WeertmanSlidingLaw{T <: Real, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     drag_coefficient :: W
     weertman_m :: T
     reg_speed :: T
@@ -41,21 +41,45 @@ function update_β_using_sliding_law!(sliding_law::WeertmanSlidingLaw, model::Ab
     return model
 end
 
+"""
+    reconstruct_on_grid(sliding_law::WeertmanSlidingLaw, grid)
+
+Return a copy whose drag coefficient is a 2D array on `grid`.
+
+A number (the usual constructor default) is expanded to every cell. An array
+must already match the grid. Called when the model is built, including after
+an MPI subdomain or thread tile has been cut.
+"""
 function reconstruct_on_grid(sliding_law::WeertmanSlidingLaw, grid::Grid)
     return WeertmanSlidingLaw(
-        isa(sliding_law.drag_coefficient,Number) ? sliding_law.drag_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.drag_coefficient) == (grid.nx,grid.ny) ? sliding_law.drag_coefficient :
-        throw(DimensionMismatch("Drag Coefficient does not match grid size")),
+        field_on_grid(sliding_law.drag_coefficient, grid; name = "Drag Coefficient"),
           sliding_law.weertman_m,
           sliding_law.reg_speed)
 end
 
-function reconstruct_on_subdomain(sliding_law::WeertmanSlidingLaw, grid::Grid, subdomain::NTuple{4,<: Integer})
-    
-    x_start,x_end,y_start,y_end = subdomain
+"""
+    reconstruct_on_subdomain(sliding_law::WeertmanSlidingLaw, grid, subdomain)
 
+Return a copy whose drag coefficient is cut to this tile, if it is already a
+full-grid array. A number is left as a number so `reconstruct_on_grid` can
+expand it on the local grid rather than the full domain.
+"""
+function reconstruct_on_subdomain(sliding_law::WeertmanSlidingLaw, grid::Grid, subdomain::NTuple{4,<: Integer})
     return WeertmanSlidingLaw(
-          sliding_law.drag_coefficient[x_start:x_end, y_start:y_end],
+          spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
           sliding_law.reg_speed)
+end
+
+"""
+    on_architecture(arch, sliding_law::WeertmanSlidingLaw)
+
+Copy the drag coefficient onto `arch` when it is a dense array.
+"""
+function on_architecture(arch::AbstractArchitecture, sliding_law::WeertmanSlidingLaw)
+    return WeertmanSlidingLaw(
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+    )
 end

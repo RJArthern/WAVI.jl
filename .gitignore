@@ -36,6 +36,7 @@ gendata.m
 PIG_ideal_bed_plot.m
 Project.toml
 !benchmarks/Project.toml
+!example_drivers/MISMIP_PLUS/Project.toml
 ismip_testing/*
 
 #SLURM logging

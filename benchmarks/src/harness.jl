@@ -4,7 +4,26 @@ using LinearAlgebra
 using MPI
 using WAVI
 
-const _VALID_MODES = (:basic, :threaded, :mpi)
+const _VALID_MODES = (:basic, :threaded, :mpi, :gpu, :mpi_gpu)
+
+"""
+Check that CUDA.jl was loaded before WAVI, so `GPUSpec` methods exist.
+
+Do not `using CUDA` in this module: CPU benchmark runs must not require it.
+`benchmarks/run.jl` loads CUDA at top level when `gpu` or `mpi_gpu` is in ARGS.
+"""
+function load_cuda!()
+    if Base.get_extension(WAVI, :WAVICUDAExt) === nothing
+        error(
+            "GPU mode needs CUDA.jl loaded before WAVI. " *
+            "Use: julia --project=benchmarks benchmarks/run.jl run gpu <driver> " *
+            "(or run mpi_gpu <driver> under mpiexec). " *
+            "If CUDA is missing from the benchmarks project: " *
+            "julia --project=benchmarks -e 'using Pkg; Pkg.add(\"CUDA\")'.",
+        )
+    end
+    return nothing
+end
 
 # # Configuration
 
@@ -15,7 +34,7 @@ Configuration for a benchmark run.
 
 # Fields
 
-- `mode`: execution mode: `:basic`, `:threaded`, or `:mpi`
+- `mode`: execution mode: `:basic`, `:threaded`, `:mpi`, `:gpu`, or `:mpi_gpu`
 - `driver`: registered adaptor name (e.g. `"mismip_plus"`)
 - `ngridsx`, `ngridsy`, `overlap`, `niterations`: ThreadedSpec / Schwarz parameters
 - `px`, `py`: MPI process grid dimensions (`px == 0` means use `Comm_size`; `py` defaults to `1`, i.e. an `N×1` layout)
@@ -35,6 +54,8 @@ Base.@kwdef struct BenchmarkOptions
     sample_interval::Float64 = 0.25
     no_plots::Bool = false
     warmup::Bool = false
+    tag::String = ""
+    output_group::String = ""
 end
 
 # Convenience constructor accepting a string mode (from the Comonicon CLI),
@@ -75,6 +96,13 @@ Extract benchmark details (mode, driver, julia threads, and BLAS threads)
 into a dict for serialisation with final benchmark JSON results output.
 """
 function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
+    commit_hash = ""
+    try
+        commit_hash = strip(read(`git rev-parse HEAD`, String))
+    catch
+        commit_hash = "unknown"
+    end
+
     return merge!(Dict{String, Any}(
         "mode" => string(opts.mode),
         "driver" => opts.driver,
@@ -83,6 +111,9 @@ function benchmark_metadata(opts::BenchmarkOptions; mpi_world_size::Union{Nothin
         "sample_interval_s" => opts.sample_interval,
         "reference_cores" => reference_cores(opts; mpi_world_size = mpi_world_size),
         "command" => BENCHMARK_COMMAND[],
+        "tag" => opts.tag,
+        "output_group" => opts.output_group,
+        "git_commit" => commit_hash,
     ), slurm_metadata())
 end
 
@@ -92,17 +123,21 @@ end
 How many cores this benchmark is meant to use, for normalising CPU samples
 (`cpu_fraction = cpu_cores_used / reference_cores`).
 
-- `:basic`: `1`
+- `:basic`: `Threads.nthreads()`
 - `:threaded`: `ngridsx * ngridsy`
 - `:mpi`: `mpi_world_size` if given, else `SLURM_NTASKS`, else `1`
+- `:gpu`: `1` (one process, one device)
+- `:mpi_gpu`: `mpi_world_size` if given (one GPU per rank)
 """
 function reference_cores(opts::BenchmarkOptions; mpi_world_size::Union{Nothing, Int} = nothing)
     if opts.mode == :threaded
         return opts.ngridsx * opts.ngridsy
-    elseif opts.mode == :mpi
-        return something(mpi_world_size, tryparse(Int, get(ENV, "SLURM_NTASKS", "")), 1)
-    else
+    elseif opts.mode in (:mpi, :mpi_gpu)
+        return something(mpi_world_size, 1)
+    elseif opts.mode == :gpu
         return 1
+    else
+        return Threads.nthreads()
     end
 end
 
@@ -115,15 +150,16 @@ Load the requested driver adaptor, build appropriate WAVI spec, and run
 `benchmark_main` for monitoring.
 """
 function run_benchmark(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, or mpi.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, gpu, or mpi_gpu.")
 
     pin_blas_threads!()
 
+    mpi_mode = opts.mode in (:mpi, :mpi_gpu)
     # Initialise MPI up front so the entire setup is covered by finalisation.
-    opts.mode == :mpi && !MPI.Initialized() && MPI.Init()
+    mpi_mode && !MPI.Initialized() && MPI.Init()
 
-    rank = opts.mode == :mpi ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
-    mpi_world_size = opts.mode == :mpi ? MPI.Comm_size(MPI.COMM_WORLD) : nothing
+    rank = mpi_mode ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
+    mpi_world_size = mpi_mode ? MPI.Comm_size(MPI.COMM_WORLD) : nothing
     metadata = benchmark_metadata(opts; mpi_world_size = mpi_world_size)
 
 
@@ -135,8 +171,8 @@ function run_benchmark(opts::BenchmarkOptions)
         spec_kwargs = Dict{Symbol, Any}()
 
         if opts.mode == :basic
-            # Serial: BasicSpec setup
-            run_id = "basic"
+            # Serial / Multi-threaded: BasicSpec setup
+            run_id = "basic" * (Threads.nthreads() > 1 ? "_t$(Threads.nthreads())" : "")
 
         elseif opts.mode == :threaded
             # Shared memory: ThreadedSpec setup
@@ -144,8 +180,15 @@ function run_benchmark(opts::BenchmarkOptions)
             spec_kwargs[:spec] = ThreadedSpec(; ngridsx = nx, ngridsy = ny, overlap = ov, niterations = ni)
             run_id = "threaded.$(nx)x$(ny)_o$(ov)_i$(ni)"
 
-        elseif opts.mode == :mpi
-            # Distributed: MPISpec setup
+        elseif opts.mode == :gpu
+            # GPU: GPUSpec setup
+            load_cuda!()
+            spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
+            run_id = "gpu"
+
+        elseif opts.mode == :mpi || opts.mode == :mpi_gpu
+            opts.mode == :mpi_gpu && load_cuda!()
+            # Distributed: MPISpec setup (CPU ranks, or one GPU per rank)
             comm = MPI.COMM_WORLD
             sz = MPI.Comm_size(comm)
 
@@ -153,10 +196,6 @@ function run_benchmark(opts::BenchmarkOptions)
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             # Narrow domains (e.g. MISMIP+ ny=10) need enough core cells after halo.
@@ -170,11 +209,14 @@ function run_benchmark(opts::BenchmarkOptions)
                           "for PoU on narrow domains such as MISMIP+."
                 end
             end
-            spec = MPISpec(px, py, halo, grid; pou = true, niterations = opts.niterations)
+            child = opts.mode == :mpi_gpu ? Base.invokelatest(GPU) : CPU()
+            spec = MPISpec(px, py, halo, grid; pou = true, niterations = opts.niterations,
+                           child_architecture = child)
 
             spec_kwargs[:grid] = grid
             spec_kwargs[:spec] = spec
-            run_id = "mpi.$(px)x$(py)_sz$(sz)"
+            prefix = opts.mode == :mpi_gpu ? "mpi_gpu" : "mpi"
+            run_id = "$(prefix).$(px)x$(py)_sz$(sz)"
         end
 
         benchmark_main(run_id, driver.run, spec_kwargs, driver.plot_vars, rank;
@@ -183,9 +225,37 @@ function run_benchmark(opts::BenchmarkOptions)
                        no_plots = opts.no_plots,
                        warmup = opts.warmup)
     finally
-        opts.mode == :mpi && MPI.Initialized() && MPI.Finalize()
+        opts.mode in (:mpi, :mpi_gpu) && MPI.Initialized() && MPI.Finalize()
     end
 
+    return nothing
+end
+
+"""
+    log_wavelet_sizes(result)
+
+Print coarse wavelet DOFs (`wu.n + wv.n`) against fine inner DOFs (`gu.ni + gv.ni`).
+Used after a profile warm-up to decide whether assembling a coarse operator is cheap.
+If `io` is given, the same line is written there as well.
+"""
+function log_wavelet_sizes(result; io::Union{IO, Nothing} = nothing)
+    sim = if result isa NamedTuple && haskey(result, :simulation)
+        result.simulation
+    elseif hasproperty(result, :model)
+        result
+    else
+        nothing
+    end
+    sim === nothing && return
+    hasproperty(sim, :model) || return
+    fields = sim.model.fields
+    n_fine = fields.gu.ni + fields.gv.ni
+    n_coarse = fields.wu.n[] + fields.wv.n[]
+    msg = "Wavelet sizes: n_coarse=$(n_coarse) (wu.n=$(fields.wu.n[]), wv.n=$(fields.wv.n[])); " *
+          "n_fine=$(n_fine) (gu.ni=$(fields.gu.ni), gv.ni=$(fields.gv.ni)); " *
+          "ratio=$(round(n_coarse / max(n_fine, 1); digits = 4))"
+    @info msg
+    io !== nothing && println(io, msg)
     return nothing
 end
 
@@ -199,12 +269,13 @@ For allocation profiling, launch Julia with `--track-allocation=user` instead
 (slow; not part of this subcommand).
 """
 function run_profile(opts::BenchmarkOptions)
-    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, or mpi.")
+    opts.mode in _VALID_MODES || error("Unknown mode '$(opts.mode)'. Use basic, threaded, mpi, gpu, or mpi_gpu.")
 
     pin_blas_threads!()
-    opts.mode == :mpi && !MPI.Initialized() && MPI.Init()
+    mpi_mode = opts.mode in (:mpi, :mpi_gpu)
+    mpi_mode && !MPI.Initialized() && MPI.Init()
 
-    rank = opts.mode == :mpi ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
+    rank = mpi_mode ? MPI.Comm_rank(MPI.COMM_WORLD) : 0
     rank == 0 && !isnothing(BENCHMARK_COMMAND[]) && @info "Command: $(BENCHMARK_COMMAND[])"
 
     driver = load_driver(opts.driver)
@@ -218,16 +289,18 @@ function run_profile(opts::BenchmarkOptions)
             spec_kwargs[:spec] = ThreadedSpec(; ngridsx = nx, ngridsy = ny, overlap = ov, niterations = ni)
             run_id = "threaded.$(nx)x$(ny)_o$(ov)_i$(ni)"
 
-        elseif opts.mode == :mpi
+        elseif opts.mode == :gpu
+            load_cuda!()
+            spec_kwargs[:spec] = Base.invokelatest(GPUSpec)
+            run_id = "gpu"
+
+        elseif opts.mode == :mpi || opts.mode == :mpi_gpu
+            opts.mode == :mpi_gpu && load_cuda!()
             sz = MPI.Comm_size(MPI.COMM_WORLD)
             px = opts.px == 0 ? sz : opts.px
             py = opts.py
             px * py == sz || error("MPI process grid px×py ($(px)×$(py)) must equal world size ($(sz)).")
 
-            slurm_ntasks = tryparse(Int, get(ENV, "SLURM_NTASKS", ""))
-            if slurm_ntasks !== nothing && slurm_ntasks != sz
-                error("SLURM_NTASKS ($(slurm_ntasks)) must equal MPI world size ($(sz)).")
-            end
 
             grid = Base.invokelatest(driver.grid)
             halo = 2
@@ -239,9 +312,12 @@ function run_profile(opts::BenchmarkOptions)
                           "for PoU on narrow domains such as MISMIP+."
                 end
             end
+            child = opts.mode == :mpi_gpu ? Base.invokelatest(GPU) : CPU()
             spec_kwargs[:grid] = grid
-            spec_kwargs[:spec] = MPISpec(px, py, halo, grid; pou = false, niterations = opts.niterations)
-            run_id = "mpi.$(px)x$(py)_sz$(sz)"
+            spec_kwargs[:spec] = MPISpec(px, py, halo, grid; pou = false, niterations = opts.niterations,
+                                         child_architecture = child)
+            prefix = opts.mode == :mpi_gpu ? "mpi_gpu" : "mpi"
+            run_id = "$(prefix).$(px)x$(py)_sz$(sz)"
         end
 
         output_dir = joinpath(
@@ -252,7 +328,15 @@ function run_profile(opts::BenchmarkOptions)
         spec_kwargs[:folder] = output_dir
 
         rank == 0 && @info "Profiling $(opts.driver) ($(opts.mode)): warm-up then @profile..."
-        Base.invokelatest(driver.run; spec_kwargs...)
+        warmup_result = Base.invokelatest(driver.run; spec_kwargs...)
+        if rank == 0
+            open(joinpath(output_dir, "wavelet_sizes.txt"), "w") do io
+                log_wavelet_sizes(warmup_result; io = io)
+            end
+        end
+        # Default n=10^7 fills on the 381x381 ISMIP7 driver; 10^8 is about 800 MB and
+        # covers a full 5-step run at -t 1 and a moderately threaded -t 16 run.
+        Profile.init(n = 10^8, delay = 0.001)
         Profile.clear()
         @profile Base.invokelatest(driver.run; spec_kwargs...)
 
@@ -264,7 +348,7 @@ function run_profile(opts::BenchmarkOptions)
             @info "Flat profile saved to: $profile_file"
         end
     finally
-        opts.mode == :mpi && MPI.Initialized() && MPI.Finalize()
+        opts.mode in (:mpi, :mpi_gpu) && MPI.Initialized() && MPI.Finalize()
     end
 
     return nothing

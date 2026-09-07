@@ -2,9 +2,12 @@ export ISMIP7Hydrofracture
 
 using WAVI: AbstractClimateForcing
 using WAVI.ClimateForcing
+using WAVI.Utilities: copy_onto!
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
 using NCDatasets
 
-struct ISMIP7Hydrofracture{P <: String, V<:String, T <: Real, CM <: Union{Array{T,2}, Nothing}} <: AbstractFracture
+struct ISMIP7Hydrofracture{P <: String, V<:String, T <: Real, CM <: Union{AbstractArray{T,2}, Nothing}} <: AbstractFracture
       hydrofracture_prefix::P
       hydrofracture_varname::V
       damage_value :: T
@@ -88,20 +91,37 @@ function update_climate_forcing!(fracture::ISMIP7Hydrofracture, grid::Grid, cloc
   resolution = join([string(Int(dx)), "m"])
   ice_shelf_collapse_mask_filename = joinpath(path_to_forcing, join([hydrofracture_prefix,  current_time_string,".nc"]))
   ice_shelf_collapse_mask_ncfile   = NCDataset(ice_shelf_collapse_mask_filename)
-  mask_full = ice_shelf_collapse_mask_ncfile[hydrofracture_varname][:,:,1]
 
   println("read in fracture mask file: " * ice_shelf_collapse_mask_filename)
   @info "read in fracture mask file: $ice_shelf_collapse_mask_filename"
 
-  if size(ice_shelf_collapse_mask) == size(mask_full)
-      ice_shelf_collapse_mask .= mask_full
-  else
-      is = isnothing(x_indices) ? (1:size(ice_shelf_collapse_mask, 1)) : x_indices
-      js = isnothing(y_indices) ? (1:size(ice_shelf_collapse_mask, 2)) : y_indices
-      ice_shelf_collapse_mask .= mask_full[is, js]
+  if isnothing(ice_shelf_collapse_mask)
+      throw(ArgumentError("ISMIP7 hydrofracture mask has not been allocated; reconstruct on the grid first"))
   end
+  is, js = forcing_index_ranges(x_indices, y_indices, ice_shelf_collapse_mask)
+  # NetCDF mask is typically Int8; destination is Float64 (host or device).
+  mask_host = Float64.(ice_shelf_collapse_mask_ncfile[hydrofracture_varname][is, js, 1])
+  copy_onto!(ice_shelf_collapse_mask, mask_host)
 
   return nothing
+end
+
+"""
+    on_architecture(arch, fracture::ISMIP7Hydrofracture)
+
+Copy the collapse mask onto `arch` so it can broadcast with model fields.
+"""
+function on_architecture(arch::AbstractArchitecture, fracture::ISMIP7Hydrofracture)
+    return ISMIP7Hydrofracture(
+        fracture.hydrofracture_prefix,
+        fracture.hydrofracture_varname,
+        fracture.damage_value,
+        fracture.partially_floating_cells,
+        on_architecture(arch, fracture.ice_shelf_collapse_mask),
+        fracture.path_to_forcing,
+        fracture.x_indices,
+        fracture.y_indices,
+    )
 end
 
 function update_damage!(fracture::ISMIP7Hydrofracture,model::AbstractModel{T,N};kwargs...) where {T,N}
@@ -121,6 +141,7 @@ function update_strain_history!(fracture::ISMIP7Hydrofracture,model::AbstractMod
 end
 
 function reconstruct_on_grid(fracture::ISMIP7Hydrofracture, grid::Grid)
+    xs, ys = grid_index_ranges(fracture.x_indices, fracture.y_indices, grid)
     return ISMIP7Hydrofracture(
         fracture.hydrofracture_prefix,
         fracture.hydrofracture_varname,
@@ -130,22 +151,18 @@ function reconstruct_on_grid(fracture::ISMIP7Hydrofracture, grid::Grid)
         size(fracture.ice_shelf_collapse_mask) == (grid.nx,grid.ny) ? fracture.ice_shelf_collapse_mask :
         throw(DimensionMismatch("Size of ice shelf collapse_mask is incompatible with grid")),
         fracture.path_to_forcing,
-        1:grid.nx,
-        1:grid.ny)
+        xs,
+        ys)
 end
 
 function reconstruct_on_subdomain(fracture::ISMIP7Hydrofracture, grid::Grid,subdomain::NTuple{4,<: Integer})
-    x_start, x_end, y_start, y_end = subdomain
-    parent_x = isnothing(fracture.x_indices) ? (1:size(fracture.ice_shelf_collapse_mask, 1)) : fracture.x_indices
-    parent_y = isnothing(fracture.y_indices) ? (1:size(fracture.ice_shelf_collapse_mask, 2)) : fracture.y_indices
-    xs = parent_x[x_start:x_end]
-    ys = parent_y[y_start:y_end]
+    xs, ys = subdomain_index_ranges(fracture.x_indices, fracture.y_indices, grid, subdomain)
     return ISMIP7Hydrofracture(
         fracture.hydrofracture_prefix,
         fracture.hydrofracture_varname,
         fracture.damage_value,
         fracture.partially_floating_cells,
-        size(fracture.ice_shelf_collapse_mask) == size(grid)[1:2] ? fracture.ice_shelf_collapse_mask[x_start:x_end, y_start:y_end] : fracture.ice_shelf_collapse_mask,
+        spatial_on_subdomain(fracture.ice_shelf_collapse_mask, grid, subdomain),
         fracture.path_to_forcing,
         xs,
         ys)

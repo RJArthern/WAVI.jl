@@ -48,12 +48,14 @@ const MapOrMatrix{T} = Union{LinearMap{T}, AbstractMatrix{T}}
 
 ##################################################################################
 #include all of the code
+include("Architectures.jl")
 include("Deferred.jl")
 include("Time.jl")
 include("Grids.jl")
 include("Parameters.jl")
 include("ClimateForcing/ClimateForcing.jl")
 include("KroneckerProducts.jl")
+include("Stencils/Stencils.jl")
 include("Utilities.jl")
 include("Wavelets/Wavelets.jl")
 include("Fields/Fields.jl")
@@ -76,6 +78,11 @@ export AbstractField, AbstractGrid, AbstractMeltRate, AbstractSurfaceMassBalance
   AbstractFracture, AbstractSlidingLaw , AbstractBasalHydrology,
    AbstractThermoDynamics, AbstractModel, AbstractPreconditioner,
    AbstractSpec,AbstractClimateForcing
+
+using .Architectures
+export AbstractArchitecture, CPU, GPU
+export array_type, on_architecture, child_architecture, synchronise, gpu_device
+export architecture, zeros_on, assign_local_device!
 
 using .Deferred
 export Collector, clear!, collect!, register_field!
@@ -127,7 +134,7 @@ export Simulation, run_simulation!, timestep!,
     update_clock!, update_thickness!, write_vel
 
 using .Specs
-export BasicSpec, ThreadedSpec, MPISpec
+export BasicSpec, ThreadedSpec, GPUSpec, MPISpec
 
 using .Fracture
 export ConstantDamage, DruckerPragerPhaseField, ISMIP7Hydrofracture
@@ -148,6 +155,9 @@ export Inversion, InversionParams, JKVsteppingParams, DataFields,
 
 using .ClimateForcing 
 export ISMIP7_ANOMALY,ISMIP7_CONTROL,ISMIP7_OCX
+
+using .Stencils
+export launch!
 
 end
 

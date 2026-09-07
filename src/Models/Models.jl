@@ -13,6 +13,8 @@ using WAVI: AbstractField,
             AbstractThermoDynamics,
             AbstractModel, 
             AbstractSpec
+using WAVI.Architectures: on_architecture, CPU
+import WAVI.Architectures: architecture
 using WAVI.Fields
 using WAVI.Grids
 using WAVI.MeltRates
@@ -23,11 +25,20 @@ using WAVI.BasalHydrology
 using WAVI.ThermoDynamics
 using WAVI.Parameters
 
-export Model, update_state!
+export Model, update_state!, restore_pickup_architecture!
 
 """
-Struct to represent the basic specification for a model
+    BasicSpec()
 
+Default specification: one process, arrays on the CPU.
+
+If no `spec` is passed to Model, a `BasicSpec` is used. Stencil
+kernels still use Julia threads when you launch with `julia -t N`. This
+is different to `ThreadedSpec`, which splits the domain into overlapping
+Schwarz subdomains which I think should be removed (or, not advertised
+in the docs) in the future.
+
+TODO: Remove ThreadedSpec in a future optimisation.
 """
 struct BasicSpec <: AbstractSpec 
     function BasicSpec()
@@ -86,6 +97,11 @@ function Model(grid::G,
                         BH<:AbstractBasalHydrology,
                         TD<:AbstractThermoDynamics}
 
+    spec_label = hasproperty(spec, :ngridsx) ?
+        "$(nameof(typeof(spec))) $(spec.ngridsx)x$(spec.ngridsy)" :
+        string(nameof(typeof(spec)))
+    @debug "$(spec_label) grid $(grid.nx)x$(grid.ny)"
+
     # FIXME: this all smells, hacking for threading
     bed_array = typeof(bed_elevation) <: AbstractArray ? bed_elevation : get_bed_elevation(bed_elevation, grid)
     
@@ -108,7 +124,13 @@ function Model(grid::G,
 
     # TODO: the passthrough of arguments like this is smelly - Configuration should be a type
     fields = GridField(grid, bed_array; initial_conditions, params, solver_params)
-    
+    arch = architecture(spec)
+    if !(arch isa CPU)
+        fields = on_architecture(arch, fields)
+        surface_mass_balance = on_architecture(arch, surface_mass_balance)
+        fracture = on_architecture(arch, fracture)
+        sliding_law = on_architecture(arch, sliding_law)
+    end
 
     model = Model(
                grid, 
@@ -123,11 +145,40 @@ function Model(grid::G,
                basal_hydrology,
                thermo_dynamics,
                verbose)
+    @debug "$(nameof(typeof(spec))): model ready"
     return model
 end
 
 Model(grid, bed_elev; kw...) = Model(grid, bed_elev, BasicSpec(); kw...)
 Model(; grid, bed_elevation, spec = BasicSpec(), kw...) = Model(grid, bed_elevation, spec; kw...)
+
+architecture(model::AbstractModel) = architecture(model.spec)
+
+"""
+    restore_pickup_architecture!(model)
+
+Put dense fields, climate, fracture, and sliding-law arrays on the spec's
+architecture and drop stencil scratch.
+
+Call this after loading a checkpoint, before the next velocity solve.
+JLD2 may restore mixed host and device arrays, or a host scratch buffer,
+while the spec says the run is on the GPU. The file format is left
+unchanged, so later checkpoint layouts can keep calling this hook.
+Do not use this on MPI `spec.global_fields`; those stay on the host.
+"""
+function restore_pickup_architecture!(model::AbstractModel)
+    model.fields.stencil_scratch[] = nothing
+    arch = architecture(model)
+    arch isa CPU && return model
+    fields = on_architecture(arch, model.fields)
+    smb = on_architecture(arch, model.surface_mass_balance)
+    fracture = on_architecture(arch, model.fracture)
+    sliding_law = on_architecture(arch, model.sliding_law)
+    model = @set model.fields = fields
+    model = @set model.surface_mass_balance = smb
+    model = @set model.fracture = fracture
+    return @set model.sliding_law = sliding_law
+end
 
 # This is to enable use of Setfield, which derives a parameter setup from the fields of an existing structure via JuliaObjects
 # FIXME: this wasn't required in the original WAVI codebase. 

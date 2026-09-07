@@ -32,6 +32,35 @@ using WAVI
         return model
     end
 
+    # Direct apply: left/right and top/bottom halo widths can differ (lh=0, rh=2, th=1, bh=2).
+    @testset "apply_halo_exchange_blends! uses rh and bh" begin
+        nx, ny = 8, 7
+        lh, rh, th, bh = 0, 2, 1, 2
+        local_field = fill(0.0, nx, ny)
+        L0 = fill(-1.0, nx, ny)
+        recv_right = fill(10.0, rh, ny)
+        recv_top = fill(30.0, nx, th)
+        recv_bottom = fill(20.0, nx, bh)
+        W_right = zeros(rh)
+        W_top = zeros(1, th)
+        W_bottom = zeros(1, bh)
+        WAVI.Specs.apply_halo_exchange_blends!(
+            local_field, L0,
+            nothing, recv_right, recv_top, recv_bottom,
+            zeros(0), W_right, W_top, W_bottom,
+            lh, rh, th, bh, nx, ny,
+            -1, 1, 1, 1,
+        )
+        j_mid = (th + 1):(ny - bh)
+        i_mid = (lh + 1):(nx - rh)
+        @test all(local_field[(nx - rh + 1):nx, j_mid] .== 10.0)
+        @test all(local_field[i_mid, (ny - bh + 1):ny] .== 20.0)
+        @test all(local_field[i_mid, 1:th] .== 30.0)
+        # Zero weights: right-bottom corner uses recv_right (see apply_halo_exchange_blends!).
+        @test all(local_field[(nx - rh + 1):nx, (ny - bh + 1):ny] .== 10.0)
+        @test all(local_field[i_mid, j_mid] .== 0.0)
+    end
+
     # After exchange, the left halo should hold the left neighbour's core thickness (rank 1 on a 2×1 split).
     @testset "halo_exchange! updates rank-neighbour h halos" begin
         model = build_model(halo = 1, pou = false)
@@ -45,6 +74,32 @@ using WAVI
         if model.spec.left > -1 && lh > 0
             @test all(h[1:lh, :] .== (model.spec.left + 1.0))
         end
+        if model.spec.right > -1 && rh > 0
+            @test all(h[(end - rh + 1):end, :] .== (model.spec.right + 1.0))
+        end
+        @test architecture(model.spec) isa CPU
+        @test architecture(model) isa CPU
+    end
+
+    # Halo and PoU MPI buffers stay host `Vector`/`Matrix` (not CUDA-aware MPI).
+    @testset "RAS and PoU scratch stay host Array" begin
+        model = build_model(halo = 2, pou = true)
+        WAVI.Specs.halo_exchange!(model; fields = [:h])
+        hs = model.spec.halo_scratch
+        @test hs !== nothing
+        @test hs.send_l isa Vector
+        @test hs.recv_l isa Vector
+        @test hs.l0_h isa Matrix
+        @test hs.W_left isa Vector
+        @test hs.dev_halo_strip === nothing
+
+        WAVI.Specs.mpi_velocity_pou_weights(model)
+        ps = model.spec.pou_scratch
+        @test ps !== nothing
+        @test ps.ωu isa Matrix
+        @test ps.work_u isa Matrix
+        @test ps.send_l isa Vector
+        @test ps.recv_l isa Vector
     end
 
     # With partition of unity, thickness sync must not overwrite assembled u and v halos.

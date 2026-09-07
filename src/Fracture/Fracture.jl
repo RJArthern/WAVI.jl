@@ -11,7 +11,11 @@ using WAVI: AbstractFracture, AbstractModel
 using WAVI.Advection
 using WAVI.Time
 using WAVI.Grids
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
 
+# Default: most fracture schemes have no dense arrays to move.
+on_architecture(::AbstractArchitecture, fracture::AbstractFracture) = fracture
 
 get_fracture(model::AbstractModel{T,N}) where {T,N} = model.fracture
 

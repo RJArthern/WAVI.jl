@@ -1,11 +1,12 @@
 module Outputs
 
-export OutputParams
+export OutputParams, with_cleared_stencil_scratch, is_output_step
 
 import WAVI.Deferred: clear!, collect!
 using WAVI.Deferred
 using Parameters
 using WAVI: AbstractSpec
+using WAVI.Time: Clock
 
 #structure that contains outputting info
 struct OutputParams{T<:Real, R<:Real, O<:Collector}
@@ -92,6 +93,19 @@ function OutputParams(; outputs = NamedTuple(), kwargs...)
 end
 clear!(op::OutputParams) = clear!(op.outputs)
 collect!(op::OutputParams, args...) = collect!(op.outputs, args...)
+
+"""
+    is_output_step(output_params, clock)
+
+True if this step should write field output.
+
+That is when `n_iter_out` (steps between writes) is positive and `clock.n_iter` is
+a multiple of it.
+"""
+function is_output_step(output_params::OutputParams, clock::Clock)
+    n = output_params.n_iter_out
+    return n > 0 && mod(clock.n_iter, n) == 0
+end
 
 include("checkpoints.jl")
 include("output_writing.jl")

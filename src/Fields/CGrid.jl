@@ -1,14 +1,14 @@
 struct CGrid{T <: Real, N <: Integer}
         nxc :: N
         nyc :: N
-      mask :: Array{Bool,2} 
+      mask :: AbstractArray{Bool,2}
          n :: N 
-      crop :: Diagonal{T,Array{T,1}}
+      crop :: Diagonal{T, <:AbstractVector{T}}
       samp :: SparseMatrixCSC{T,N} 
     spread :: SparseMatrixCSC{T,N}
       cent :: KronType{T,N}
      centᵀ :: KronType{T,N}
-  dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}}    # Rheological operator (-h × ηav)
+  dneghηav :: Base.RefValue{<:Diagonal{T}}             # Rheological operator (-h × ηav)
 end
 
 

@@ -1,8 +1,21 @@
 using JLD2
+using Logging
 
 using WAVI.Parameters: TimesteppingParams
 using WAVI.Time: Clock
 using WAVI: AbstractSpec
+
+# Drop JLD2's "stores functions by name" warning; keep the caller's logger as-is.
+struct SkipJLD2FunctionWarnings <: AbstractLogger
+    parent::AbstractLogger
+end
+Logging.min_enabled_level(l::SkipJLD2FunctionWarnings) = Logging.min_enabled_level(l.parent)
+Logging.catch_exceptions(l::SkipJLD2FunctionWarnings) = Logging.catch_exceptions(l.parent)
+Logging.shouldlog(l::SkipJLD2FunctionWarnings, args...) = Logging.shouldlog(l.parent, args...)
+function Logging.handle_message(l::SkipJLD2FunctionWarnings, level, message, args...; kwargs...)
+    level == Warn && occursin("stores functions by name", string(message)) && return
+    Logging.handle_message(l.parent, level, message, args...; kwargs...)
+end
 
 """
     checkpoint_path(timestepping_params, output_params)
@@ -31,13 +44,50 @@ function should_write_checkpoint(timestepping_params::TimesteppingParams, clock:
            mod(clock.n_iter, timestepping_params.n_iter_chkpt) == 0
 end
 
+"""
+    with_cleared_stencil_scratch(f, model)
+
+Run `f()` with checkpoint-hostile caches omitted from the model.
+
+Temporarily sets `model.fields.stencil_scratch` to `nothing`, and replaces
+`model.spec.field_collector` with an empty collector when that field exists.
+Scratch holds anonymous matvec / restrict / prolong closures; the MPI field
+collector holds anonymous accessors. JLD2 cannot serialise either usefully.
+Restore both afterwards so an ongoing run keeps its workspace and registered
+outputs.
+"""
+function with_cleared_stencil_scratch(f, model)
+    scratch_ref = model.fields.stencil_scratch
+    scratch = scratch_ref[]
+    scratch_ref[] = nothing
+
+    spec = model.spec
+    collector = nothing
+    if hasproperty(spec, :field_collector)
+        collector = spec.field_collector
+        spec.field_collector = Collector()
+    end
+    try
+        return with_logger(SkipJLD2FunctionWarnings(current_logger())) do
+            f()
+        end
+    finally
+        scratch_ref[] = scratch
+        if collector !== nothing
+            spec.field_collector = collector
+        end
+    end
+end
+
 function write_checkpoint!(model, timestepping_params::TimesteppingParams, output_params::OutputParams, clock::Clock)
     path = checkpoint_path(timestepping_params, output_params)
     if !isdir(path)
         mkpath(path)
     end
     fname = joinpath(path, checkpoint_filename(clock.n_iter))
-    @save fname model=model timestepping_params=timestepping_params clock=clock
+    with_cleared_stencil_scratch(model) do
+        @save fname model=model timestepping_params=timestepping_params clock=clock
+    end
     @info "Permanent checkpoint at timestep number $(clock.n_iter) — $(fname)"
     return nothing
 end

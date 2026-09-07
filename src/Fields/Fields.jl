@@ -4,12 +4,15 @@ import WAVI.Grids: reconstruct_on_grid, reconstruct_on_subdomain
 export reconstruct_on_grid, reconstruct_on_subdomain
 export GridField, InitialConditions, HGrid, UGrid, VGrid, CGrid, SigmaGrid
 
+using Adapt
 using LinearAlgebra
 using LinearMaps
 using Parameters
 using Setfield          # TODO: InitialConditions using this, bit of an anti-pattern?
 using SparseArrays
 
+using WAVI.Architectures: adapt_structure_fields, AbstractArchitecture, array_type
+import WAVI.Architectures: on_architecture
 using WAVI: AbstractField, AbstractGrid
 using WAVI.Grids
 using WAVI.KroneckerProducts
@@ -39,7 +42,8 @@ struct GridField{T <: Real, N <: Integer} <: AbstractField{T, N}
     gc  :: CGrid{T,N}
     g3d :: SigmaGrid{T,N}
     wu  :: UWavelets{T,N}
-    wv  :: VWavelets{T,N}    
+    wv  :: VWavelets{T,N}
+    stencil_scratch :: Ref{Union{Nothing, StencilScratch{T}}}
 end
 
 """
@@ -117,21 +121,22 @@ function GridField(grid::AbstractGrid, bed_array;
             mask=c_mask,
             storage_only = true,
         )
+        # Collect is 2D-only, so rank-0 assembly buffers do not need 3D sigma fields.
         g3d=SigmaGrid(
             nxs=grid.nx,
             nys=grid.ny,
             nσs=grid.nσ,
             σ =grid.σ,
-            η = zeros(grid.nx, grid.ny, grid.nσ),
-            θ = zeros(grid.nx, grid.ny, grid.nσ),
-            Φ = zeros(grid.nx, grid.ny, grid.nσ),
-            strain_history = zeros(grid.nx, grid.ny, grid.nσ),
-            glen_b = zeros(grid.nx, grid.ny, grid.nσ),
+            η = zeros(0, 0, 0),
+            θ = zeros(0, 0, 0),
+            Φ = zeros(0, 0, 0),
+            strain_history = zeros(0, 0, 0),
+            glen_b = zeros(0, 0, 0),
             quadrature_weights = grid.quadrature_weights
         )
         wu=UWavelets(nxuw=grid.nx+1,nyuw=grid.ny,levels=solver_params.levels, storage_only=true)
         wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels, storage_only=true)
-        return GridField(gh,gu,gv,gc,g3d,wu,wv)
+        return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Union{Nothing, StencilScratch{eltype(gh.h)}}}(nothing))
     end
 
     #h-grid
@@ -212,13 +217,16 @@ function GridField(grid::AbstractGrid, bed_array;
         nσ = grid.nσ,
         glen_a_ref = params.glen_a_ref,
     )
-    for i = 1:grid.nx
-        for j = 1:grid.ny
-            for k = 1:grid.nσ
-                g3_glen_b[i,j,k] = glen_b(θ[i,j,k],Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
-            end
-        end
-    end
+    fill_glen_b!(
+        g3_glen_b,
+        θ,
+        Φ,
+        params.glen_a_ref,
+        params.glen_n,
+        params.glen_a_activation_energy,
+        params.glen_temperature_ref,
+        params.gas_const,
+    )
 
     g3d=SigmaGrid(
         nxs=grid.nx,
@@ -238,7 +246,34 @@ function GridField(grid::AbstractGrid, bed_array;
 
     #Wavelet-grid, v-component.
     wv=VWavelets(nxvw=grid.nx,nyvw=grid.ny+1,levels=solver_params.levels)
-    return GridField(gh,gu,gv,gc,g3d,wu,wv)
+    return GridField(gh,gu,gv,gc,g3d,wu,wv,Ref{Union{Nothing, StencilScratch{eltype(gh.h)}}}(nothing))
 end
+
+"""
+    on_architecture(arch, fields::GridField)
+
+Copy dense grid and wavelet fields onto `arch`. Sparse operators stay on
+the host. Scratch is dropped so it is rebuilt on the new array type.
+Do not call this on MPI `spec.global_fields`.
+"""
+function on_architecture(arch::AbstractArchitecture, fields::GridField)
+    to = array_type(arch)
+    T = eltype(fields.gh.h)
+    return GridField(
+        Adapt.adapt(to, fields.gh),
+        Adapt.adapt(to, fields.gu),
+        Adapt.adapt(to, fields.gv),
+        Adapt.adapt(to, fields.gc),
+        Adapt.adapt(to, fields.g3d),
+        Adapt.adapt(to, fields.wu),
+        Adapt.adapt(to, fields.wv),
+        Ref{Union{Nothing, StencilScratch{T}}}(nothing),
+    )
+end
+
+# Dense fields move; sparse crop/samp/spread and Kronecker operators stay on the host.
+# Do not Adapt GridField as a whole: MPI spec.global_fields must remain rank-0 CPU.
+Adapt.adapt_structure(to, grid::Union{HGrid, UGrid, VGrid, CGrid, SigmaGrid}) =
+    adapt_structure_fields(to, grid)
 
 end

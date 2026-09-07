@@ -1,59 +1,59 @@
 struct HGrid{T <: Real, N  <: Integer}
                   nxh :: N                                     # Number of grid cells in x-direction in HGrid
                   nyh :: N                                     # Number of grid cells in y-direction in HGrid
-                 mask :: Array{Bool,2}                         # Mask specifying the model domain
-            h_isfixed :: Array{Bool,2}                         # Mask specifying locations of fixed thickness
-hyd_potential_isfixed :: Array{Bool,2}                         # Mask specifying locations of fixed hydraulic potential at the bed
+                 mask :: AbstractArray{Bool,2}                 # Mask specifying the model domain
+            h_isfixed :: AbstractArray{Bool,2}                 # Mask specifying locations of fixed thickness
+hyd_potential_isfixed :: AbstractArray{Bool,2}                 # Mask specifying locations of fixed hydraulic potential at the bed
                     n :: N                                     # Total number of cells in the model domain
-                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
+                 crop :: Diagonal{T, <:AbstractVector{T}}      # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
                spread :: SparseMatrixCSC{T,N}                  # Sparse form of the sampling matrix 
               cent_xy :: KronType{T,N}                         # Centering operator from H-grid to C-grid
-                    b :: Array{T,2}                            # Bed elevation
-                    h :: Array{T,2}                            # Ice thickness 
-                    s :: Array{T,2}                            # Current surface elevation
-                 dhdt :: Array{T,2}                            # Time rate of change of thickness 
-         accumulation :: Array{T,2}                            # Accumulation rate
-           basal_melt :: Array{T,2}                            # basal melt rate  
-                  haf :: Array{T,2}                            # Grid cell height above floatation
-    grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction 
-                 dsdh :: Array{T,2}                            # Change of surface elevation per unit thickness change
-    shelf_strain_rate :: Array{T,2}                            # Strain rate appropriate for shelf (no basal drag) 
-             av_speed :: Array{T,2}                            # Depth averaged speed 
-                    u :: Array{T,2}                            # Depth averaged x-velocity 
-                    v :: Array{T,2}                            # Depth averaged y-velocity 
-                   us :: Array{T,2}                            # x-velocity at the surface 
-                   vs :: Array{T,2}                            # y-velocity at the surface 
-                   ub :: Array{T,2}                            # x-velocity at the bed 
-                   vb :: Array{T,2}                            # y-velocity at the bed
-            bed_speed :: Array{T,2}                            # Ice speed at the bed
-     drag_coefficient :: Array{T,2}                            # Sliding law drag coefficients
-                    β :: Array{T,2}                            # Raw β value (eqn 8 in Arthern 2015 JGeophysRes)
-                 βeff :: Array{T,2}                            # Effective β value (eqn 12 in Arthern 2015 JGeophysRes)
-                 τbed :: Array{T,2}                            # Stress at the bed
-                  ηav :: Array{T,2}                            # Depth averaged viscosity
-              quad_f0 :: Array{T,2}                            # F0 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
-              quad_f1 :: Array{T,2}                            # F1 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
-              quad_f2 :: Array{T,2}                            # F2 quadrature field (eqn 7 in Arthern 2015 JGeophysRes)
-             dneghηav :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-h × ηav)
-            dimplicit :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (-ρi × g × dt × dshs)
-basal_water_thickness :: Array{T,2}                            # basal water thickness
-hydraulic_potential_b :: Array{T,2}                            # hydraulic potential at the bed
-   effective_pressure :: Array{T,2}                            # effective pressure  
-     shelf_basal_melt :: Array{T,2}                            # basal melt rate under ice shelves (ie floating ice)
-                θ_ave :: Array{T,2}                            # depth-averaged temperature
-              σzzsurf :: Array{T,2}                            # Sigmazzsurf calculated in inversion (see in Arthern 2015 JGeophysRes)
-              τx_surf :: Array{T,2}                            # Stress at surface u component
-              τy_surf :: Array{T,2}                            # Stress at surface u component
-              τsurf :: Array{T,2}                              # Stress at surface
-              τx_bed :: Array{T,2}                             # Stress at bed u component
-              τy_bed :: Array{T,2}                             # Stress at bed v component
-           surf_speed :: Array{T,2}                            # Ice speed at the surface u magnitude
-        shelf_heating :: Array{T,2}                            # Shelf heating rate calculated in inversion  (see in Arthern 2015 JGeophysRes)
-   vert_shear_heating :: Array{T,2}                            # Vertical shear heating rate calculated in inversion (see in Arthern 2015 JGeophysRes)
-         drag_heating :: Array{T,2}                            # SDrag heating rate calculated in inversion (see in Arthern 2015 JGeophysRes)
-         preBfactor   :: Array{T,2}                            # preBfactor calculated in inversion (see in Arthern 2015 JGeophysRes)
-             mpi_rank :: Array{T,2}                            # MPI rank for each cell (for visualization)
+                    b :: AbstractArray{T,2}                    # Bed elevation
+                    h :: AbstractArray{T,2}                    # Ice thickness
+                    s :: AbstractArray{T,2}                    # Current surface elevation
+                 dhdt :: AbstractArray{T,2}                    # Time rate of change of thickness
+         accumulation :: AbstractArray{T,2}                    # Accumulation rate
+           basal_melt :: AbstractArray{T,2}                    # basal melt rate
+                  haf :: AbstractArray{T,2}                    # Grid cell height above floatation
+    grounded_fraction :: AbstractArray{T,2}                    # Grid cell grounded fraction
+                 dsdh :: AbstractArray{T,2}                    # Change of surface elevation per unit thickness change
+    shelf_strain_rate :: AbstractArray{T,2}                    # Strain rate appropriate for shelf (no basal drag)
+             av_speed :: AbstractArray{T,2}                    # Depth averaged speed
+                    u :: AbstractArray{T,2}                    # Depth averaged x-velocity
+                    v :: AbstractArray{T,2}                    # Depth averaged y-velocity
+                   us :: AbstractArray{T,2}                    # x-velocity at the surface
+                   vs :: AbstractArray{T,2}                    # y-velocity at the surface
+                   ub :: AbstractArray{T,2}                    # x-velocity at the bed
+                   vb :: AbstractArray{T,2}                    # y-velocity at the bed
+            bed_speed :: AbstractArray{T,2}                    # Ice speed at the bed
+     drag_coefficient :: AbstractArray{T,2}                    # Sliding law drag coefficients
+                    β :: AbstractArray{T,2}                    # Raw β value (eqn 8 in Arthern 2015 JGeophysRes)
+                 βeff :: AbstractArray{T,2}                    # Effective β value (eqn 12 in Arthern 2015 JGeophysRes)
+                 τbed :: AbstractArray{T,2}                    # Stress at the bed
+                  ηav :: AbstractArray{T,2}                    # Depth averaged viscosity
+              quad_f0 :: AbstractArray{T,2}                    # F0 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
+              quad_f1 :: AbstractArray{T,2}                    # F1 quadratrue field (eqn 7 in Arthern 2015 JGeophysRes)
+              quad_f2 :: AbstractArray{T,2}                    # F2 quadrature field (eqn 7 in Arthern 2015 JGeophysRes)
+             dneghηav :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (-h × ηav)
+            dimplicit :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (-ρi × g × dt × dshs)
+basal_water_thickness :: AbstractArray{T,2}                    # basal water thickness
+hydraulic_potential_b :: AbstractArray{T,2}                    # hydraulic potential at the bed
+   effective_pressure :: AbstractArray{T,2}                    # effective pressure
+     shelf_basal_melt :: AbstractArray{T,2}                    # basal melt rate under ice shelves (ie floating ice)
+                θ_ave :: AbstractArray{T,2}                    # depth-averaged temperature
+              σzzsurf :: AbstractArray{T,2}                    # Sigmazzsurf calculated in inversion (see in Arthern 2015 JGeophysRes)
+              τx_surf :: AbstractArray{T,2}                    # Stress at surface u component
+              τy_surf :: AbstractArray{T,2}                    # Stress at surface u component
+              τsurf :: AbstractArray{T,2}                      # Stress at surface
+              τx_bed :: AbstractArray{T,2}                     # Stress at bed u component
+              τy_bed :: AbstractArray{T,2}                     # Stress at bed v component
+           surf_speed :: AbstractArray{T,2}                    # Ice speed at the surface u magnitude
+        shelf_heating :: AbstractArray{T,2}                    # Shelf heating rate calculated in inversion  (see in Arthern 2015 JGeophysRes)
+   vert_shear_heating :: AbstractArray{T,2}                    # Vertical shear heating rate calculated in inversion (see in Arthern 2015 JGeophysRes)
+         drag_heating :: AbstractArray{T,2}                    # SDrag heating rate calculated in inversion (see in Arthern 2015 JGeophysRes)
+         preBfactor   :: AbstractArray{T,2}                    # preBfactor calculated in inversion (see in Arthern 2015 JGeophysRes)
+             mpi_rank :: AbstractArray{T,2}                    # MPI rank for each cell (for visualization)
 end
 
 
@@ -210,9 +210,6 @@ function HGrid(;
     @assert size(hyd_potential_isfixed)==(nxh,nyh);
     if !storage_only
         @assert n == count(mask)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxh*nyh))[mask[:]],ones(n),n,nxh*nyh)
-        @assert spread == sparse(samp')
         @assert size(cent_xy) == ((nxh-1)*(nyh-1),nxh*nyh)
     end
     @assert size(b)==(nxh,nyh)

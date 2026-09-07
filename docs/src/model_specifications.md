@@ -12,49 +12,72 @@ Semantically, we can think of the components of WAVI this way:
 
 Specifications heavily leverage multiple dispatch to re-implement portions of WAVI to introduce new structural architectures, computational approaches and data operations.
 
-## Types
+## [Choosing how to run WAVI](@id choosing-how-to-run-wavi)
 
-### Model Specifications
+`spec` is how you tell WAVI *where* the local solve runs and *whether* the domain is split for parallel processing. The type names in code are `BasicSpec`, `ThreadedSpec`, `MPISpec`, and `GPUSpec`.
 
-There are three types of specifications currently available in WAVI: 
+| Option | Spec | How you launch | Memory | Use when |
+| :--- | :--- | :--- | :--- | :--- |
+| Serial CPU | `BasicSpec()` (default) | `julia --project=. driver.jl` | one process | development, small domains |
+| CPU threads | `BasicSpec()` | `julia -t N --project=. driver.jl` | one process | one node; KernelAbstractions.jl uses Julia threads |
+| Shared-memory Schwarz | `ThreadedSpec(...)` | `julia -t N` with `N` at least `ngridsx * ngridsy` | one process | overlapping subdomain preconditioner; still one node's RAM |
+| Distributed CPU | `MPISpec(px, py, halo, grid)` | `mpiexecjl -n px*py ...` | per rank | several nodes, or several processes on one node |
+| Single GPU | `GPUSpec()` | `julia --project=. driver.jl` after `using CUDA` | one GPU | NVIDIA GPU; see [GPU setup](./gpu_setup.md) |
+| One GPU per MPI rank | `MPISpec(..., child_architecture = GPU())` | `mpiexecjl -n N ...` after `using CUDA` | per rank, one GPU | several GPUs on one node, or one GPU per node |
 
-* `BasicSpec` - this is the original single-core, single-thread implementation. You will run into limits with bigger domains.
-* `ThreadedSpec` - this is an implementation of schwarz decomposition for solving subdomains within individual threads. It won't get you around the memory limits, but it will speed up compute.
-* `MPISpec` - this is the __currently experimental__ fully-distributed specification for WAVI. The model domain is split apart and computed individually.
+`BasicSpec` plus `julia -t N` is **not** the same as `ThreadedSpec`. Threads on `BasicSpec` parallelise loops on the whole grid. `ThreadedSpec` builds overlapping Schwarz subdomains and solves each on a Julia thread which can result in slightly varying results.
 
-### Implementation Considerations
+`GPUSpec` is one GPU in one process. Several GPUs use `MPISpec` with `child_architecture = GPU()` (one rank, one GPU). Halo exchange copies through host MPI buffers; this is not CUDA-aware MPI. Do not pass `local_spec = ThreadedSpec(...)` with a GPU child. Use [GPU setup](./gpu_setup.md) for CUDA.jl, and [MPI setup](./mpi_setup.md) for `MPISpec`.
 
-Depending on specifications, some considerations need to be taken into account:
-
-* Examples in the docs simply default to `BasicSpec`, so the model will not be distributed by default
-* How you use `Model` interface changes in a distributed setting, to a fully functional interface
-* **Grid Balancing**: If the global grid size is not perfectly divisible by the number of subdomains or MPI processes, the remainder cells are balanced across the first few subdomains (for both `ThreadedSpec` and `MPISpec`). This ensures the full global domain is covered without remainders at the boundaries, removing the previous requirement of the user needing to specify a divisible thread/core count.
+### Implementation notes
+* **Grid balancing:** if the global grid is not divisible by the number of subdomains or MPI ranks, remainder cells are spread over the first few subdomains (`ThreadedSpec` and `MPISpec`). You do not have to pick a thread or rank count that divides the grid exactly.
+* Examples in these docs default to `BasicSpec`, so a model is not distributed unless you pass another spec.
 
 ## Setting up specifications
 
-This is relatively simply achieved in the call to Model. As part of the model creation process, one needs to supply a [`Grid`](@ref) to a [`Model`](@ref) constructor (alongside the bed). If no spec is provided a `BasicSpec` is used.
-
-For any other specification, you might use:
+Pass a [`Grid`](@ref) and bed into [`Model`](@ref). With no `spec`, a `BasicSpec` is used.
 
 ```julia
-    spec = ThreadedSpec(ngridsx = 16, 
-                        ngridsy = 2,
-                        overlap = 1,
-                        niterations = 1)
+model = Model(grid, bed)   # BasicSpec, CPU
 
-    # or
+spec = ThreadedSpec(
+    ngridsx = 16,
+    ngridsy = 2,
+    overlap = 1,
+    niterations = 1,
+)
+model = Model(grid, bed, spec)
 
-    # px, py, halo, grid
-    spec = MPISpec(16, 2, 1, grid)
+# px, py, halo, grid  (px * py must equal the MPI world size)
+spec = MPISpec(16, 2, 1, grid)
+model = Model(grid, bed, spec)
+
+using CUDA
+model = Model(grid, bed, GPUSpec())
+
+spec = MPISpec(4, 1, 2, grid; child_architecture = GPU())
+model = Model(grid, bed, spec)
 ```
 
-As can be seen, the grid is necessarily provided to the MPI specification prior to model construction, whereas the operation of the threaded specification does not require the same.
+Pass `spec` as the third argument, or use `Model(; grid, bed_elevation, spec=...)`. `Model(grid, bed; spec=...)` will not work: the two-argument method always inserts `BasicSpec()`.
 
-#### MPI specific execution
+The grid is required when you construct `MPISpec`, because the split happens then. `ThreadedSpec` and `GPUSpec` do not need the grid at spec construction.
 
-Configure MPI for your Julia project once per machine (MPIPreferences, `mpiexecjl`, verification). See [MPI setup](./mpi_setup.md) and the [MPI.jl configuration guide](https://juliaparallel.org/MPI.jl/stable/configuration/).
+### Using multiple CPU threads (`BasicSpec`)
 
-To run a driver with an `MPISpec`:
+```bash
+julia -t 8 --project=. driver.jl
+```
+
+No change in specification, just the default `BasicSpec`. KernelAbstractions uses those Julia threads to parallelise across loops.
+
+### Threaded Schwarz (`ThreadedSpec`)
+
+Use `ThreadedSpec` as above, and launch Julia with enough threads for the subdomain grid (`ngridsx * ngridsy`).
+
+### MPI execution
+
+Configure MPI once per machine (MPIPreferences, `mpiexecjl`, checks). See [MPI setup](./mpi_setup.md) and the [MPI.jl configuration guide](https://juliaparallel.org/MPI.jl/stable/configuration/).
 
 ```bash
 mpiexecjl -n <num> --project=<path-to-project> julia <path-to-driver.jl> <driver args...>
@@ -64,6 +87,15 @@ Example (MISMIP+ driver, four ranks):
 
 ```bash
 mpiexecjl -n 4 --project=../.. julia example_drivers/MISMIP_PLUS/MISMIP_PLUS.jl
+```
+
+### GPU execution
+
+Add CUDA.jl to the driver project and load it. One GPU: `GPUSpec()`. Several GPUs: one MPI rank per GPU with `MPISpec(..., child_architecture = GPU())`. Step-by-step: [GPU setup](./gpu_setup.md).
+
+```bash
+julia --project=. driver.jl    # In the driver: using CUDA; GPUSpec()
+mpiexecjl -n 4 --project=. julia driver.jl    # 4 ranks in this case means 4 GPUs; In the driver: MPISpec(..., child_architecture = GPU())
 ```
 
 ## Domain Decomposition
@@ -80,6 +112,12 @@ For this specification only two methods are overridden:
 
 The memory space is still limited to one process, with the potential to leverage threading optimisations within a single physical processor. _Therefore this might increase parallelisation of the model computations, __but it will remain memory bound__._
 
+### GPUSpec
+
+`GPUSpec` does not split the domain. One process owns the whole grid; dense arrays live on one NVIDIA GPU. Some aspects still live and are transferred across from host (CPU) to device (GPU) which should be optimised for in the future. Colour-list Gauss-Seidel and Kronecker geometry (`cent`, `∂x`, `∂y`) still run on the host and copy the fields they need.
+
+Use [`GPUSpec()`](./gpu_setup.md) after `using CUDA`. Several GPUs use [`MPISpec`](#mpispec) with `child_architecture = GPU()`.
+
 ### MPISpec
 
 The MPI specification is used to decompose the global domain of the `Model`. Unlike the threaded specification however, this decomposition takes place at time of creation. The grid provided is split and the root rank takes the upper-left node in the topology, [which is clearly explained here](https://hpc-tutorials.llnl.gov/mpi/virtual_topologies/).
@@ -87,6 +125,7 @@ The MPI specification is used to decompose the global domain of the `Model`. Unl
 The list of methods overridden is not explained in detail here, there are numerous areas of the model that require alteration:
 
 * The underlying `Model` constructor is implemented such that each node contains it's own localised portion of the global domain.
+* Pass `child_architecture = GPU()` after `using CUDA` to put each rank's local fields on one GPU. Rank 0's `global_fields` (output gather) stay on the host. Halo exchange is host-staged (not CUDA-aware MPI). `local_spec = ThreadedSpec(...)` is rejected on GPU ranks.
 
 !!! tip "Process Layout Geometry"
     The geometric layout of the MPI process grid (`px` × `py`) heavily impacts performance and solver convergence. For domains with high aspect ratios (like MISMIP+ which is long and narrow), **favour 1D process layouts** (e.g., `4x1` instead of `2x2`).

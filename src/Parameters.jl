@@ -189,13 +189,9 @@ function reconstruct_on_grid(params::Params, grid::Grid)
                   params.phase_field_length,
                   params.energy_release_rate,
                   params.degradation_regularisation,
-                  isa(params.accumulation_rate, Number) ? 
-                       params.accumulation_rate*ones(grid.nx,grid.ny) : 
-                       params.accumulation_rate,
+                  field_on_grid(params.accumulation_rate, grid),
                   params.glen_a_activation_energy,
-                  isa(params.glen_a_ref, Number) ? 
-                       params.glen_a_ref*ones(grid.nx,grid.ny) : 
-                       params.glen_a_ref,
+                  field_on_grid(params.glen_a_ref, grid),
                   params.glen_temperature_ref,
                   params.glen_n,
                   params.glen_reg_strain_rate,
@@ -206,12 +202,8 @@ function reconstruct_on_grid(params::Params, grid::Grid)
                   params.evolveShelves,
                   params.smallHAF,
                   params.basal_water_thickness,
-                  isa(params.hydraulic_potential_b, Number) ? 
-                       params.hydraulic_potential_b*ones(grid.nx,grid.ny) : 
-                       params.hydraulic_potential_b,
-                  isa(params.effective_pressure, Number) ? 
-                       params.effective_pressure*ones(grid.nx,grid.ny) : 
-                       params.effective_pressure,
+                  field_on_grid(params.hydraulic_potential_b, grid),
+                  field_on_grid(params.effective_pressure, grid),
                   params.default_temperature_ave,
                   params.default_preBfactor
                   )
@@ -219,9 +211,6 @@ end
 
 #Outer constructor that selects parameters for a specified subdomain from parameters defined on a particular grid
 function reconstruct_on_subdomain(params::Params, grid::Grid, subdomain::NTuple{4,<: Integer})
-    
-    x_start,x_end,y_start,y_end = subdomain
-
     return Params(  params.dt, 
                     params.g, 
                     params.density_ice,
@@ -240,9 +229,9 @@ function reconstruct_on_subdomain(params::Params, grid::Grid, subdomain::NTuple{
                     params.phase_field_length,
                     params.energy_release_rate,
                     params.degradation_regularisation,
-                    params.accumulation_rate[x_start:x_end, y_start:y_end],
+                    spatial_on_subdomain(params.accumulation_rate, grid, subdomain),
                     params.glen_a_activation_energy,
-                    params.glen_a_ref[x_start:x_end, y_start:y_end],
+                    spatial_on_subdomain(params.glen_a_ref, grid, subdomain),
                     params.glen_temperature_ref,
                     params.glen_n,
                     params.glen_reg_strain_rate,
@@ -253,8 +242,8 @@ function reconstruct_on_subdomain(params::Params, grid::Grid, subdomain::NTuple{
                     params.evolveShelves,
                     params.smallHAF,
                     params.basal_water_thickness,
-                    params.hydraulic_potential_b[x_start:x_end, y_start:y_end],
-                    params.effective_pressure[x_start:x_end, y_start:y_end],
+                    spatial_on_subdomain(params.hydraulic_potential_b, grid, subdomain),
+                    spatial_on_subdomain(params.effective_pressure, grid, subdomain),
                     params.default_temperature_ave,
                     params.default_preBfactor
                     )

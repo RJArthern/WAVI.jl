@@ -25,7 +25,11 @@ end
 
 function update_preconditioner!(model::AbstractModel, spec::ThreadedSpec)
     @unpack ngridsx, ngridsy, overlap = spec
-    @debug "Spawning $(ngridsx * ngridsy) threads for preconditioning"
+    n_patch = ngridsx * ngridsy
+    if !isassigned(spec.schwarzModelArray, 1)
+        @info "ThreadedSpec: building $(n_patch) Schwarz subdomain models"
+    end
+    @debug "Spawning $(n_patch) threads for preconditioning"
 
     @sync for igrid = 1:ngridsx
         for jgrid = 1:ngridsy

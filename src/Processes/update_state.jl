@@ -2,8 +2,7 @@ export update_state!, update_velocities_on_h_grid!, update_state_novelocity!
 
 using Parameters
 
-using WAVI: AbstractModel
-using WAVI.KroneckerProducts
+using WAVI: AbstractModel, AbstractThermoDynamics, AbstractFracture
 using WAVI.MeltRates
 using WAVI.SurfaceMassBalance
 using WAVI.Fracture
@@ -13,6 +12,8 @@ using WAVI.ThermoDynamics
 using WAVI.Time
 using WAVI.Utilities
 using WAVI.Wavelets
+using WAVI.Stencils
+using KernelAbstractions: KernelAbstractions as KA
 
 """
 update_state!(model::AbstractModel, clock)
@@ -103,8 +104,9 @@ Adjust surface elevation to hydrostatic equilibrium.
 function update_surface_elevation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
-    gh.s[gh.mask] .= max.(gh.b[gh.mask]+gh.h[gh.mask],
-                          params.sea_level_wrt_geoid .+ gh.h[gh.mask]*(1-params.density_ice./params.density_ocean))
+    sea = params.sea_level_wrt_geoid
+    ρ = params.density_ice / params.density_ocean
+    @. gh.s = ifelse(gh.mask, max(gh.b + gh.h, sea + gh.h * (1 - ρ)), gh.s)
     return model
 end
 
@@ -115,13 +117,41 @@ Interpolate thickness and surface elvation from h-grid to u- and v-grids.
 
 """
 function update_geometry_on_uv_grids!(model::AbstractModel{T,N}) where {T,N}
-    @unpack gh,gu,gv,gc=model.fields
-    onesvec=ones(T,gh.nxh*gh.nyh)
-    gu.h[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.h[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
-    gu.s[gu.mask].=(gu.samp*(gu.centᵀ*(gh.crop*gh.s[:])))./(gu.samp*(gu.centᵀ*(gh.crop*onesvec)))
-    gv.h[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.h[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
-    gv.s[gv.mask].=(gv.samp*(gv.centᵀ*(gh.crop*gh.s[:])))./(gv.samp*(gv.centᵀ*(gh.crop*onesvec)))
+    @unpack gh, gu, gv = model.fields
+    backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
+    ones_crop = s.ones_crop
+    src_crop = s.β_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+    denu = s.denu
+    denv = s.denv
+
+    fill!(ones_crop, one(T))
+    launch!(_apply_mask!, ones_crop, gh.mask; ndrange = size(ones_crop), sync = false)
+    KA.synchronize(backend)
+    launch!(_avg_xT!, denu, ones_crop; ndrange = size(denu), sync = false)
+    launch!(_avg_yT!, denv, ones_crop; ndrange = size(denv), sync = false)
+    KA.synchronize(backend)
+
+    _interp_h_to_uv!(gu.h, gv.h, gh.h, gh.mask, gu.mask, gv.mask, src_crop, tmpu, tmpv, denu, denv)
+    _interp_h_to_uv!(gu.s, gv.s, gh.s, gh.mask, gu.mask, gv.mask, src_crop, tmpu, tmpv, denu, denv)
     return model
+end
+
+"""
+Crop an H-grid field, average onto U and V, and keep ice faces only.
+
+Matches `samp * centᵀ * crop * vec(src) ./ (samp * centᵀ * crop * ones)`.
+"""
+function _interp_h_to_uv!(dest_u, dest_v, src_h, mask_h, mask_u, mask_v, src_crop, tmpu, tmpv, denu, denv)
+    copyto!(src_crop, src_h)
+    launch!(_apply_mask!, src_crop, mask_h; ndrange = size(src_crop))
+    launch!(_avg_xT!, tmpu, src_crop; ndrange = size(tmpu))
+    @. dest_u = ifelse(mask_u, tmpu / denu, dest_u)
+    launch!(_avg_yT!, tmpv, src_crop; ndrange = size(tmpv))
+    @. dest_v = ifelse(mask_v, tmpv / denv, dest_v)
+    return nothing
 end
 
 """
@@ -132,7 +162,10 @@ Update height above floatation. Zero value is used to define location of groundi
 function update_height_above_floatation!(model::AbstractModel)
     @unpack params=model
     @unpack gh=model.fields
-    gh.haf .= height_above_floatation.(gh.h,gh.b,Ref(params))
+    # Do not broadcast `params`: it holds host Matrix fields and cannot enter a GPU kernel.
+    ρ = params.density_ocean / params.density_ice
+    sea = params.sea_level_wrt_geoid
+    @. gh.haf = gh.h - ρ * (sea - gh.b)
     return model
 end
 
@@ -143,10 +176,7 @@ Update grounded area fraction on h-, u-, and v-grids for use in subgrid paramete
 """
 function update_grounded_fraction_on_huv_grids!(model::AbstractModel)
     @unpack gh,gu,gv = model.fields
-    (gfh,gfu,gfv)=pos_fraction(gh.haf;mask=gh.mask)
-    gh.grounded_fraction[:] .= gfh[:]
-    gu.grounded_fraction[:] .= gfu[:]
-    gv.grounded_fraction[:] .= gfv[:]
+    pos_fraction!(gh.grounded_fraction, gu.grounded_fraction, gv.grounded_fraction, gh.haf, gh.mask)
     return model
 end
 
@@ -171,21 +201,44 @@ function update_thermodynamics_basal_melt!(model::AbstractModel)
     return model
 end
 
+glen_b_temperature_frozen(::AbstractThermoDynamics) = false
+glen_b_temperature_frozen(::NoThermoDynamics) = true
+
+glen_b_damage_frozen(::AbstractFracture) = false
+glen_b_damage_frozen(::ConstantDamage) = true
+
+glen_b_is_frozen(model::AbstractModel) =
+    glen_b_temperature_frozen(model.thermo_dynamics) &&
+    glen_b_damage_frozen(model.fracture)
+
+function glen_a_ref_for_fill(model::AbstractModel)
+    a_ref = model.params.glen_a_ref
+    KA.get_backend(a_ref) === KA.get_backend(model.fields.g3d.glen_b) && return a_ref
+    return stencil_scratch!(model).glen_a_ref
+end
+
 """
     update_glen_b!(model::AbstractModel)
 
 Update stiffness parameter B in Glen flow law.
+
+Skipped when temperature and damage are both held constant. Construction
+already filled `glen_b` from the initial fields.
 """
 function update_glen_b!(model::AbstractModel)
-    @unpack g3d=model.fields
-    @unpack params=model
-    for k=1:g3d.nσs
-        for j=1:g3d.nys
-            for i=1:g3d.nxs
-                g3d.glen_b[i,j,k] = glen_b.(g3d.θ[i,j,k],g3d.Φ[i,j,k],params.glen_a_ref[i,j], params.glen_n, params.glen_a_activation_energy, params.glen_temperature_ref, params.gas_const)
-            end
-        end
-    end
+    glen_b_is_frozen(model) && return model
+    @unpack g3d = model.fields
+    @unpack params = model
+    fill_glen_b!(
+        g3d.glen_b,
+        g3d.θ,
+        g3d.Φ,
+        glen_a_ref_for_fill(model),
+        params.glen_n,
+        params.glen_a_activation_energy,
+        params.glen_temperature_ref,
+        params.gas_const,
+    )
     return model
 end
 
@@ -232,9 +285,9 @@ Update the velocities (depth averaged, surface and bed) on the h grid
 """
 function update_velocities_on_h_grid!(model::AbstractModel{T,N,S}) where {T,N,S<:AbstractSpec}
     @unpack gh,gu,gv = model.fields
-    #depth averaged velocities
-    gh.u[:] .= gu.cent*gu.u[:] #(gu.u[1:end-1,:] + gu.u[2:end,:])./2
-    gh.v[:] .= gv.cent*gv.v[:] #(gv.v[:,1:end-1] + gv.v[:, 2:end])./2
+    #depth averaged velocities (cent of U/V onto H; no crop, matching the Kronecker map)
+    launch!(_avg_x!, gh.u, gu.u; ndrange = size(gh.u), sync = false)
+    launch!(_avg_y!, gh.v, gv.v; ndrange = size(gh.v))
 
     #bed velocities
     gh.ub .= gh.u ./ (1 .+ (gh.β .* gh.quad_f2))
@@ -263,9 +316,25 @@ end
 Evaluate rate of change of thickness using mass conservation.
 """
 function update_dhdt!(model::AbstractModel)
-    @unpack gh,gu,gv=model.fields
-    gh.dhdt[gh.mask].=gh.samp*(gh.accumulation[:] .- gh.basal_melt[:] .-
-             (  (gu.∂x*(gu.crop*(gu.h[:].*gu.u[:]))) .+ (gv.∂y*(gv.crop*(gv.h[:].*gv.v[:]))) ) )
+    @unpack gh, gu, gv = model.fields
+    backend = KA.get_backend(gh.h)
+    s = stencil_scratch!(model)
+    u_crop = s.u_crop
+    v_crop = s.v_crop
+    dudx = s.dudx
+    dvdy = s.dvdy
+    extra = s.extra
+
+    @. u_crop = gu.h * gu.u
+    @. v_crop = gv.h * gv.v
+    launch!(_apply_mask!, u_crop, gu.mask; ndrange = size(u_crop), sync = false)
+    launch!(_apply_mask!, v_crop, gv.mask; ndrange = size(v_crop), sync = false)
+    KA.synchronize(backend)
+    launch!(_diff_x!, dudx, u_crop, s.dx_inv; ndrange = size(dudx), sync = false)
+    launch!(_diff_y!, dvdy, v_crop, s.dy_inv; ndrange = size(dvdy), sync = false)
+    KA.synchronize(backend)
+    @. extra = gh.accumulation - gh.basal_melt - dudx - dvdy
+    @. gh.dhdt = ifelse(gh.mask, extra, gh.dhdt)
     return model
 end
 
@@ -280,10 +349,22 @@ function update_model_wavelets!(model::AbstractModel)
 end
 
 function update_surface_velocities_on_uv_grid!(model)
-    @unpack gh,gu,gv = model.fields
-    #surface  velocities
-    gu.us[:].=gu.crop*(gu.centᵀ*gh.crop*(gh.us[:]))
-    gv.vs[:].=gv.crop*(gv.centᵀ*gh.crop*(gh.vs[:]))
+    @unpack gh, gu, gv = model.fields
+    s = stencil_scratch!(model)
+    src_crop = s.β_crop
+    tmpu = s.tmpu
+    tmpv = s.tmpv
+
+    z = zero(eltype(tmpu))
+    copyto!(src_crop, gh.us)
+    launch!(_apply_mask!, src_crop, gh.mask; ndrange = size(src_crop))
+    launch!(_avg_xT!, tmpu, src_crop; ndrange = size(tmpu))
+    @. gu.us = ifelse(gu.mask, tmpu, z)
+
+    copyto!(src_crop, gh.vs)
+    launch!(_apply_mask!, src_crop, gh.mask; ndrange = size(src_crop))
+    launch!(_avg_yT!, tmpv, src_crop; ndrange = size(tmpv))
+    @. gv.vs = ifelse(gv.mask, tmpv, z)
     return model
 end
 

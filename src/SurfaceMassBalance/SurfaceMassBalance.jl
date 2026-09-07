@@ -9,6 +9,12 @@ using WAVI: AbstractSurfaceMassBalance, AbstractModel, AbstractClimateForcing
 using Parameters
 using WAVI.Time
 using WAVI.Grids
+using WAVI.Utilities: copy_onto!
+using WAVI.Architectures: AbstractArchitecture
+import WAVI.Architectures: on_architecture
+
+# Default: most SMB schemes have no dense arrays to move.
+on_architecture(::AbstractArchitecture, smb::AbstractSurfaceMassBalance) = smb
 
 #return the sceme used to compute surface mass balance
 get_surface_mass_balance(model::AbstractModel) = model.surface_mass_balance

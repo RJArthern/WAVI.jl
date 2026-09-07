@@ -3,8 +3,24 @@ using JSON3
 using MPI
 using Printf
 using Profile
+using Logging
 
 const BENCHMARK_OUTPUT_DIR = normpath(@__DIR__, "..", "output")
+
+# Logging updates mimics the behaviour of LoggingExtras.TeeLogger (Trying to get working with GPU case where it failed).
+struct TeeIO{A <: IO, B <: IO} <: IO
+    a::A
+    b::B
+end
+Base.write(io::TeeIO, x::UInt8) = (write(io.a, x); write(io.b, x))
+function Base.unsafe_write(io::TeeIO, p::Ptr{UInt8}, n::UInt)
+    unsafe_write(io.a, p, n)
+    return unsafe_write(io.b, p, n)
+end
+Base.flush(io::TeeIO) = (flush(io.a); flush(io.b); nothing)
+Base.isopen(io::TeeIO) = isopen(io.a) && isopen(io.b)
+Base.iswritable(::TeeIO) = true
+Base.get(io::TeeIO, key::Symbol, default) = get(io.a, key, default)
 
 """
     BenchmarkResults
@@ -145,13 +161,38 @@ function benchmark_main(id::String,
         timestamp = String(timestamp_chars)
     end
 
-    output_dir = joinpath(
-        BENCHMARK_OUTPUT_DIR,
-        driver_name,
-        "benchmark_$(id)_$(timestamp)",
-    )
+    output_group = get(metadata, "output_group", "")
+    if isempty(output_group)
+        output_dir = joinpath(
+            BENCHMARK_OUTPUT_DIR,
+            driver_name,
+            "benchmark_$(id)_$(timestamp)",
+        )
+    else
+        output_dir = joinpath(
+            BENCHMARK_OUTPUT_DIR,
+            driver_name,
+            output_group,
+            "benchmark_$(id)_$(timestamp)",
+        )
+    end
     model_args[:folder] = output_dir
     mkpath(output_dir)
+
+    old_logger = global_logger()
+    log_io = nothing
+    if rank == 0
+        log_io = open(joinpath(output_dir, "run.log"), "w")
+        global_logger(ConsoleLogger(TeeIO(stderr, log_io)))
+        @async begin
+            while isopen(log_io)
+                flush(log_io)
+                sleep(1)
+            end
+        end
+    end
+
+    try
 
     # Copy the driver adaptor file to the output directory for reproducibility
     driver_path = joinpath(normpath(@__DIR__, "..", "drivers"), "$(driver_name).jl")
@@ -202,6 +243,20 @@ function benchmark_main(id::String,
         @info "GC time: $(@sprintf("%.3f", benchmark_results.gc_time)) seconds"
         @info "Allocations: $(benchmark_results.allocations)"
 
+        if hasproperty(result, :setup_time)
+            @info "Setup time: $(@sprintf("%.3f", result.setup_time)) seconds"
+            metadata["setup_time_seconds"] = result.setup_time
+        end
+        if hasproperty(result, :solve_time)
+            @info "Solve time: $(@sprintf("%.3f", result.solve_time)) seconds"
+            metadata["solve_time_seconds"] = result.solve_time
+        end
+        if hasproperty(result, :setup_time) && hasproperty(result, :solve_time)
+            comp_time = max(0.0, benchmark_results.execution_time - (result.setup_time + result.solve_time))
+            @info "Compilation & Overhead time: $(@sprintf("%.3f", comp_time)) seconds"
+            metadata["compilation_and_overhead_time_seconds"] = comp_time
+        end
+
         benchmark_file = joinpath(output_dir, "benchmark_results.json")
         save_benchmark_results(benchmark_results, benchmark_file; metadata = metadata)
 
@@ -220,6 +275,22 @@ function benchmark_main(id::String,
     end
 
     return result, benchmark_results
+    catch e
+        if rank == 0 && log_io !== nothing
+            bt = catch_backtrace()
+            showerror(stderr, e, bt)
+            println(stderr)
+            showerror(log_io, e, bt)
+            println(log_io)
+            flush(log_io)
+        end
+        rethrow()
+    finally
+        if rank == 0 && log_io !== nothing
+            global_logger(old_logger)
+            close(log_io)
+        end
+    end
 end
 
 """

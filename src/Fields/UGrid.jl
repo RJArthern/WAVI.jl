@@ -1,12 +1,12 @@
 struct UGrid{T <: Real, N <: Integer}
                    nxu :: N                                    # Number of frid cells in x-direction in UGrid
                    nyu :: N                                    # Number of grid cells in y-direction in UGrid 
-                 mask :: Array{Bool,2}                         # Mask specifying model domain wrt U grid 
-           mask_inner :: Array{Bool,2}                         # Mask specifying interior of model domain wrt U grid 
-            u_isfixed :: Array{Bool,2}                         # Mask specifying location of fixed u-velocity 
+                 mask :: AbstractArray{Bool,2}                 # Mask specifying model domain wrt U grid
+           mask_inner :: AbstractArray{Bool,2}                 # Mask specifying interior of model domain wrt U grid
+            u_isfixed :: AbstractArray{Bool,2}                 # Mask specifying location of fixed u-velocity
                     n :: N                                     # Total number of cells in model domain 
                    ni :: N                                     # Total number of cells in interior of model domain 
-                 crop :: Diagonal{T,Array{T,1}}                # Crop matrix: diagonal matrix with mask entries on diag
+                 crop :: Diagonal{T, <:AbstractVector{T}}      # Crop matrix: diagonal matrix with mask entries on diag
                  samp :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to model domain 
            samp_inner :: SparseMatrixCSC{T,N}                  # Sampling matrix: take full domain to interior of model domain 
                spread :: SparseMatrixCSC{T,N}                  # Spread matrix: take model domain to full domain
@@ -18,16 +18,15 @@ struct UGrid{T <: Real, N <: Integer}
                    ∂y :: KronType{T,N}                         # Matrix representation of differentiation wrt y
                   ∂yᵀ :: KronType{T,N}                         # Adjoint of differentiation wrt y
                levels :: N                                     # Number of levels in the preconditioner
-                  dwt :: KronType{T,N}                         # Wavelet matrix product on u grid 
-                    s :: Array{T,2}                            # Ice surface elevation
-                    h :: Array{T,2}                            # Ice thickness
-    grounded_fraction :: Array{T,2}                            # Grid cell grounded fraction
-                 βeff :: Array{T,2}                            # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
-             dnegβeff :: Base.RefValue{Diagonal{T,Array{T,1}}} # Rheological operator (diagonal of βeff) 
-                    u :: Array{T,2}                            # Ice velocities in x direction
-             residual :: Array{T,2}                            # Residuals in x direction
-                τsurf :: Array{T,2}                            # TauSurf Dirichlet calculated in inversion (see in Arthern 2015 JGeophysRes)
-                   us :: Array{T,2}                               # Ice surface velocities in x direction
+                    s :: AbstractArray{T,2}                    # Ice surface elevation
+                    h :: AbstractArray{T,2}                    # Ice thickness
+    grounded_fraction :: AbstractArray{T,2}                    # Grid cell grounded fraction
+                 βeff :: AbstractArray{T,2}                    # Effective β value on u grid(eqn 12 in Arthern 2015 JGeophysRes)
+             dnegβeff :: Base.RefValue{<:Diagonal{T}}          # Rheological operator (diagonal of βeff)
+                    u :: AbstractArray{T,2}                    # Ice velocities in x direction
+             residual :: AbstractArray{T,2}                    # Residuals in x direction
+                τsurf :: AbstractArray{T,2}                    # TauSurf Dirichlet calculated in inversion (see in Arthern 2015 JGeophysRes)
+                   us :: AbstractArray{T,2}                    # Ice surface velocities in x direction
               end
     
 """
@@ -96,7 +95,7 @@ function UGrid(;
         spread = spzeros(Float64, nxu * nyu, 0)
         spread_inner = spzeros(Float64, nxu * nyu, 0)
         kron = _storage_only_kron()
-        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = dωt = kron
+        cent = centᵀ = ∂x = ∂xᵀ = ∂y = ∂yᵀ = kron
         dnegβeff = Ref(Diagonal(Float64[]))
     else
         #construct operators
@@ -113,17 +112,11 @@ function UGrid(;
         ∂xᵀ =  sparse(spI(nyu)') ⊗ sparse(∂1d(nxu-1,dx)')
         ∂y =  ∂1d(nyu-1,dy) ⊗ χ(nxu-2)
         ∂yᵀ =  sparse(∂1d(nyu-1,dy)') ⊗ sparse(χ(nxu-2)')
-        dωt = wavelet_matrix(nyu,levels,"forward" ) ⊗ wavelet_matrix(nxu,levels,"forward")
         dnegβeff = Ref(crop*Diagonal(-βeff[:])*crop)
 
         #size assertions
         @assert n == count(mask)
         @assert ni == count(mask_inner)
-        @assert crop == Diagonal(float(mask[:]))
-        @assert samp == sparse(1:n,(1:(nxu*nyu))[mask[:]],ones(n),n,nxu*nyu)
-        @assert samp_inner == sparse(1:ni,(1:(nxu*nyu))[mask_inner[:]],ones(ni),ni,nxu*nyu)
-        @assert spread == sparse(samp')
-        @assert spread_inner == sparse(samp_inner')
     end
 
     @assert size(s)==(nxu,nyu)
@@ -153,7 +146,6 @@ function UGrid(;
                 ∂y,
                 ∂yᵀ,
                 levels,
-                dωt,
                 s,
                 h,
                 grounded_fraction,

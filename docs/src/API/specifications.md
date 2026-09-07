@@ -3,5 +3,6 @@
 ```@docs
 BasicSpec
 ThreadedSpec
+GPUSpec
 MPISpec
 ```

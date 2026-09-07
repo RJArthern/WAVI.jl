@@ -10,6 +10,7 @@ using Parameters, Enzyme
 using WAVI: AbstractBasalHydrology, AbstractModel
 using WAVI.Grids
 using WAVI.Time
+using WAVI.Utilities: copy_onto!
 
 
 #add each of the individual basal hydrology models

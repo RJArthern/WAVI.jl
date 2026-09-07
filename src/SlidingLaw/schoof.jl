@@ -1,6 +1,6 @@
 export SchoofSlidingLaw
 
-struct SchoofSlidingLaw{T <: Real, C <: Union{T,Array{T,2}}, W <: Union{T,Array{T,2}}} <: AbstractSlidingLaw
+struct SchoofSlidingLaw{T <: Real, C <: Union{T,AbstractArray{T,2}}, W <: Union{T,AbstractArray{T,2}}} <: AbstractSlidingLaw
     coulomb_coefficient :: C
     drag_coefficient :: W
     weertman_m :: T
@@ -23,8 +23,8 @@ function SchoofSlidingLaw(;
                         coulomb_coefficient = 0.2,
                         drag_coefficient = 3.165e6, # 3.165e6 = Pa (yr/m)^(1/3) = 1.0e3 MPa (s/m)^(1/3)
                         weertman_m  = 3.0,
-                        reg_speed = 1.0e-5) 
-                        
+                        reg_speed = 1.0e-5)
+
     return SchoofSlidingLaw(
                             coulomb_coefficient,
                             drag_coefficient,
@@ -47,23 +47,25 @@ end
 
 function reconstruct_on_grid(sliding_law::SchoofSlidingLaw, grid::Grid)
     return SchoofSlidingLaw(
-        isa(sliding_law.coulomb_coefficient,Number) ? sliding_law.coulomb_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.coulomb_coefficient) == (grid.nx,grid.ny) ? sliding_law.coulomb_coefficient :
-        throw(DimensionMismatch("Coulomb Coefficient does not match grid size")),
-        isa(sliding_law.drag_coefficient,Number) ? sliding_law.drag_coefficient*ones(grid.nx,grid.ny) : 
-        size(sliding_law.drag_coefficient) == (grid.nx,grid.ny) ? sliding_law.drag_coefficient :
-        throw(DimensionMismatch("Drag Coefficient does not match grid size")),
+        field_on_grid(sliding_law.coulomb_coefficient, grid; name = "Coulomb Coefficient"),
+        field_on_grid(sliding_law.drag_coefficient, grid; name = "Drag Coefficient"),
         sliding_law.weertman_m,
         sliding_law.reg_speed)
 end
 
 function reconstruct_on_subdomain(sliding_law::SchoofSlidingLaw, grid::Grid, subdomain::NTuple{4,<: Integer})
-    
-    x_start,x_end,y_start,y_end = subdomain
-
     return SchoofSlidingLaw(
-          sliding_law.coulomb_coefficient[x_start:x_end, y_start:y_end],
-          sliding_law.drag_coefficient[x_start:x_end, y_start:y_end],
+          spatial_on_subdomain(sliding_law.coulomb_coefficient, grid, subdomain),
+          spatial_on_subdomain(sliding_law.drag_coefficient, grid, subdomain),
           sliding_law.weertman_m,
           sliding_law.reg_speed)
+end
+
+function on_architecture(arch::AbstractArchitecture, sliding_law::SchoofSlidingLaw)
+    return SchoofSlidingLaw(
+        on_architecture(arch, sliding_law.coulomb_coefficient),
+        on_architecture(arch, sliding_law.drag_coefficient),
+        sliding_law.weertman_m,
+        sliding_law.reg_speed,
+    )
 end

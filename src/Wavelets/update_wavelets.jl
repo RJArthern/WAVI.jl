@@ -8,9 +8,15 @@ Compute wavelet transform of velocities to define the coarse grid used in multig
 function update_wavelets!(model::AbstractModel{T}) where {T}
     @unpack wu,wv,gu,gv=model.fields
     @unpack params,solver_params=model
+    s = stencil_scratch!(model)
 
-    wu.wavelets[:] .= gu.dwt*(gu.crop*gu.u[:])
-    wv.wavelets[:] .= gv.dwt*(gv.crop*gv.v[:])
+    copyto!(wu.wavelets, gu.u)
+    @. wu.wavelets *= gu.mask
+    haar_dwt!(wu.wavelets, s.haar_u_tmp, wu.levels)
+
+    copyto!(wv.wavelets, gv.v)
+    @. wv.wavelets *= gv.mask
+    haar_dwt!(wv.wavelets, s.haar_v_tmp, wv.levels)
 
     wu.mask .= (abs.(wu.wavelets) .>= solver_params.wavelet_threshold)
     wv.mask .= (abs.(wv.wavelets) .>= solver_params.wavelet_threshold)
@@ -18,17 +24,11 @@ function update_wavelets!(model::AbstractModel{T}) where {T}
     wu.n[] = count(wu.mask)
     wv.n[] = count(wv.mask)
 
-    wu.crop[] .= Diagonal(float(wu.mask[:]))
-    wv.crop[] .= Diagonal(float(wv.mask[:]))
+    wu.correction_coarse[] = zeros_like(vec(wu.wavelets), wu.n[])
+    wv.correction_coarse[] = zeros_like(vec(wv.wavelets), wv.n[])
 
-    wu.samp[]  = sparse(1:wu.n[],(1:(wu.nxuw*wu.nyuw))[wu.mask[:]],ones(wu.n[]),wu.n[],wu.nxuw*wu.nyuw)
-    wv.samp[]  = sparse(1:wv.n[],(1:(wv.nxvw*wv.nyvw))[wv.mask[:]],ones(wv.n[]),wv.n[],wv.nxvw*wv.nyvw)
-
-    wu.spread[] = sparse(wu.samp[]')
-    wv.spread[] = sparse(wv.samp[]')
-
-    wu.correction_coarse[] = zeros(T,wu.n[])
-    wv.correction_coarse[] = zeros(T,wv.n[])
+    fill_index_map!(wu.index_map, wu.mask)
+    fill_index_map!(wv.index_map, wv.mask)
 
     return model
 end
