@@ -254,3 +254,60 @@ function reconstruct_on_subdomain(initial_conditions::InitialConditions, grid::G
 
 end
 
+# Maps each InitialConditions field to a path on GridField.
+# MPI gather/scatter uses the same list so it won't diverge from a serial run.
+const INITIAL_CONDITION_FIELD_PATHS = (
+    :initial_thickness => (:gh, :h),
+    :initial_grounded_fraction => (:gh, :grounded_fraction),
+    :initial_u_veloc => (:gu, :u),
+    :initial_v_veloc => (:gv, :v),
+    :initial_viscosity => (:g3d, :η),
+    :initial_temperature => (:g3d, :θ),
+    :initial_damage => (:g3d, :Φ),
+    :initial_strain_history => (:g3d, :strain_history),
+    :initial_basal_water_thickness => (:gh, :basal_water_thickness),
+    :initial_hydraulic_potential_b => (:gh, :hydraulic_potential_b),
+    :initial_effective_pressure => (:gh, :effective_pressure),
+    :initial_θ_ave => (:gh, :θ_ave),
+    :initial_preBfactor => (:gh, :preBfactor),
+)
+
+const CHECKPOINT_EXTRA_FIELD_PATHS = ((:gh, :β),)
+const CHECKPOINT_FIELD_PATHS = (map(last, INITIAL_CONDITION_FIELD_PATHS)..., CHECKPOINT_EXTRA_FIELD_PATHS...)
+
+function gridfield_get(fields, path::Tuple)
+    value = fields
+    for name in path
+        value = getproperty(value, name)
+    end
+    return value
+end
+
+"""Copy restart arrays from a `GridField` into an `InitialConditions` object."""
+function initial_conditions_from_fields(fields)
+    kwargs = Pair{Symbol, Any}[name => copy(gridfield_get(fields, path)) for (name, path) in INITIAL_CONDITION_FIELD_PATHS]
+    return InitialConditions(; kwargs...)
+end
+
+"""
+Copy restart arrays from `initial_conditions` into a live `GridField`.
+
+`names` selects which IC fields to copy. A size mismatch is an error, not a skip.
+"""
+function copy_initial_conditions_to_fields!(
+    fields,
+    initial_conditions,
+    names = fieldnames(typeof(initial_conditions)),
+)
+    for (name, path) in INITIAL_CONDITION_FIELD_PATHS
+        name in names || continue
+        src = getfield(initial_conditions, name)
+        dst = gridfield_get(fields, path)
+        if size(src) != size(dst)
+            error("Checkpoint $name has size $(size(src)), live field has $(size(dst))")
+        end
+        dst .= src
+    end
+    return nothing
+end
+

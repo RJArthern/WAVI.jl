@@ -521,13 +521,17 @@ end
 
 Copy each rank's patch from the assembled field on `global_fields` (rank 0).
 
-The full global array is broadcast from rank 0; each rank then indexes its own
-`mpi_global_field_origin` slice.
+The full global array is broadcast from rank 0 in one collective; each rank then
+indexes its own `mpi_global_field_origin` slice (including halo cells).
+
+Both 2D (`nx x ny`) and 3D (`nx x ny x nσ`) fields are handled uniformly by
+normalising to a 3D view before the broadcast and copy. For 2D fields this is a
+zero-copy reshape to `(nx, ny, 1)`.
 """
 function mpi_fill_local_from_global!(
     model::AbstractModel{T,N,S},
     path::Vector{Symbol},
-    local_field::AbstractMatrix,
+    local_field::AbstractArray,
 ) where {T,N,S<:MPISpec}
     @unpack comm, global_fields = model.spec
     path[1] == :global_fields || error("path must start with :global_fields")
@@ -535,10 +539,18 @@ function mpi_fill_local_from_global!(
     for p in path[2:end]
         global_field = getproperty(global_field, p)
     end
+
+    if !(ndims(local_field) in (2, 3))
+        error("mpi_fill_local_from_global! supports 2D or 3D fields only")
+    end
+
+    x_sz, y_sz = size(local_field, 1), size(local_field, 2)
+    local_3d = ndims(local_field) == 2 ? reshape(local_field, x_sz, y_sz, 1) : local_field
+    global_3d = ndims(global_field) == 2 ? reshape(global_field, size(global_field)..., 1) : global_field
+
     MPI.Bcast!(global_field, comm)
     gx0, gy0 = mpi_global_field_origin(model.spec)
-    nx, ny = size(local_field)
-    local_field .= global_field[gx0:(gx0+nx-1), gy0:(gy0+ny-1)]
+    local_3d .= global_3d[gx0:(gx0 + x_sz - 1), gy0:(gy0 + y_sz - 1), :]
     return local_field
 end
 
@@ -605,28 +617,39 @@ function mpi_init_global_core_field!(
     return nothing
 end
 
+"""
+    collect_mpi_field!(model, path)
+
+Gather a 2D or 3D field onto root in a single collective operation.
+
+Both 2D (`nx x ny`) and 3D (`nx x ny x nσ`) fields are handled uniformly by
+normalising to a 3D view before packing. For 2D fields this is a zero-copy
+reshape to `(nx, ny, 1)`; for 3D fields all vertical levels are packed into
+one `Gatherv!` call.
+"""
 function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) where {T,N,S<:MPISpec}
-    @unpack comm, coords, global_fields, global_size, rank = model.spec
+    @unpack comm, global_fields, global_size, rank = model.spec
 
     # Get the full field we want to collect into from the spec, and the equivalent local field on this member
     if path[1] != :global_fields
-        error("$(path) should be referring to a global field, so the first symbol should be global_fields")
+        error("$(path) should be referring to a global field, so the first symbol should be :global_fields")
     end
 
     global_field = global_fields # Not named correctly
     local_field = model.fields
-    for path_el in path[2:end] 
+    for path_el in path[2:end]
         global_field = getproperty(global_field, path_el)
         local_field = getproperty(local_field, path_el)
     end
 
+    if !(ndims(local_field) in (2, 3))
+        error("Field $(join(path, '.')) must be 2D or 3D.")
+    end
+
     # Establish the local grid information, with full grid information available already from global_grid
     th, rh, bh, lh = get_halos(model.spec)
-    # We only handle 2D fields!
-    if length(size(local_field)) != 2
-        error("Trying to exchange a field ",join(string.(path), ".")," that is not 2D, this is not possible")
-    end
-    x_sz, y_sz = size(local_field)
+    x_sz = size(local_field, 1)
+    y_sz = size(local_field, 2)
     x_start, x_end, y_start, y_end = get_bounds(model.spec)
 
     @debug "[$(rank+1)/$(global_size)", join(string.(path), "."), "$((x_sz, y_sz, x_start, x_end, y_start, y_end))"
@@ -649,31 +672,41 @@ function collect_mpi_field!(model::AbstractModel{T,N,S}, path::Vector{Symbol}) w
         ey -= 1
     end
 
+    x_core, y_core = x_sz - lh - rh, y_sz - th - bh
+
+    # Normalise to 3D so all indexing is uniform.
+    local_3d = ndims(local_field) == 2 ? reshape(local_field, x_sz, y_sz, 1) : local_field
+    global_3d = ndims(global_field) == 2 ? reshape(global_field, size(global_field)..., 1) : global_field
+    nσ = size(local_3d, 3)
+
     # Send/Gather the remote copies from the other nodes into the full field.
     # We provide the local core size and positioning in the target global field.
-    field_sz = MPI.Gather(((x_sz - lh - rh, y_sz - th - bh), sx, ex, sy, ey), 0, comm)
-    
+    field_sz = MPI.Gather(((x_core, y_core), sx, ex, sy, ey), 0, comm)
+
+    # Each rank sends its core region (all levels) as one flat buffer.
+    local_core = local_3d[1+lh:end-rh, 1+th:end-bh, :]
+
     if rank == 0
-        # We calculate the global grid coordinates for all ranks 
+        # We calculate the global grid coordinates for all ranks
         # based on the received sizes of their core domain (ie. no halo)
-        count_sizes = map(x -> prod(x[1]), field_sz)
-        field_type = eltype(local_field)
-        recv_data = Vector{field_type}(undef, sum(count_sizes))
-        recv_buffer = MPI.VBuffer(recv_data, count_sizes)
-        @debug "[$(rank+1)/$(global_size) ", join(string.(path), "."), "] Gathering field $((1+lh, size(local_field)[1]-rh, 1+th, size(local_field)[2]-bh)) to buffer $(size(recv_data))"
-        MPI.Gatherv!(local_field[1+lh:end-rh, 1+th:end-bh], recv_buffer, comm)
+        count_sizes = [prod(m[1]) * nσ for m in field_sz]
+        recv_data = Vector{eltype(local_field)}(undef, sum(count_sizes))
+        @debug "[$(rank+1)/$(global_size) ", join(string.(path), "."), "] Gathering field $((1+lh, x_sz-rh, 1+th, y_sz-bh)) to buffer $(size(recv_data))"
+        MPI.Gatherv!(vec(local_core), MPI.VBuffer(recv_data, count_sizes), comm)
 
-        idxer = collect(cumsum(count_sizes))
-
-        for proc_rank in 0:(global_size-1)
+        # Write each rank's patch into the correct location in the global field.
+        idxer = cumsum(count_sizes)
+        for proc_rank in 0:(global_size - 1)
             offset = proc_rank == 0 ? 0 : idxer[proc_rank]
-            proc_data = recv_data[offset+1:offset + count_sizes[proc_rank+1]]
-            sx, ex, sy, ey = field_sz[proc_rank+1][2:end]
-            global_field[sx:ex, sy:ey] = reshape(proc_data, field_sz[proc_rank + 1][1])
+            core_x, core_y = field_sz[proc_rank + 1][1]
+            proc_sx, proc_ex, proc_sy, proc_ey = field_sz[proc_rank + 1][2:end]
+
+            proc_data = recv_data[offset+1:offset+count_sizes[proc_rank+1]]
+            global_3d[proc_sx:proc_ex, proc_sy:proc_ey, :] = reshape(proc_data, core_x, core_y, nσ)
         end
     else
         @debug "[$(rank+1)/$(global_size)] Sending ", join(string.(path), "."), " data"
-        MPI.Gatherv!(local_field[1+lh:end-rh, 1+th:end-bh], nothing, comm)
+        MPI.Gatherv!(vec(local_core), nothing, comm)
     end
 
     MPI.Barrier(comm)

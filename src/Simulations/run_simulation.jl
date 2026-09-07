@@ -126,6 +126,19 @@ end
 run_simulation!(s::Simulation) = run_simulation!(s.model, s.timestepping_params, s.output_params, s.clock)
 
 
+"""
+    last_completed_climate_forcing_clock(clock, timestepping_params)
+
+Clock at the last climate-forcing load that has already run.
+"""
+function last_completed_climate_forcing_clock(clock::Clock, timestepping_params::TimesteppingParams)
+    n_update = timestepping_params.ntimesteps_climate_forcing_update
+    n_iter = clock.n_iter
+    last_n_iter = n_iter == 0 ? 0 : fld(n_iter - 1, n_update) * n_update
+    last_time = clock.time - (n_iter - last_n_iter) * timestepping_params.dt
+    return Clock(n_iter = last_n_iter, time = last_time, ref_time = clock.ref_time)
+end
+
 function update_model_climate_forcing!(model::AbstractModel, clock)
         @unpack shelf_melt_rate, surface_mass_balance, fracture, sliding_law, basal_hydrology, thermo_dynamics, grid = model
 
