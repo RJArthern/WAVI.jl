@@ -79,8 +79,8 @@ function apply_halo_exchange_blends!(
                 (1.0 .- W_left) .* recv_left[:, j_mid] .+ W_left .* L0[1:lh, j_mid]
         end
     end
-    if right > -1 && lh > 0
-        ir = (nx - lh + 1):nx
+    if right > -1 && rh > 0
+        ir = (nx - rh + 1):nx
         if isempty(j_mid)
             local_field[ir, :] .= (1.0 .- W_right) .* recv_right .+ W_right .* L0[ir, :]
         else
@@ -96,8 +96,8 @@ function apply_halo_exchange_blends!(
                 (1.0 .- W_top) .* recv_top[i_mid, :] .+ W_top .* L0[i_mid, 1:th]
         end
     end
-    if bottom > -1 && th > 0
-        jb = (ny - th + 1):ny
+    if bottom > -1 && bh > 0
+        jb = (ny - bh + 1):ny
         if isempty(i_mid)
             local_field[:, jb] .= (1.0 .- W_bottom) .* recv_bottom .+ W_bottom .* L0[:, jb]
         else
@@ -113,26 +113,26 @@ function apply_halo_exchange_blends!(
             local_field[i, j] = (1 - wl) * (1 - wt) * RL + (1 - wl) * wt * RT + wl * L0[i, j]
         end
     end
-    if right > -1 && top > -1 && lh > 0 && th > 0
-        for j in 1:th, i_loc in 1:lh
-            i = nx - lh + i_loc
+    if right > -1 && top > -1 && rh > 0 && th > 0
+        for j in 1:th, i_loc in 1:rh
+            i = nx - rh + i_loc
             wr, wt = W_right[i_loc], W_top[1, j]
             RR, RT = recv_right[i_loc, j], recv_top[i, j]
             local_field[i, j] = (1 - wr) * (1 - wt) * RR + (1 - wr) * wt * RT + wr * L0[i, j]
         end
     end
-    if left > -1 && bottom > -1 && lh > 0 && th > 0
-        for j_loc in 1:th, i in 1:lh
-            j = ny - th + j_loc
+    if left > -1 && bottom > -1 && lh > 0 && bh > 0
+        for j_loc in 1:bh, i in 1:lh
+            j = ny - bh + j_loc
             wl, wb = W_left[i], W_bottom[1, j_loc]
             RL, RB = recv_left[i, j], recv_bottom[i, j_loc]
             local_field[i, j] = (1 - wl) * (1 - wb) * RL + (1 - wl) * wb * RB + wl * L0[i, j]
         end
     end
-    if right > -1 && bottom > -1 && lh > 0 && th > 0
-        for j_loc in 1:th, i_loc in 1:lh
-            i = nx - lh + i_loc
-            j = ny - th + j_loc
+    if right > -1 && bottom > -1 && rh > 0 && bh > 0
+        for j_loc in 1:bh, i_loc in 1:rh
+            i = nx - rh + i_loc
+            j = ny - bh + j_loc
             wr, wb = W_right[i_loc], W_bottom[1, j_loc]
             RR, RB = recv_right[i_loc, j], recv_bottom[i, j_loc]
             local_field[i, j] = (1 - wr) * (1 - wb) * RR + (1 - wr) * wb * RB + wr * L0[i, j]
