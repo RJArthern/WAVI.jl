@@ -3,13 +3,14 @@ module Utilities
 using InplaceOps
 using LinearAlgebra
 using Parameters
+using Interpolations, Contour, ForwardDiff, LinearAlgebra #for the grounding line flux calculation
 
 using WAVI: AbstractModel
 using WAVI.KroneckerProducts
 
 export get_op_fun, get_restrict_fun, get_prolong_fun, pos_fraction, mismip_plus_bed,
     get_glx, glen_b, get_u_mask, get_v_mask, get_c_mask, clip, get_resid, get_resid!, 
-    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ
+    icedraft, height_above_floatation, volume_above_floatation, spI, ∂1d, c, χ, get_gl_flux
 
 #1D Matrix operator utility functions.
 spI(n) = spdiagm(n,n, 0 => ones(n))
@@ -565,4 +566,193 @@ function get_resid!(resid,x,op,b)
     resid .= b .- resid
 end
 
+
+
+
+"""
+    get_gl_normals(grounded_fraction)
+
+Returns normals to the grounding line as two arrays for grid points which are fully grounded (grounded_fraction = 1) but have a point next to them which is not fully grounded. 
+Level defines the level for the contour. 
+"""
+function get_gl_normals(grounded_fraction,u, v, dx, dy, gl_level)
+
+    (nx,ny) = size(grounded_fraction)
+
+    #set up matrices to fill with normal components
+    normals_x = fill(NaN, nx,ny)
+    normals_y = fill(NaN, nx,ny)
+    gl_bool   = falses(nx,ny)
+    
+
+    for ix in 3:(nx-2)
+        for iy = 3:(ny-2)
+            #extract the 5 x 5 sub-square 
+            sub_grounded_fraction = grounded_fraction[ix-2:ix+2,iy-2:iy+2]
+
+            #if the centre is fully grounded and there's a partially or fully ungrounded cell in the subsquare, do the calculation
+            is_gl = (sub_grounded_fraction[3,3] == 1) && any(sub_grounded_fraction[2:4,2:4] .< 1)
+
+            if is_gl
+                gl_bool[ix,iy] = true 
+                normal_x, normal_y = get_gl_normal(sub_grounded_fraction, gl_level, dx, dy)
+                normals_x[ix,iy] = normal_x
+                normals_y[ix,iy] = normal_y
+            end
+
+        end
+    end
+
+    #check that the normals are aligned with the flow direction
+    align_normals_with_velocity!(normals_x, normals_y, gl_bool, u, v)
+
+    return normals_x, normals_y, gl_bool
+
 end
+
+
+"""
+    function align_normals_with_velocity!(normals_x, normals_y, gl_bool, u, v)
+
+Checks that the normals obtained from the contour fit are aligned with the velocity and flips them if they aren't
+"""
+function align_normals_with_velocity!(normals_x, normals_y, gl_bool, u, v)
+    idxs = findall(gl_bool)
+
+    for idx in idxs
+        nx_val = normals_x[idx]
+        ny_val = normals_y[idx]
+        u_val  = u[idx]
+        v_val  = v[idx]
+
+        dotprod = nx_val*u_val + ny_val*v_val
+
+        if dotprod < 0
+            normals_x[idx] = -nx_val
+            normals_y[idx] = -ny_val
+            #print("flipped normal")
+            #print(normals_x[idx]*u_val + normals_y[idx]*v_val)
+        end
+    end
+
+    return nothing
+end
+
+"""
+    function get_gl_normal(sub_grounded_fraction, gl_level, dx, dy)
+
+Get the normal at the centre of the sub_grounded_fraction array. 
+"""
+function get_gl_normal(sub_grounded_fraction, gl_level, dx, dy)
+
+    # Centre of the matrix and some helper co-ordinates
+    cx, cy = 3, 3
+    xs = 1:5
+    ys = 1:5
+
+    # create a cubic spline interpolant
+    sitp = cubic_spline_interpolation((xs, ys), sub_grounded_fraction)
+
+    f(p) = sitp(p[1], p[2])   # scalar field as function of [x, y]
+
+    # Extract the level contour line(s) from the raw grid
+    c = Contour.contour(collect(xs), collect(ys), sub_grounded_fraction, gl_level)
+
+    # Collect all contour points across all lines/segments
+    allpts = Vector{Tuple{Float64,Float64}}()
+    for line in Contour.lines(c)
+        xpts, ypts = Contour.coordinates(line)
+        for (x, y) in zip(xpts, ypts)
+            push!(allpts, (x, y))
+        end
+    end
+
+    @assert !isempty(allpts) "No contour points found at level $level."
+
+    # Find the point closest to the centre
+    dists = [hypot(p[1]-cx, p[2]-cy) for p in allpts]
+    minidx = argmin(dists)
+    x0, y0 = allpts[minidx]
+
+    # Gradient (normal direction) at that point
+    g = ForwardDiff.gradient(f, [x0, y0])
+    g_phys = [g[1] / dx, g[2] / dy] #put into physical space
+    (nx,ny) = g_phys / norm(g_phys)
+
+    return nx, ny
+end
+
+
+"""
+    get_nearest_gl_distance(gl_bool, x, y)
+
+For each true point in gl_bool, find the distance (in physical units) to the nearest other true point.
+x and y are 2D meshgrid-style arrays, same size as gl_bool, giving the physical coordinates of each grid point.
+Returns a matrix the same size as gl_bool, NaN everywhere except at true points.
+"""
+function get_nearest_gl_distance(gl_bool, x, y)
+    idxs = findall(gl_bool)
+    n = length(idxs)
+
+    # physical coordinates of each gl_bool point, read directly from the meshgrid arrays
+    pts = [(x[idx], y[idx]) for idx in idxs]
+
+    dists = fill(NaN, size(gl_bool))
+
+    for k in 1:n
+        px, py = pts[k]
+        mindist = Inf
+        for j in 1:n
+            if j != k
+                qx, qy = pts[j]
+                d = hypot(px - qx, py - qy)
+                if d < mindist
+                    mindist = d
+                end
+            end
+        end
+        dists[idxs[k]] = mindist
+    end
+
+    return dists
+end
+
+"""
+    function get_gl_flux_metressquaredperyear(grounded_fraction,u, v, h, x, y, dx, dy; gl_level = 0.99)  
+
+Return the grounding line flux and grounding line points, in m^2 /yr (i.e. not integrated across the GL)
+"""
+function get_gl_flux_metressquaredperyear(grounded_fraction,u, v, h, x, y, dx, dy; gl_level = 0.99)
+    normals_x, normals_y, gl_bool = get_gl_normals(grounded_fraction, u, v, dx, dy, gl_level) #get the grounding line points and normals
+    gl_flux = (u .* normals_x + v .*  normals_y) .* h .* gl_bool #this is the flux in m^2/yr
+
+    #find the distance to the nearest grid point for distance to integrate over
+    nearest_dist = WAVI.Utilities.get_nearest_gl_distance(gl_bool, x, y)
+
+    gl_flux_m3yr = gl_flux .* nearest_dist #flux in m^3 /yr
+
+    return gl_flux_m3yr
+
+end
+
+
+"""
+    function get_gl_flux_metrescubedperyear(grounded_fraction,u, v, h, x, y, dx, dy; gl_level = 0.99)  
+
+Return the grounding line flux and grounding line points, in m^3 /yr (i.e. integrated across the GL)
+"""
+function get_gl_flux_metressquaredperyear(grounded_fraction,u, v, h, x, y, dx, dy; gl_level = 0.99)
+    #get the non integrated gl flux
+    gl_flux = get_gl_flux_metressquaredperyear(grounded_fraction,u, v, h, x, y, dx, dy; gl_level = gl_level)
+
+    #find the distance to the nearest grid point for distance to integrate over
+    nearest_dist = WAVI.Utilities.get_nearest_gl_distance(gl_bool, x, y)
+
+    gl_flux_m3yr = gl_flux .* nearest_dist #flux in m^3 /yr
+
+    return gl_flux
+
+end
+
+
+end #end module
