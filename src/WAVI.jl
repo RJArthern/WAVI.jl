@@ -133,7 +133,7 @@ using .Fracture
 export ConstantDamage, DruckerPragerPhaseField, ISMIP7Hydrofracture
 
 using .SlidingLaw
-export WeertmanSlidingLaw, CoulombSlidingLaw, BuddSlidingLaw, TsaiSlidingLaw, TsaiBuddSlidingLaw, SchoofSlidingLaw, ZoetIversonSlidingLaw
+export WeertmanSlidingLaw, WeertmanRelaxationSlidingLaw, CoulombSlidingLaw, BuddSlidingLaw, TsaiSlidingLaw, TsaiBuddSlidingLaw, SchoofSlidingLaw, ZoetIversonSlidingLaw
 
 using .BasalHydrology
 export NoHydrology, ConstantBasalWaterThickness, LeakyBucket, SheetOnlyGlaDS

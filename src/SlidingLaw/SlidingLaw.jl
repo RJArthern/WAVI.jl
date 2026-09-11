@@ -14,6 +14,7 @@ using WAVI.Time
 
 #add each of the individual sliding laws
 include("./WeertmanSlidingLaw.jl")
+include("./WeertmanRelaxationSlidingLaw.jl")
 include("./coulomb.jl")
 include("./budd.jl")
 include("./tsai.jl")
