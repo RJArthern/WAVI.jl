@@ -112,9 +112,22 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
     #setup attributes for spatiotemporal variables 
     x_atts, y_atts, time_atts = get_spatiotemporal_var_atts()
 
-    # Get the keys of variables to be written (excluding spatial and time dimensions)
-    filekeys = collect(keys(get_output_as_dict(filenames[1], format)))
-    data_keys = filter(k -> !(k in ["x", "y", "t"]), filekeys)
+    # Load all variables from first snapshot file to inspect their
+    # sizes and types without reading files more than once
+    first_file_vars = get_output_as_dict(filenames[1], format)
+
+    # Keep only data variables, excluding co-ordinate keys (x, y, t)
+    data_keys = filter(k -> !(k in ["x", "y", "t"]), collect(keys(first_file_vars)))
+
+    # Get the size of sigma (vertical) dimension, if any 3D fields are present
+    # Sigma not stored explicitly in snapshot files, so infer from shape of first 3D variable
+    nσ = nothing
+    for k in data_keys
+        if ndims(first_file_vars[k]) == 3
+            nσ = size(first_file_vars[k], 3)
+            break
+        end
+    end
 
     # Remove existing file if it exists
     isfile(nc_name_full) && rm(nc_name_full)
@@ -122,7 +135,8 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
     NCDataset(nc_name_full, "c") do ds
         defDim(ds, "x", length(x))
         defDim(ds, "y", length(y))
-        defDim(ds,"TIME", length(t))
+        defDim(ds, "TIME", length(t))
+        !isnothing(nσ) && defDim(ds, "σ", nσ)
 
         # Define and write coordinate variables
         defVar(ds, "x", x, ("x",), attrib = x_atts)
@@ -130,20 +144,28 @@ function make_ncfile_from_filenames(filenames, format, nc_name_full)
         defVar(ds, "TIME", t, ("TIME",), attrib = time_atts)
 
         for key in data_keys
-            # Get the data from the first file to determine its type and size
-            first_file_data = get_output_as_dict(filenames[1], format)[key]
+            # Use the already-loaded first-file data to check the variable's type and size.
+            first_file_data = first_file_vars[key]
             sz = size(first_file_data)
 
-            if sz == (length(x), length(y))
-                # NetCDF writer does not support Bool directly; store logical fields as UInt8 (0/1).
-                var_type = eltype(first_file_data) <: Bool ? UInt8 : eltype(first_file_data)
-                # Define the variable in the NetCDF file
-                var_nc = defVar(ds, key, var_type, ("x", "y", "TIME"))
+            # NetCDF writer does not support Bool directly; store logical fields as UInt8 (0/1).
+            is_bool = eltype(first_file_data) <: Bool
+            var_type = is_bool ? UInt8 : eltype(first_file_data)
 
+            if sz == (length(x), length(y))
+                # 2D field: dimensions are (x, y, TIME)
+                var_nc = defVar(ds, key, var_type, ("x", "y", "TIME"))
                 # Populate the variable by iterating through filenames
-                for i = 1:length(filenames)
+                for i in 1:length(filenames)
                     data_i = get_output_as_dict(filenames[i], format)[key]
-                    var_nc[:,:,i] = eltype(first_file_data) <: Bool ? UInt8.(data_i) : data_i
+                    var_nc[:, :, i] = is_bool ? UInt8.(data_i) : data_i
+                end
+            elseif !isnothing(nσ) && sz == (length(x), length(y), nσ)
+                # 3D field: dimensions are (x, y, sigma, TIME)
+                var_nc = defVar(ds, key, var_type, ("x", "y", "σ", "TIME"))
+                for i in 1:length(filenames)
+                    data_i = get_output_as_dict(filenames[i], format)[key]
+                    var_nc[:, :, :, i] = is_bool ? UInt8.(data_i) : data_i
                 end
             else
                 @warn string("found an output variable (", key, ") who's spatial dimensions (", sz, ") do not match the co-ordinates. Skipping this variable from the nc output...")

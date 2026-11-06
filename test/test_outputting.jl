@@ -48,10 +48,11 @@ end
 
 #########################################################
 ############### Test flags ##############################
-test_basic_outputting = true
-test_zipping_output   = true
+test_basic_outputting    = true
+test_zipping_output      = true
+test_3d_zipping_output   = true
 test_output_after_restart = true
-test_output_errors = true
+test_output_errors       = true
 ##########################################################
 
 
@@ -194,7 +195,46 @@ test_output_errors = true
         end
     end
 
+    if test_3d_zipping_output
+        @testset "Zipping output with 3D fields" begin
+            @info "Testing NetCDF zipping with mixed 2D and 3D fields..."
+            folder = "outputs_3d/"
+            isdir(folder) && rm(folder, force = true, recursive = true)
+            mkdir(folder)
+
+            nx, ny, nσ, nt = 10, 8, 4, 3
+            x = reshape(1.0:nx, nx, 1) .* ones(1, ny)
+            y = ones(nx, 1) .* reshape(1.0:ny, 1, ny)
+
+            for i in 1:nt
+                d = Dict(
+                    "x" => x,
+                    "y" => y,
+                    "t" => Float64(i),
+                    "h" => rand(nx, ny),        # 2D field
+                    "η" => rand(nx, ny, nσ),    # 3D field
+                )
+                save(string(folder, "outfile", lpad(i, 10, "0"), ".jld2"), d)
+            end
+
+            nc_name = string(folder, "outfile.nc")
+            WAVI.Outputs.make_ncfile("jld2", folder, nc_name, "outfile")
+            @test isfile(nc_name)
+
+            NCDataset(nc_name, "r") do ds
+                @test haskey(ds, "h")
+                @test haskey(ds, "η")
+                @test size(ds["h"]) == (nx, ny, nt)
+                @test size(ds["η"]) == (nx, ny, nσ, nt)
+                @test ds.dim["σ"] == nσ
+            end
+
+            rm(folder, force = true, recursive = true)
+        end
+    end
+
     if test_output_after_restart
+
         @testset "Outputting after a restart" begin 
             @info "Testing outputting after a restart"
             
